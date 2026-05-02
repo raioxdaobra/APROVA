@@ -17,16 +17,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('system');
 
   useEffect(() => {
-    const stored = (typeof window !== 'undefined' &&
-      window.localStorage.getItem(STORAGE_KEY)) as Theme | null;
-    if (stored === 'light' || stored === 'dark' || stored === 'system') {
-      applyTheme(stored);
-      setThemeState(stored);
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
+      if (stored === 'light' || stored === 'dark' || stored === 'system') {
+        applyTheme(stored);
+        setThemeState(stored);
+      }
+    } catch {
+      /* localStorage indisponível — segue com 'system' */
     }
   }, []);
 
   const setTheme = (next: Theme) => {
-    window.localStorage.setItem(STORAGE_KEY, next);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      /* localStorage indisponível */
+    }
     applyTheme(next);
     setThemeState(next);
   };
