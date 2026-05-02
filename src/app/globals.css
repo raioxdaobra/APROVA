@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Cores primárias */
+    --primary: #C4633B;
+    --primary-dark: #A85128;
+    --primary-light: #FDF6F1;
+    --primary-foreground: #FFFFFF;
+
+    /* Neutros stone */
+    --neutral-50: #FAFAF9;
+    --neutral-100: #F5F5F4;
+    --neutral-200: #E7E5E4;
+    --neutral-500: #78716C;
+    --neutral-900: #1C1917;
+
+    /* Semânticas */
+    --success: #15803D;
+    --success-bg: #DCFCE7;
+    --error: #B91C1C;
+    --error-bg: #FEE2E2;
+    --warning: #B45309;
+    --warning-bg: #FEF3C7;
+
+    /* Tema (light) */
+    --page-bg: #FAFAF9;
+    --card-bg: #FFFFFF;
+    --border: #E7E5E4;
+    --text-primary: #1C1917;
+    --text-secondary: #78716C;
+  }
+
+  .dark {
+    /* Tema (dark) — primária e semânticas mantêm; neutros invertem */
+    --page-bg: #0C0A09;
+    --card-bg: #1C1917;
+    --border: #292524;
+    --text-primary: #FAFAF9;
+    --text-secondary: #A8A29E;
+
+    --neutral-50: #0C0A09;
+    --neutral-100: #1C1917;
+    --neutral-200: #292524;
+    --neutral-500: #A8A29E;
+    --neutral-900: #FAFAF9;
+
+    --primary-light: #2A1812;
+    --success-bg: #14271C;
+    --error-bg: #2A1313;
+    --warning-bg: #2A1F0E;
+  }
+
+  /* Aplica modo escuro automaticamente quando o sistema pedir,
+     a menos que o ThemeProvider tenha forçado uma escolha manual via .light/.dark */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --page-bg: #0C0A09;
+      --card-bg: #1C1917;
+      --border: #292524;
+      --text-primary: #FAFAF9;
+      --text-secondary: #A8A29E;
+
+      --neutral-50: #0C0A09;
+      --neutral-100: #1C1917;
+      --neutral-200: #292524;
+      --neutral-500: #A8A29E;
+      --neutral-900: #FAFAF9;
+
+      --primary-light: #2A1812;
+      --success-bg: #14271C;
+      --error-bg: #2A1313;
+      --warning-bg: #2A1F0E;
+    }
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--page-bg);
+    color: var(--text-primary);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Foco visível obrigatório para acessibilidade */
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
