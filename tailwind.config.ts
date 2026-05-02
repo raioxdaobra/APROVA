@@ -29,14 +29,17 @@ const config: Config = {
         success: {
           DEFAULT: 'var(--success)',
           bg: 'var(--success-bg)',
+          foreground: 'var(--success)',
         },
         error: {
           DEFAULT: 'var(--error)',
           bg: 'var(--error-bg)',
+          foreground: 'var(--error)',
         },
         warning: {
           DEFAULT: 'var(--warning)',
           bg: 'var(--warning-bg)',
+          foreground: 'var(--warning)',
         },
         // Acentos de disciplina (chips finos, nunca blocos grandes)
         discipline: {

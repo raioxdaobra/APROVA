@@ -137,22 +137,13 @@ export default function DesignPage() {
       <section className="mt-12">
         <h2 className="text-2xl font-semibold">Feedback semântico</h2>
         <div className="mt-4 grid gap-3">
-          <div
-            className="rounded border border-success bg-success-bg p-3 text-sm"
-            style={{ color: 'var(--success)' }}
-          >
+          <div className="rounded border border-success bg-success-bg p-3 text-sm text-success-foreground">
             Correto! Gabarito: B (+15 XP)
           </div>
-          <div
-            className="rounded border border-error bg-error-bg p-3 text-sm"
-            style={{ color: 'var(--error)' }}
-          >
+          <div className="rounded border border-error bg-error-bg p-3 text-sm text-error-foreground">
             Resposta certa: B. Você marcou D.
           </div>
-          <div
-            className="rounded border border-warning bg-warning-bg p-3 text-sm"
-            style={{ color: 'var(--warning)' }}
-          >
+          <div className="rounded border border-warning bg-warning-bg p-3 text-sm text-warning-foreground">
             Esta questão foi anulada pela banca — pontuação concedida a todos.
           </div>
         </div>
