@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const disciplines = [
-  { name: 'Matemática', color: '#6366F1' },
-  { name: 'Física', color: '#0891B2' },
-  { name: 'Química', color: '#15803D' },
-  { name: 'Biologia', color: '#DC2626' },
-  { name: 'Humanas', color: '#9333EA' },
-  { name: 'Linguagens', color: '#DB2777' },
+  { name: 'Matemática', className: 'bg-discipline-matematica' },
+  { name: 'Física', className: 'bg-discipline-fisica' },
+  { name: 'Química', className: 'bg-discipline-quimica' },
+  { name: 'Biologia', className: 'bg-discipline-biologia' },
+  { name: 'Humanas', className: 'bg-discipline-humanas' },
+  { name: 'Linguagens', className: 'bg-discipline-linguagens' },
 ];
 
 const fontSizes = [
@@ -63,8 +63,7 @@ export default function DesignPage() {
           {disciplines.map((d) => (
             <span
               key={d.name}
-              className="rounded-sm px-3 py-0.5 text-xs font-semibold text-white"
-              style={{ backgroundColor: d.color }}
+              className={`rounded-sm px-3 py-0.5 text-xs font-semibold text-white ${d.className}`}
             >
               {d.name}
             </span>
