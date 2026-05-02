@@ -30,13 +30,16 @@ export default function DesignPage() {
   return (
     <main className="container max-w-4xl py-12">
       <div className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">← Voltar</Link>
+        <Link href="/" className="text-sm text-muted-foreground hover:underline">
+          ← Voltar
+        </Link>
         <ThemeToggle />
       </div>
 
       <h1 className="mt-6 text-3xl font-semibold">Design System</h1>
       <p className="mt-2 text-base text-muted-foreground">
-        Pré-visualização dos tokens definidos em <code className="font-mono text-sm">Design_Tokens_Aprova.md</code>.
+        Pré-visualização dos tokens definidos em{' '}
+        <code className="font-mono text-sm">Design_Tokens_Aprova.md</code>.
       </p>
 
       <section className="mt-12">
@@ -71,7 +74,9 @@ export default function DesignPage() {
 
       <section className="mt-12">
         <h2 className="text-2xl font-semibold">Tipografia</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Inter (sans) · JetBrains Mono (mono) · pesos 400 e 600.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Inter (sans) · JetBrains Mono (mono) · pesos 400 e 600.
+        </p>
         <div className="mt-4 flex flex-col gap-2">
           {fontSizes.map((f) => (
             <div key={f.token} className="flex items-baseline gap-4">
@@ -90,7 +95,9 @@ export default function DesignPage() {
           <Button variant="secondary">Secundário</Button>
           <Button variant="ghost">Ghost</Button>
           <Button variant="destructive">Destrutivo</Button>
-          <Button variant="primary" disabled>Desabilitado</Button>
+          <Button variant="primary" disabled>
+            Desabilitado
+          </Button>
         </div>
       </section>
 
@@ -131,13 +138,22 @@ export default function DesignPage() {
       <section className="mt-12">
         <h2 className="text-2xl font-semibold">Feedback semântico</h2>
         <div className="mt-4 grid gap-3">
-          <div className="rounded border border-success bg-success-bg p-3 text-sm" style={{ color: 'var(--success)' }}>
+          <div
+            className="rounded border border-success bg-success-bg p-3 text-sm"
+            style={{ color: 'var(--success)' }}
+          >
             Correto! Gabarito: B (+15 XP)
           </div>
-          <div className="rounded border border-error bg-error-bg p-3 text-sm" style={{ color: 'var(--error)' }}>
+          <div
+            className="rounded border border-error bg-error-bg p-3 text-sm"
+            style={{ color: 'var(--error)' }}
+          >
             Resposta certa: B. Você marcou D.
           </div>
-          <div className="rounded border border-warning bg-warning-bg p-3 text-sm" style={{ color: 'var(--warning)' }}>
+          <div
+            className="rounded border border-warning bg-warning-bg p-3 text-sm"
+            style={{ color: 'var(--warning)' }}
+          >
             Esta questão foi anulada pela banca — pontuação concedida a todos.
           </div>
         </div>

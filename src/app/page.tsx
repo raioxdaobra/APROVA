@@ -25,8 +25,12 @@ export default function HomePage() {
         </Link>
       </div>
       <footer className="mt-12 flex gap-6 text-xs text-muted-foreground">
-        <Link href="/privacidade" className="hover:underline">Privacidade</Link>
-        <Link href="/termos" className="hover:underline">Termos</Link>
+        <Link href="/privacidade" className="hover:underline">
+          Privacidade
+        </Link>
+        <Link href="/termos" className="hover:underline">
+          Termos
+        </Link>
       </footer>
     </main>
   );

@@ -13,11 +13,17 @@ export function ThemeToggle() {
     return 'system';
   })();
 
-  const icon = theme === 'light' ? <Sun size={18} /> : theme === 'dark' ? <Moon size={18} /> : <Monitor size={18} />;
+  const icon =
+    theme === 'light' ? <Sun size={18} /> : theme === 'dark' ? <Moon size={18} /> : <Monitor size={18} />;
   const label = theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Sistema';
 
   return (
-    <Button variant="secondary" size="sm" onClick={() => setTheme(next)} aria-label={`Tema atual: ${label}. Trocar.`}>
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => setTheme(next)}
+      aria-label={`Tema atual: ${label}. Trocar.`}
+    >
       <span className="mr-2">{icon}</span>
       {label}
     </Button>
