@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { HelpPanel } from '@/components/help-panel';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import {
@@ -383,6 +384,15 @@ export function QuizRunner({
             ? `Correto! Gabarito: ${correctLetter}`
             : `Resposta certa: ${correctLetter}. Você marcou ${currentAnswer.selected}.`}
         </div>
+      ) : null}
+
+      {currentAnswer.selected !== null ? (
+        <HelpPanel
+          key={current.id}
+          questionId={current.id}
+          discipline={current.discipline}
+          subtopic={current.subtopic}
+        />
       ) : null}
 
       {errorMsg ? (
