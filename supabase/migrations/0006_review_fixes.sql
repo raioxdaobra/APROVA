@@ -4,10 +4,11 @@
 -- FIX 1 — Helpers de timezone (America/Fortaleza) e uso nos triggers/funcoes.
 -- FIX 2 — Cap diario 2.000 XP atomico via tabela daily_xp + SELECT FOR UPDATE.
 -- FIX 3 — Fecha leak de RLS em weekly_leaderboard via SECURITY DEFINER.
+-- FIX 4 — Threshold de dominio: aceita subtopicos com menos de 6 questoes.
 --
 -- Migrations sao append-only: nao editamos 0001-0005, apenas criamos 0006+.
--- Demais fixes do review (threshold dominio, annulled, indexes, CHECK
--- constraints) serao adicionados a este arquivo nos proximos commits.
+-- Demais fixes do review (annulled, indexes, CHECK constraints) serao
+-- adicionados a este arquivo nos proximos commits.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -373,3 +374,133 @@ comment on view public.weekly_leaderboard is
   'Ranking semanal publico via fn_weekly_leaderboard (SECURITY DEFINER). Expoe apenas colunas seguras; nunca email, id ou created_at.';
 
 grant select on public.weekly_leaderboard to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- FIX 4 — Threshold de dominio adaptado a subtopicos pequenos
+-- -----------------------------------------------------------------------------
+-- Antes: o codigo exigia >= 6 attempts no subtopico para conceder o bonus,
+-- mas alguns subtopicos tem menos de 6 questoes no banco -- nesse caso o
+-- bonus nunca seria concedido. Agora calculamos
+--   v_threshold = least(6, total_de_questoes_validas_no_subtopico)
+-- e exigimos v_attempts_in_subtopic >= v_threshold (com v_threshold > 0
+-- para nao conceder em subtopicos vazios).
+create or replace function public.fn_update_weekly_xp_on_attempt()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := new.user_id;
+  v_today date := public.aprova_today();
+  v_week_start date;
+  v_repeated_count int;
+  v_subtopic text;
+  v_discipline text;
+  v_attempts_in_subtopic int;
+  v_correct_in_subtopic int;
+  v_already_mastered boolean;
+  v_threshold int;
+  v_xp_to_add int;
+  v_xp_today int;
+  v_xp_remaining int;
+  v_xp_actual int;
+  v_bonus int := 0;
+begin
+  if new.answer is null or new.is_correct is null then
+    return new;
+  end if;
+  if new.time_spent_sec is null or new.time_spent_sec < 2 then
+    return new;
+  end if;
+
+  select count(*) into v_repeated_count
+  from (
+    select answer
+    from public.attempts
+    where user_id = v_user
+      and id <> new.id
+    order by created_at desc, id desc
+    limit 29
+  ) recent
+  where recent.answer = new.answer;
+
+  if v_repeated_count >= 29 then
+    return new;
+  end if;
+
+  v_xp_to_add := 10 + case when new.is_correct then 5 else 0 end;
+
+  select q.subtopic, q.discipline
+    into v_subtopic, v_discipline
+  from public.questions q
+  where q.id = new.question_id;
+
+  if v_subtopic is not null then
+    select exists(
+      select 1 from public.subtopic_mastery
+      where user_id = v_user
+        and discipline = v_discipline
+        and subtopic = v_subtopic
+    ) into v_already_mastered;
+
+    if not v_already_mastered then
+      select count(*),
+             count(*) filter (where a.is_correct)
+        into v_attempts_in_subtopic, v_correct_in_subtopic
+      from public.attempts a
+      join public.questions q on q.id = a.question_id
+      where a.user_id = v_user
+        and q.subtopic = v_subtopic
+        and q.discipline = v_discipline
+        and a.answer is not null
+        and a.is_correct is not null;
+
+      v_threshold := least(6, (
+        select count(*) from public.questions
+        where discipline = v_discipline
+          and subtopic = v_subtopic
+      ));
+
+      if v_threshold > 0
+         and v_attempts_in_subtopic >= v_threshold
+         and v_correct_in_subtopic::numeric / v_attempts_in_subtopic >= 0.75 then
+        insert into public.subtopic_mastery (user_id, discipline, subtopic, granted_at)
+        values (v_user, v_discipline, v_subtopic, now())
+        on conflict (user_id, discipline, subtopic) do nothing;
+        v_bonus := 200;
+      end if;
+    end if;
+  end if;
+
+  v_xp_to_add := v_xp_to_add + v_bonus;
+
+  insert into public.daily_xp (user_id, day, xp)
+  values (v_user, v_today, 0)
+  on conflict (user_id, day) do nothing;
+
+  select xp into v_xp_today
+  from public.daily_xp
+  where user_id = v_user and day = v_today
+  for update;
+
+  v_xp_remaining := greatest(0, 2000 - v_xp_today);
+  v_xp_actual := least(v_xp_to_add, v_xp_remaining);
+
+  if v_xp_actual > 0 then
+    update public.daily_xp
+       set xp = xp + v_xp_actual
+     where user_id = v_user and day = v_today;
+  end if;
+
+  v_week_start := public.aprova_week_start(v_today);
+
+  insert into public.weekly_xp (user_id, week_start, xp, questions_answered)
+  values (v_user, v_week_start, v_xp_actual, 1)
+  on conflict (user_id, week_start) do update
+    set xp = public.weekly_xp.xp + excluded.xp,
+        questions_answered = public.weekly_xp.questions_answered + 1;
+
+  return new;
+end;
+$$;
