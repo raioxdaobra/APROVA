@@ -6,10 +6,13 @@
 -- FIX 3 — Fecha leak de RLS em weekly_leaderboard via SECURITY DEFINER.
 -- FIX 4 — Threshold de dominio: aceita subtopicos com menos de 6 questoes.
 -- FIX 5 — Filtra questions.annulled na contagem de dominio.
+-- FIX 6 — Index em simulado_bonuses(user_id).
+-- FIX 8 — CHECK em questions.discipline (whitelist de disciplinas).
+-- FIX 9 — CHECK xp >= 0 e questions_answered >= 0 em weekly_xp.
+--
+-- (FIX 7 fica fora deste arquivo — aplicado em src/lib/supabase/server.ts.)
 --
 -- Migrations sao append-only: nao editamos 0001-0005, apenas criamos 0006+.
--- Demais fixes do review (indexes, CHECK constraints) serao adicionados
--- a este arquivo nos proximos commits.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -642,3 +645,21 @@ $$;
 -- como "quantos bonus de simulado o usuario X recebeu" varriam a tabela.
 create index if not exists idx_simulado_bonuses_user
   on public.simulado_bonuses (user_id);
+
+-- -----------------------------------------------------------------------------
+-- FIX 8 — CHECK constraint em questions.discipline
+-- -----------------------------------------------------------------------------
+-- Como migrations sao append-only, adicionamos a constraint via ALTER TABLE.
+-- A migration falha se a constraint ja existir (semantica intencional: schema
+-- changes nao sao idempotentes; quem reaplica este 0006 sabe que a alteracao
+-- ja foi feita).
+alter table public.questions
+  add constraint questions_discipline_valid
+  check (discipline in ('matematica','fisica','quimica','biologia','humanas','linguagens'));
+
+-- -----------------------------------------------------------------------------
+-- FIX 9 — CHECK xp >= 0 e questions_answered >= 0 em weekly_xp
+-- -----------------------------------------------------------------------------
+alter table public.weekly_xp
+  add constraint weekly_xp_xp_nonneg check (xp >= 0),
+  add constraint weekly_xp_questions_nonneg check (questions_answered >= 0);
