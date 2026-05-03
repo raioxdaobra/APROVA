@@ -12,6 +12,7 @@ import { FavoriteDisciplineForm } from './forms/favorite-discipline-form';
 import { PrivacyForm } from './forms/privacy-form';
 import { DeleteAccountSection } from './forms/delete-account-section';
 import { SignOutForm } from './forms/sign-out-form';
+import { SoundToggle } from '@/components/sound-toggle';
 
 export const metadata = {
   title: 'Configurações — APROVA',
@@ -89,6 +90,16 @@ export default async function ConfiguracoesPage() {
             <CardDescription>Controle o que aparece para os outros.</CardDescription>
           </div>
           <PrivacyForm initial={leaderboardPublic} />
+        </Card>
+
+        <Card className="flex flex-col gap-5">
+          <div>
+            <CardTitle>Som</CardTitle>
+            <CardDescription>
+              Efeitos sonoros para acerto, erro, badge desbloqueado e level-up.
+            </CardDescription>
+          </div>
+          <SoundToggle />
         </Card>
 
         <Card className="flex flex-col gap-3">

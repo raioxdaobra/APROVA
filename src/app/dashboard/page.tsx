@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
+import { RankBadge } from '@/components/rank-badge';
+import { DailyMissionsCard } from '@/components/daily-missions-card';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -130,7 +132,7 @@ export default async function DashboardPage() {
       .gte('created_at', `${sevenDaysAgoIso}T00:00:00-03:00`),
     supabase
       .from('weekly_xp')
-      .select('questions_answered')
+      .select('questions_answered, xp')
       .eq('user_id', user.id)
       .eq('week_start', weekStartIso)
       .maybeSingle(),
@@ -169,6 +171,7 @@ export default async function DashboardPage() {
   const attemptsToday = attemptsTodayRes.count ?? 0;
   const attempts7d = attempts7dRes.data ?? [];
   const weeklyAnswered = weeklyXpRes.data?.questions_answered ?? 0;
+  const weeklyXpVal = weeklyXpRes.data?.xp ?? 0;
   const weeklyGoal = dailyGoal * 7;
   const pendingWrongs = pendingWrongsRes.count ?? 0;
 
@@ -242,6 +245,7 @@ export default async function DashboardPage() {
                 ? `Hoje você já fez ${attemptsToday} ${attemptsToday === 1 ? 'questão' : 'questões'}`
                 : 'Hoje você ainda não estudou'}
             </p>
+            <RankBadge xp={weeklyXpVal} />
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -254,6 +258,8 @@ export default async function DashboardPage() {
         <Button asChild size="lg" className="w-full">
           <Link href={primaryCta.href}>{primaryCta.label}</Link>
         </Button>
+
+        <DailyMissionsCard />
 
         <section aria-label="Modos de estudo" className="-mx-4 px-4">
           <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">

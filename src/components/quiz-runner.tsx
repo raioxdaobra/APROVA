@@ -13,6 +13,11 @@ import {
   submitAttempt,
   toggleReviewStatus,
 } from '@/app/quiz/actions';
+import { evaluateAfterAttemptAction } from '@/app/quiz/gamification-actions';
+import { getAudioPlayer } from '@/lib/audio/player';
+import { rankFromXp } from '@/lib/achievements/ranks';
+import { showAchievementToast } from '@/components/achievement-toast';
+import { RankUpModal } from '@/components/rank-up-modal';
 import type { AnswerLetter, Discipline } from '@/lib/supabase/types';
 
 export interface QuizQuestion {
@@ -76,10 +81,12 @@ export function QuizRunner({
   sessionId,
   questions,
   initialReviewMarked,
+  initialWeeklyXp = 0,
 }: {
   sessionId: string;
   questions: QuizQuestion[];
   initialReviewMarked: Record<string, boolean>;
+  initialWeeklyXp?: number;
 }) {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -93,6 +100,9 @@ export function QuizRunner({
   const [xpToast, setXpToast] = useState<number | null>(null);
   const [finishing, startFinishTransition] = useTransition();
   const [, startReviewTransition] = useTransition();
+  const [weeklyXp, setWeeklyXp] = useState<number>(initialWeeklyXp);
+  const [rankUpOpen, setRankUpOpen] = useState(false);
+  const lastRankIdRef = useRef<string>(rankFromXp(initialWeeklyXp).id);
 
   const startedAtRef = useRef<number>(Date.now());
 
@@ -211,6 +221,15 @@ export function QuizRunner({
         navigator.vibrate(50);
       }
 
+      // Som — acerto/erro (respeita prefers-reduced-motion + localStorage)
+      try {
+        if (!res.annulled) {
+          getAudioPlayer().play(res.is_correct ? 'correct' : 'wrong');
+        }
+      } catch {
+        /* noop */
+      }
+
       // XP indicativo (10 base + 5 por acerto). DB calcula o real via trigger.
       const xp = res.is_correct ? 15 : 10;
       setXpToast(xp);
@@ -220,6 +239,31 @@ export function QuizRunner({
         is_correct: res.is_correct,
         time_spent_sec: elapsed,
         annulled: res.annulled,
+      });
+
+      // Gamificação: avalia badges + missões + atualiza XP semanal.
+      // Fail-soft — se algo der errado, não bloqueia o fluxo.
+      void evaluateAfterAttemptAction({
+        question_id: current.id,
+        is_correct: res.is_correct,
+        discipline: current.discipline,
+      }).then((g) => {
+        if (g.badges.length > 0) {
+          try {
+            getAudioPlayer().play('badge');
+          } catch {
+            /* noop */
+          }
+          showAchievementToast(g.badges);
+        }
+        if (typeof g.weeklyXp === 'number' && g.weeklyXp >= 0) {
+          setWeeklyXp(g.weeklyXp);
+          const newRankId = rankFromXp(g.weeklyXp).id;
+          if (newRankId !== lastRankIdRef.current) {
+            lastRankIdRef.current = newRankId;
+            setRankUpOpen(true);
+          }
+        }
       });
     });
   };
@@ -445,6 +489,12 @@ export function QuizRunner({
           +{xpToast} XP
         </div>
       ) : null}
+
+      <RankUpModal
+        open={rankUpOpen}
+        xp={weeklyXp}
+        onClose={() => setRankUpOpen(false)}
+      />
     </>
   );
 }
