@@ -1,12 +1,12 @@
 -- =============================================================================
 -- Migration 0006 — Fixes do code review (PR 2)
 -- =============================================================================
--- FIX 1 — Helpers de timezone (America/Fortaleza) e uso nos triggers e funcoes.
+-- FIX 1 — Helpers de timezone (America/Fortaleza) e uso nos triggers/funcoes.
+-- FIX 2 — Cap diario 2.000 XP atomico via tabela daily_xp + SELECT FOR UPDATE.
 --
 -- Migrations sao append-only: nao editamos 0001-0005, apenas criamos 0006+.
--- Demais fixes do review (cap diario atomico, RLS leak, threshold dominio,
--- annulled, indexes, CHECK constraints) serao adicionados a este arquivo nos
--- proximos commits.
+-- Demais fixes do review (RLS leak, threshold dominio, annulled, indexes,
+-- CHECK constraints) serao adicionados a este arquivo nos proximos commits.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -25,6 +25,28 @@ stable
 as $$
   select (date_trunc('week', coalesce(d, public.aprova_today())))::date
 $$;
+
+-- -----------------------------------------------------------------------------
+-- FIX 2.a — Tabela daily_xp para cap diario atomico
+-- -----------------------------------------------------------------------------
+-- Antes: somava XP do dia recalculando attempts em cada trigger -> race
+-- condition. Agora: linha por (user, day) atualizada com SELECT FOR UPDATE
+-- garante que o teto de 2.000 XP seja respeitado mesmo sob concorrencia.
+create table if not exists public.daily_xp (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  day date not null,
+  xp int not null default 0 check (xp >= 0),
+  primary key (user_id, day)
+);
+
+alter table public.daily_xp enable row level security;
+drop policy if exists daily_xp_select_own on public.daily_xp;
+create policy daily_xp_select_own on public.daily_xp
+  for select to authenticated
+  using (auth.uid() = user_id);
+
+-- Nenhuma policy de INSERT/UPDATE: a tabela e gravada apenas pelo trigger
+-- SECURITY DEFINER fn_update_weekly_xp_on_attempt.
 
 -- -----------------------------------------------------------------------------
 -- FIX 1.b — update_streak_on_attempt usando aprova_today()
@@ -81,10 +103,14 @@ end;
 $$;
 
 -- -----------------------------------------------------------------------------
--- FIX 1.c — update_weekly_xp_on_attempt usando aprova_today()/aprova_week_start()
--- (sem mudancas adicionais neste commit; cap atomico, threshold dominio e
--- filtro annulled virao em commits subsequentes do mesmo arquivo)
+-- FIX 2.b — update_weekly_xp_on_attempt com cap diario atomico (daily_xp)
 -- -----------------------------------------------------------------------------
+-- Mudancas:
+--   * Inserir linha em daily_xp (idempotente) e fazer SELECT ... FOR UPDATE
+--     para ler o XP do dia sob lock de linha.
+--   * Calcular v_xp_actual = least(v_xp_to_add, 2000 - daily_xp.xp).
+--   * Persistir em daily_xp e weekly_xp na mesma transacao.
+--   * Bonus de dominio (200 XP) tambem passa pelo mesmo cap atomico.
 create or replace function public.fn_update_weekly_xp_on_attempt()
 returns trigger
 language plpgsql
@@ -92,16 +118,20 @@ security definer
 set search_path = public
 as $$
 declare
-  v_xp_gained int;
-  v_week_start date;
+  v_user uuid := new.user_id;
   v_today date := public.aprova_today();
-  v_xp_today int;
+  v_week_start date;
   v_repeated_count int;
   v_subtopic text;
   v_discipline text;
   v_attempts_in_subtopic int;
   v_correct_in_subtopic int;
   v_already_mastered boolean;
+  v_xp_to_add int;
+  v_xp_today int;
+  v_xp_remaining int;
+  v_xp_actual int;
+  v_bonus int := 0;
 begin
   if new.answer is null or new.is_correct is null then
     return new;
@@ -110,11 +140,12 @@ begin
     return new;
   end if;
 
+  -- Anti-cheat de sequencia: 30 attempts identicas em sequencia => zero XP.
   select count(*) into v_repeated_count
   from (
     select answer
     from public.attempts
-    where user_id = new.user_id
+    where user_id = v_user
       and id <> new.id
     order by created_at desc, id desc
     limit 29
@@ -125,27 +156,10 @@ begin
     return new;
   end if;
 
-  v_xp_gained := 10 + case when new.is_correct then 5 else 0 end;
+  -- XP base do attempt (10 base + 5 acerto)
+  v_xp_to_add := 10 + case when new.is_correct then 5 else 0 end;
 
-  select coalesce(
-           sum(10 + case when a.is_correct then 5 else 0 end),
-           0
-         )
-    into v_xp_today
-  from public.attempts a
-  where a.user_id = new.user_id
-    and a.id <> new.id
-    and a.answer is not null
-    and a.is_correct is not null
-    and a.time_spent_sec >= 2
-    and (timezone('America/Fortaleza', a.created_at))::date = v_today;
-
-  if v_xp_today >= 2000 then
-    v_xp_gained := 0;
-  elsif v_xp_today + v_xp_gained > 2000 then
-    v_xp_gained := 2000 - v_xp_today;
-  end if;
-
+  -- Bonus de dominio de subtopico (200 XP, unico por subtopico)
   select q.subtopic, q.discipline
     into v_subtopic, v_discipline
   from public.questions q
@@ -154,7 +168,7 @@ begin
   if v_subtopic is not null then
     select exists(
       select 1 from public.subtopic_mastery
-      where user_id = new.user_id
+      where user_id = v_user
         and discipline = v_discipline
         and subtopic = v_subtopic
     ) into v_already_mastered;
@@ -165,7 +179,7 @@ begin
         into v_attempts_in_subtopic, v_correct_in_subtopic
       from public.attempts a
       join public.questions q on q.id = a.question_id
-      where a.user_id = new.user_id
+      where a.user_id = v_user
         and q.subtopic = v_subtopic
         and q.discipline = v_discipline
         and a.answer is not null
@@ -174,20 +188,40 @@ begin
       if v_attempts_in_subtopic >= 6
          and v_correct_in_subtopic::numeric / v_attempts_in_subtopic >= 0.75 then
         insert into public.subtopic_mastery (user_id, discipline, subtopic, granted_at)
-        values (new.user_id, v_discipline, v_subtopic, now())
+        values (v_user, v_discipline, v_subtopic, now())
         on conflict (user_id, discipline, subtopic) do nothing;
-
-        if v_xp_today + v_xp_gained < 2000 then
-          v_xp_gained := least(v_xp_gained + 200, 2000 - v_xp_today);
-        end if;
+        v_bonus := 200;
       end if;
     end if;
   end if;
 
+  v_xp_to_add := v_xp_to_add + v_bonus;
+
+  -- Cap diario atomico: garante a linha em daily_xp e trava-a com FOR UPDATE.
+  insert into public.daily_xp (user_id, day, xp)
+  values (v_user, v_today, 0)
+  on conflict (user_id, day) do nothing;
+
+  select xp into v_xp_today
+  from public.daily_xp
+  where user_id = v_user and day = v_today
+  for update;
+
+  v_xp_remaining := greatest(0, 2000 - v_xp_today);
+  v_xp_actual := least(v_xp_to_add, v_xp_remaining);
+
+  if v_xp_actual > 0 then
+    update public.daily_xp
+       set xp = xp + v_xp_actual
+     where user_id = v_user and day = v_today;
+  end if;
+
+  -- Persistir em weekly_xp (sempre incrementa questions_answered, mesmo se
+  -- o XP foi capado a zero, para coerencia com o significado do contador).
   v_week_start := public.aprova_week_start(v_today);
 
   insert into public.weekly_xp (user_id, week_start, xp, questions_answered)
-  values (new.user_id, v_week_start, v_xp_gained, 1)
+  values (v_user, v_week_start, v_xp_actual, 1)
   on conflict (user_id, week_start) do update
     set xp = public.weekly_xp.xp + excluded.xp,
         questions_answered = public.weekly_xp.questions_answered + 1;
