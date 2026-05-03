@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { AnalyticsProvider } from '@/components/analytics-provider';
 import { AuthProvider } from '@/components/auth-provider';
+import { ServiceWorkerRegister } from '@/components/sw-register';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { inter, jetbrainsMono } from '@/lib/fonts';
@@ -13,6 +14,15 @@ export const metadata: Metadata = {
   description:
     'Resolva mais de 1.000 questões. 20 anos de vestibular Unifor Medicina, organizadas por matéria.',
   applicationName: 'APROVA',
+  appleWebApp: {
+    capable: true,
+    title: 'APROVA',
+    statusBarStyle: 'default',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icons/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {
@@ -46,6 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Suspense fallback={null}>
           <AnalyticsProvider />
         </Suspense>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

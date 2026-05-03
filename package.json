@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "check:supabase": "tsx scripts/check-supabase-env.ts",
     "db:push": "tsx scripts/apply-migrations.ts",
-    "db:seed": "tsx scripts/seed-questions.ts"
+    "db:seed": "tsx scripts/seed-questions.ts",
+    "icons": "tsx scripts/generate-pwa-icons.ts"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16",

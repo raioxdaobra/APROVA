@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { InstallPrompt } from '@/components/install-prompt';
 import { OAuthErrorToast } from '@/components/oauth-error-toast';
 import { signInWithGoogle } from '@/app/(auth-actions)/google';
 
@@ -53,6 +54,8 @@ export default function HomePage() {
           </Link>
         </div>
       </footer>
+
+      <InstallPrompt />
     </main>
   );
 }

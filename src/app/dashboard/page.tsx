@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { InstallPrompt } from '@/components/install-prompt';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { createClient } from '@/lib/supabase/server';
@@ -86,6 +87,8 @@ export default async function DashboardPage() {
           Termos
         </Link>
       </footer>
+
+      <InstallPrompt />
     </div>
   );
 }
