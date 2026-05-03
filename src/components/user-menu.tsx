@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ function initialOf(name: string): string {
 
 export function UserMenu({ displayName }: { displayName: string }) {
   const initial = initialOf(displayName);
+  const logoutFormRef = useRef<HTMLFormElement>(null);
 
   return (
     <DropdownMenu>
@@ -31,20 +33,34 @@ export function UserMenu({ displayName }: { displayName: string }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[12rem]">
         <DropdownMenuItem asChild>
+          <Link href="/estatisticas" className="w-full cursor-pointer">
+            Estatísticas
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/ranking" className="w-full cursor-pointer">
+            Ranking
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
           <Link href="/configuracoes" className="w-full cursor-pointer">
             Configurações
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <form action={logout} className="w-full">
-            <button
-              type="submit"
-              className="w-full cursor-pointer text-left outline-none"
-            >
-              Sair
-            </button>
-          </form>
+        {/* Form fora do Item: o item dispara requestSubmit via onSelect.
+            Aninhar form dentro de Radix.Item com asChild faz o onSelect
+            fechar o menu antes do submit propagar — quebra o logout. */}
+        <form ref={logoutFormRef} action={logout} className="hidden" />
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            logoutFormRef.current?.requestSubmit();
+          }}
+          className="cursor-pointer"
+        >
+          Sair
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -205,10 +205,10 @@ export default async function DashboardPage() {
     const sid = lastAttempt.session_id;
     const href =
       ctx === 'simulado'
-        ? `/simulado/${sid}`
+        ? `/simulado/sessao/${sid}`
         : ctx === 'revisao' || ctx === 'review'
-          ? `/quiz/${sid}?modo=revisao`
-          : `/quiz/${sid}`;
+          ? `/quiz/sessao/${sid}?modo=revisao`
+          : `/quiz/sessao/${sid}`;
     primaryCta = { label: 'Continuar de onde parou', href };
   } else {
     primaryCta = { label: 'Começar a estudar', href: '/quiz' };

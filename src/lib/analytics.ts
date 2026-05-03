@@ -35,6 +35,10 @@ async function ensureInit(): Promise<void> {
       autocapture: false,
       persistence: 'localStorage+cookie',
       person_profiles: 'identified_only',
+      // Feature flags exigem configuração extra do projeto PostHog. Sem isso,
+      // a chamada /flags retorna 401 e polui o console — desligamos por enquanto.
+      advanced_disable_feature_flags: true,
+      advanced_disable_feature_flags_on_first_load: true,
     });
     posthog = mod.default;
   })();
