@@ -1,9 +1,19 @@
 /**
  * Cliente Supabase para uso em Server Components, Route Handlers e Server
- * Actions do Next.js. Lê e escreve cookies via API do Next 14+.
+ * Actions do Next.js.
  *
- * Em Server Components puros, `cookies().set()` lança — encapsulamos com
- * try/catch para tornar essa diferença transparente.
+ * No Next 15 `cookies()` torna-se async; ja marcamos esta funcao como `async`
+ * e usamos `await cookies()` para forward-compat. No Next 14, `await` em um
+ * valor sincrono e no-op, entao continua funcionando.
+ *
+ * O nome do export e `createClient`, alinhado a documentacao do Supabase
+ * (https://supabase.com/docs/guides/auth/server-side/nextjs). Nao colide com
+ * o `createClient` do `src/lib/supabase/client.ts` porque os imports usam
+ * paths distintos.
+ *
+ * Em Server Components puros, `cookieStore.set()` lanca — encapsulamos com
+ * try/catch para manter a leitura de sessao funcional; o middleware cuida
+ * do refresh dos cookies.
  */
 import { cookies } from 'next/headers';
 import { createServerClient as createSupabaseServerClient, type CookieOptions } from '@supabase/ssr';
@@ -20,8 +30,8 @@ function getEnv(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KE
   return value;
 }
 
-export function createServerClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createSupabaseServerClient<Database>(
     getEnv('NEXT_PUBLIC_SUPABASE_URL'),
