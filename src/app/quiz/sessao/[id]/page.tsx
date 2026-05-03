@@ -85,12 +85,37 @@ export default async function QuizSessionPage({ params }: PageProps) {
     }
   }
 
+  // XP semanal inicial — para detectar rank-up no client.
+  const TZ = 'America/Fortaleza';
+  const todayIso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const [yy, mm, dd] = todayIso.split('-').map(Number);
+  let weekStartIso = todayIso;
+  if (yy && mm && dd) {
+    const utc = new Date(Date.UTC(yy, mm - 1, dd));
+    const dow = utc.getUTCDay();
+    utc.setUTCDate(utc.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
+    weekStartIso = utc.toISOString().slice(0, 10);
+  }
+  const { data: weeklyXpRow } = await supabase
+    .from('weekly_xp')
+    .select('xp')
+    .eq('user_id', user.id)
+    .eq('week_start', weekStartIso)
+    .maybeSingle();
+  const initialWeeklyXp = weeklyXpRow?.xp ?? 0;
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6">
       <QuizRunner
         sessionId={session.id}
         questions={ordered}
         initialReviewMarked={initialReviewMarked}
+        initialWeeklyXp={initialWeeklyXp}
       />
     </main>
   );
