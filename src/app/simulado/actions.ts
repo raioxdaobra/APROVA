@@ -1,0 +1,283 @@
+'use server';
+
+import { redirect } from 'next/navigation';
+import { z } from 'zod';
+import { createClient } from '@/lib/supabase/server';
+import type { AnswerLetter, Discipline, Json } from '@/lib/supabase/types';
+import { SIMULADO_DISCIPLINE_OPTIONS } from './config';
+
+const startSchema = z.object({
+  total: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(90)]),
+  time_limit_min: z.union([
+    z.literal(45),
+    z.literal(90),
+    z.literal(180),
+    z.literal(240),
+  ]),
+  discipline: z.enum(SIMULADO_DISCIPLINE_OPTIONS),
+});
+
+export type StartSimuladoInput = z.infer<typeof startSchema>;
+
+// Proporção quando "todas". Soma = 1.0 (mat 0.375, hum 0.25, bio/fis/qui 0.125 cada).
+const PROPORTIONS: Array<{ discipline: Discipline; weight: number }> = [
+  { discipline: 'matematica', weight: 0.375 },
+  { discipline: 'humanas', weight: 0.25 },
+  { discipline: 'biologia', weight: 0.125 },
+  { discipline: 'fisica', weight: 0.125 },
+  { discipline: 'quimica', weight: 0.125 },
+];
+
+function distributeProportional(total: number): Map<Discipline, number> {
+  // Aloca pisos pela proporção e distribui o restante para as maiores frações.
+  const items = PROPORTIONS.map((p) => {
+    const exact = total * p.weight;
+    return { discipline: p.discipline, exact, floor: Math.floor(exact) };
+  });
+  let allocated = items.reduce((s, it) => s + it.floor, 0);
+  let remaining = total - allocated;
+  // Ordena por maior fração — quem mais "merece" um arredondamento pra cima.
+  const byFraction = [...items].sort(
+    (a, b) => b.exact - b.floor - (a.exact - a.floor),
+  );
+  const result = new Map<Discipline, number>();
+  for (const it of items) result.set(it.discipline, it.floor);
+  let idx = 0;
+  while (remaining > 0 && idx < byFraction.length) {
+    const item = byFraction[idx];
+    if (item) {
+      result.set(item.discipline, (result.get(item.discipline) ?? 0) + 1);
+      remaining -= 1;
+    }
+    idx += 1;
+  }
+  return result;
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = out[i] as T;
+    out[i] = out[j] as T;
+    out[j] = tmp;
+  }
+  return out;
+}
+
+type SamplePool = { id: string; discipline: string };
+
+async function pickRandomFromDiscipline(
+  pool: SamplePool[],
+  discipline: Discipline,
+  n: number,
+): Promise<string[]> {
+  const subset = pool.filter((q) => q.discipline === discipline);
+  return shuffle(subset).slice(0, n).map((q) => q.id);
+}
+
+export async function startSimulado(input: StartSimuladoInput): Promise<void> {
+  const parsed = startSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error('Configuração inválida do simulado.');
+  }
+  const { total, time_limit_min, discipline } = parsed.data;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/');
+  }
+
+  // Carrega pool de questões não anuladas (apenas id + discipline).
+  let poolQuery = supabase
+    .from('questions')
+    .select('id, discipline')
+    .or('annulled.is.null,annulled.eq.false');
+  if (discipline !== 'todas') {
+    poolQuery = poolQuery.eq('discipline', discipline);
+  }
+  const { data: pool, error: poolErr } = await poolQuery;
+  if (poolErr || !pool || pool.length === 0) {
+    throw new Error('Não foi possível montar o simulado: banco vazio.');
+  }
+
+  let questionIds: string[] = [];
+  if (discipline === 'todas') {
+    const distribution = distributeProportional(total);
+    for (const [d, n] of distribution.entries()) {
+      if (n <= 0) continue;
+      const picked = await pickRandomFromDiscipline(pool, d, n);
+      questionIds.push(...picked);
+    }
+    // Se alguma disciplina tiver pool insuficiente, completa com qualquer outra.
+    if (questionIds.length < total) {
+      const have = new Set(questionIds);
+      const fill = shuffle(pool.filter((q) => !have.has(q.id))).slice(
+        0,
+        total - questionIds.length,
+      );
+      questionIds.push(...fill.map((q) => q.id));
+    }
+    questionIds = shuffle(questionIds).slice(0, total);
+  } else {
+    questionIds = shuffle(pool).slice(0, total).map((q) => q.id);
+  }
+
+  if (questionIds.length === 0) {
+    throw new Error('Nenhuma questão disponível para o filtro selecionado.');
+  }
+
+  const filters: Json = {
+    total: questionIds.length,
+    time_limit_sec: time_limit_min * 60,
+    question_ids: questionIds,
+    discipline_filter: discipline,
+  };
+
+  const { data: created, error: insertErr } = await supabase
+    .from('study_sessions')
+    .insert({
+      user_id: user.id,
+      type: 'simulado',
+      filters,
+    })
+    .select('id')
+    .single();
+
+  if (insertErr || !created) {
+    throw new Error('Falha ao iniciar simulado.');
+  }
+
+  redirect(`/simulado/sessao/${created.id}`);
+}
+
+const finalizeAnswerSchema = z.object({
+  question_id: z.string().min(1),
+  answer: z.enum(['A', 'B', 'C', 'D', 'E']).nullable(),
+});
+
+const finalizeSchema = z.object({
+  session_id: z.string().uuid(),
+  answers: z.array(finalizeAnswerSchema).min(1).max(120),
+});
+
+export type FinalizeSimuladoInput = z.infer<typeof finalizeSchema>;
+export type FinalizeSimuladoResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function finalizeSimulado(
+  input: FinalizeSimuladoInput,
+): Promise<FinalizeSimuladoResult> {
+  const parsed = finalizeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: 'Payload inválido.' };
+  }
+  const { session_id, answers } = parsed.data;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: 'Sessão expirada.' };
+  }
+
+  const { data: session, error: sessionErr } = await supabase
+    .from('study_sessions')
+    .select('id, user_id, type, started_at, ended_at, filters')
+    .eq('id', session_id)
+    .single();
+  if (sessionErr || !session) {
+    return { ok: false, error: 'Simulado não encontrado.' };
+  }
+  if (session.user_id !== user.id || session.type !== 'simulado') {
+    return { ok: false, error: 'Sessão inválida.' };
+  }
+  if (session.ended_at) {
+    // Já finalizado — idempotência soft: só retorna ok.
+    return { ok: true };
+  }
+
+  const startedAtMs = session.started_at
+    ? new Date(session.started_at).getTime()
+    : Date.now();
+  const totalDurationSec = Math.max(
+    1,
+    Math.round((Date.now() - startedAtMs) / 1000),
+  );
+  const perQuestionSec = Math.max(
+    1,
+    Math.round(totalDurationSec / answers.length),
+  );
+
+  const answeredIds = answers
+    .filter((a) => a.answer !== null)
+    .map((a) => a.question_id);
+
+  type CorrectMap = Map<string, AnswerLetter | null>;
+  const correctById: CorrectMap = new Map();
+  if (answeredIds.length > 0) {
+    const { data: questionRows, error: qErr } = await supabase
+      .from('questions')
+      .select('id, correct_answer')
+      .in('id', answeredIds);
+    if (qErr || !questionRows) {
+      return { ok: false, error: 'Falha ao validar respostas.' };
+    }
+    for (const q of questionRows) correctById.set(q.id, q.correct_answer);
+  }
+
+  let correctCount = 0;
+  const attemptRows = answers.map((a) => {
+    let isCorrect: boolean | null = null;
+    if (a.answer !== null) {
+      const correct = correctById.get(a.question_id) ?? null;
+      isCorrect = correct !== null && correct === a.answer;
+      if (isCorrect) correctCount += 1;
+    }
+    return {
+      user_id: user.id,
+      question_id: a.question_id,
+      answer: a.answer,
+      is_correct: isCorrect,
+      time_spent_sec: perQuestionSec,
+      context: 'simulado' as const,
+      session_id,
+    };
+  });
+
+  const { error: insertAttemptsErr } = await supabase
+    .from('attempts')
+    .insert(attemptRows);
+  if (insertAttemptsErr) {
+    return { ok: false, error: 'Falha ao salvar respostas.' };
+  }
+
+  const { error: updateErr } = await supabase
+    .from('study_sessions')
+    .update({
+      ended_at: new Date().toISOString(),
+      total_questions: answers.length,
+      correct_count: correctCount,
+      duration_sec: totalDurationSec,
+    })
+    .eq('id', session_id);
+  if (updateErr) {
+    return { ok: false, error: 'Falha ao encerrar simulado.' };
+  }
+
+  // Bônus de XP — idempotente via simulado_bonuses (PR 2).
+  const { error: rpcErr } = await supabase.rpc('award_simulado_xp', {
+    p_session_id: session_id,
+  });
+  if (rpcErr) {
+    // Não derruba o simulado por causa do bônus; só registra.
+    return { ok: true };
+  }
+
+  return { ok: true };
+}
