@@ -1,9 +1,9 @@
 /**
- * Seed das 480 questoes da Unifor Medicina (2015.2 a 2026.1).
+ * Seed das 680 questoes da Unifor Medicina (2015.1 a 2026.1, 17 provas).
  *
  * Pipeline por questao:
  *   1. Le questao do <script id="questions-data"> em
- *      Estudo_Unifor_Medicina/Estudo_Unifor_Medicina.html.
+ *      PROVAS MEDICINA UNIFOR/Estudo_Unifor_Medicina/Estudo_Unifor_Medicina.html.
  *   2. Aplica override de anuladas (FORCE_ANNULLED_IDS).
  *   3. Otimiza imagem (RGB, max 1200px, JPEG q=85) via sharp.
  *   4. Faz upload para o bucket 'questions' em {discipline}/{id}.jpg.
@@ -12,7 +12,9 @@
  * Idempotente: re-rodar nao duplica nem apaga questoes pre-existentes que
  * nao estejam no JSON.
  *
- * Uso: npm run db:seed
+ * Uso:
+ *   npm run db:seed             — executa upload + upsert
+ *   npm run db:seed -- --dry-run — apenas le HTML e reporta totais
  */
 import { createClient } from '@supabase/supabase-js';
 import { Client } from 'pg';
@@ -35,10 +37,17 @@ if (!SUPABASE_URL || !SUPABASE_SECRET || !SUPABASE_DB_URL) {
   process.exit(1);
 }
 
-const HTML_PATH = join(ROOT, 'Estudo_Unifor_Medicina', 'Estudo_Unifor_Medicina.html');
+const HTML_PATH = join(
+  ROOT,
+  'PROVAS MEDICINA UNIFOR',
+  'Estudo_Unifor_Medicina',
+  'Estudo_Unifor_Medicina.html'
+);
 const IMAGES_ROOT = join(ROOT, 'Estudo_Unifor_Medicina', 'images');
 const BUCKET = 'questions';
 const BATCH = 8;
+const DRY_RUN = process.argv.includes('--dry-run');
+const EXPECTED_TOTAL = 680;
 
 interface RawQuestion {
   id: string;
@@ -193,11 +202,42 @@ async function processOne(
 }
 
 async function main() {
-  console.log('[seed] lendo HTML...');
+  console.log(`[seed] lendo HTML${DRY_RUN ? ' (DRY-RUN)' : ''}...`);
   const questions = readQuestions();
   console.log(`[seed] ${questions.length} questoes encontradas`);
-  if (questions.length !== 480) {
-    console.warn(`[seed] aviso: esperava 480 questoes, recebeu ${questions.length}`);
+  if (questions.length !== EXPECTED_TOTAL) {
+    console.warn(
+      `[seed] aviso: esperava ${EXPECTED_TOTAL} questoes, recebeu ${questions.length}`
+    );
+  }
+
+  if (DRY_RUN) {
+    const byDisc: Record<string, number> = {};
+    const provas = new Set<string>();
+    let annulled = 0;
+    let forceAnnulled = 0;
+    let missingImages = 0;
+    let nullCorrect = 0;
+    for (const q of questions) {
+      const id = normalizeId(q.id);
+      byDisc[q.discipline] = (byDisc[q.discipline] ?? 0) + 1;
+      provas.add(`${q.year}-${q.semester}`);
+      const isAnn = q.annulled === true || FORCE_ANNULLED_IDS.has(id);
+      if (isAnn) annulled++;
+      if (FORCE_ANNULLED_IDS.has(id) && !q.annulled) forceAnnulled++;
+      if (!isAnn && q.correct_answer == null) nullCorrect++;
+      const localImage = join(IMAGES_ROOT, q.discipline, `${id}.jpg`);
+      if (!existsSync(localImage)) missingImages++;
+    }
+    console.log('[seed][dry-run] resumo:');
+    console.log(`  total:                ${questions.length}`);
+    console.log(`  por disciplina:       ${JSON.stringify(byDisc)}`);
+    console.log(`  provas distintas:     ${provas.size} (${[...provas].sort().join(', ')})`);
+    console.log(`  anuladas (final):     ${annulled}`);
+    console.log(`  via FORCE_ANNULLED:   ${forceAnnulled}`);
+    console.log(`  imagens locais missing: ${missingImages}`);
+    console.log(`  correct_answer nulo nao-anulado: ${nullCorrect}`);
+    return;
   }
 
   const url = new URL(SUPABASE_DB_URL);

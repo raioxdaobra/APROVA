@@ -805,12 +805,12 @@ git commit -m "feat: add about, privacy and terms placeholder pages"
 - Create: `src/components/ui/input.tsx`
 - Create: `src/components/ui/card.tsx`
 
-- [ ] **Step 1: Instalar peer deps do Radix usadas pelos componentes mínimos do MVP**
+- [x] **Step 1: Instalar peer deps do Radix usadas pelos componentes mínimos do MVP**
 
 Run: `npm install class-variance-authority @radix-ui/react-slot lucide-react`
 Expected: instala sem erro.
 
-- [ ] **Step 2: Criar `src/components/ui/button.tsx`**
+- [x] **Step 2: Criar `src/components/ui/button.tsx`**
 
 ```typescript
 import * as React from 'react';
@@ -859,7 +859,7 @@ Button.displayName = 'Button';
 export { buttonVariants };
 ```
 
-- [ ] **Step 3: Criar `src/components/ui/input.tsx`**
+- [x] **Step 3: Criar `src/components/ui/input.tsx`**
 
 ```typescript
 import * as React from 'react';
@@ -883,7 +883,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 Input.displayName = 'Input';
 ```
 
-- [ ] **Step 4: Criar `src/components/ui/card.tsx`**
+- [x] **Step 4: Criar `src/components/ui/card.tsx`**
 
 ```typescript
 import * as React from 'react';
@@ -923,12 +923,12 @@ export const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes
 CardContent.displayName = 'CardContent';
 ```
 
-- [ ] **Step 5: Verificar typecheck**
+- [x] **Step 5: Verificar typecheck**
 
 Run: `npm run typecheck`
 Expected: exit code 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/ui package.json package-lock.json
@@ -943,7 +943,7 @@ git commit -m "feat(ui): add Button, Input and Card primitives aligned to tokens
 - Create: `src/app/design/page.tsx`
 - Create: `src/components/theme-toggle.tsx`
 
-- [ ] **Step 1: Criar `src/components/theme-toggle.tsx`**
+- [x] **Step 1: Criar `src/components/theme-toggle.tsx`**
 
 ```typescript
 'use client';
@@ -973,7 +973,7 @@ export function ThemeToggle() {
 }
 ```
 
-- [ ] **Step 2: Criar `src/app/design/page.tsx`**
+- [x] **Step 2: Criar `src/app/design/page.tsx`**
 
 ```typescript
 import Link from 'next/link';
@@ -1137,12 +1137,12 @@ function Swatch({ label, varName }: { label: string; varName: string }) {
 }
 ```
 
-- [ ] **Step 3: Verificar build**
+- [x] **Step 3: Verificar build**
 
 Run: `npm run build`
 Expected: build completa sem erro.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/app/design src/components/theme-toggle.tsx

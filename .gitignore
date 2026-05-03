@@ -32,3 +32,5 @@ yarn-error.log*
 
 # testing
 coverage/
+
+.vercel
