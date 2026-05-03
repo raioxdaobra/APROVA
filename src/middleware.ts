@@ -21,7 +21,11 @@ function isPublic(path: string): boolean {
     PUBLIC_ROUTES.has(path) ||
     path.startsWith('/_next') ||
     path.startsWith('/api/auth') ||
-    /\.(?:svg|png|jpe?g|gif|webp|ico|woff2?)$/i.test(path)
+    path === '/sw.js' ||
+    path === '/manifest.webmanifest' ||
+    path === '/manifest.json' ||
+    path.startsWith('/icons/') ||
+    /\.(?:svg|png|jpe?g|gif|webp|ico|woff2?|js|webmanifest)$/i.test(path)
   );
 }
 
