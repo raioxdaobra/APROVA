@@ -21,6 +21,19 @@ export type Discipline = 'matematica' | 'fisica' | 'quimica' | 'biologia' | 'hum
 export type AnswerLetter = 'A' | 'B' | 'C' | 'D' | 'E';
 export type UserQuestionStatus = 'correct' | 'wrong' | 'toreview';
 export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type Plan = 'free' | 'pro';
+export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'inactive';
+export type GameId =
+  | 'mate_speed'
+  | 'wordle'
+  | 'memory_periodic'
+  | 'snake_anatomy'
+  | '2048'
+  | 'trunfo'
+  | 'corrida'
+  | 'sudoku'
+  | 'logica'
+  | 'hanoi';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -59,6 +72,10 @@ export interface Database {
           favorite_discipline: Discipline | null;
           account_status: 'pending' | 'approved' | 'blocked';
           is_admin: boolean;
+          plan: Plan;
+          plan_expires_at: string | null;
+          questions_used_count: number;
+          simulados_used_count: number;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -74,6 +91,10 @@ export interface Database {
           favorite_discipline?: Discipline | null;
           account_status?: 'pending' | 'approved' | 'blocked';
           is_admin?: boolean;
+          plan?: Plan;
+          plan_expires_at?: string | null;
+          questions_used_count?: number;
+          simulados_used_count?: number;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -89,6 +110,10 @@ export interface Database {
           favorite_discipline?: Discipline | null;
           account_status?: 'pending' | 'approved' | 'blocked';
           is_admin?: boolean;
+          plan?: Plan;
+          plan_expires_at?: string | null;
+          questions_used_count?: number;
+          simulados_used_count?: number;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -637,6 +662,105 @@ export interface Database {
         };
         Relationships: [];
       };
+      subscriptions: {
+        Row: {
+          user_id: string;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          status: SubscriptionStatus;
+          current_period_end: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          status?: SubscriptionStatus;
+          current_period_end?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          status?: SubscriptionStatus;
+          current_period_end?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'subscriptions_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      game_scores: {
+        Row: {
+          id: number;
+          user_id: string;
+          game_id: GameId;
+          score: number;
+          duration_sec: number | null;
+          difficulty: string | null;
+          played_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          user_id: string;
+          game_id: GameId;
+          score: number;
+          duration_sec?: number | null;
+          difficulty?: string | null;
+          played_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          game_id?: GameId;
+          score?: number;
+          duration_sec?: number | null;
+          difficulty?: string | null;
+          played_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'game_scores_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      daily_focus_minutes: {
+        Row: {
+          user_id: string;
+          day: string;
+          minutes: number;
+        };
+        Insert: {
+          user_id: string;
+          day: string;
+          minutes?: number;
+        };
+        Update: {
+          user_id?: string;
+          day?: string;
+          minutes?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'daily_focus_minutes_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {
       weekly_leaderboard: {
@@ -656,6 +780,17 @@ export interface Database {
           total_attempts: number;
           total_correct: number;
           correct_pct: number | null;
+        };
+        Relationships: [];
+      };
+      game_leaderboard: {
+        Row: {
+          game_id: GameId;
+          username: string;
+          display_name: string;
+          best_score: number;
+          plays: number;
+          position: number;
         };
         Relationships: [];
       };
