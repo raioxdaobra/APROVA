@@ -3,10 +3,11 @@
 -- =============================================================================
 -- FIX 1 — Helpers de timezone (America/Fortaleza) e uso nos triggers/funcoes.
 -- FIX 2 — Cap diario 2.000 XP atomico via tabela daily_xp + SELECT FOR UPDATE.
+-- FIX 3 — Fecha leak de RLS em weekly_leaderboard via SECURITY DEFINER.
 --
 -- Migrations sao append-only: nao editamos 0001-0005, apenas criamos 0006+.
--- Demais fixes do review (RLS leak, threshold dominio, annulled, indexes,
--- CHECK constraints) serao adicionados a este arquivo nos proximos commits.
+-- Demais fixes do review (threshold dominio, annulled, indexes, CHECK
+-- constraints) serao adicionados a este arquivo nos proximos commits.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -305,3 +306,70 @@ $$;
 
 revoke all on function public.award_simulado_xp(uuid) from public;
 grant execute on function public.award_simulado_xp(uuid) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- FIX 3 — Fechar RLS leak em profiles_select_public_leaderboard
+-- -----------------------------------------------------------------------------
+-- A migration 0003 criou as policies profiles_select_public_leaderboard e
+-- weekly_xp_select_public_leaderboard para que a view
+-- weekly_leaderboard (security_invoker = true) conseguisse fazer JOIN entre
+-- profiles e weekly_xp. Efeito colateral: qualquer query SELECT sobre
+-- public.profiles ou public.weekly_xp passa a expor linhas de outros
+-- usuarios que tem is_public_in_leaderboard = true (incluindo colunas como
+-- city, target_exam, daily_goal_questions, created_at, updated_at).
+--
+-- Solucao: remover essas duas policies e recriar a view com SECURITY DEFINER
+-- (uma funcao de tabela), expondo APENAS as colunas seguras
+-- (display_name, username, week_start, xp, questions_answered, position).
+drop policy if exists profiles_select_public_leaderboard on public.profiles;
+drop policy if exists weekly_xp_select_public_leaderboard on public.weekly_xp;
+
+-- Recriar a view: precisa dropar antes porque mudaremos as opcoes (de
+-- security_invoker=true para security_invoker=false, padrao).
+drop view if exists public.weekly_leaderboard;
+
+-- Funcao SECURITY DEFINER que retorna o leaderboard. Como roda com os
+-- privilegios do owner (postgres/superuser), nao depende de policies de RLS
+-- em profiles/weekly_xp. Filtra explicitamente
+-- profiles.is_public_in_leaderboard = true.
+create or replace function public.fn_weekly_leaderboard()
+returns table (
+  username text,
+  display_name text,
+  week_start date,
+  xp int,
+  questions_answered int,
+  position bigint
+)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select
+    p.username,
+    p.display_name,
+    wx.week_start,
+    wx.xp,
+    wx.questions_answered,
+    rank() over (
+      partition by wx.week_start
+      order by wx.xp desc, wx.questions_answered desc
+    ) as position
+  from public.weekly_xp wx
+  join public.profiles p on p.id = wx.user_id
+  where p.is_public_in_leaderboard = true
+$$;
+
+revoke all on function public.fn_weekly_leaderboard() from public;
+grant execute on function public.fn_weekly_leaderboard() to authenticated;
+
+-- View thin sobre a funcao: mantem a interface SELECT * FROM weekly_leaderboard
+-- usada pelo cliente. SECURITY DEFINER cobre a leitura via funcao subjacente.
+create view public.weekly_leaderboard as
+  select * from public.fn_weekly_leaderboard();
+
+comment on view public.weekly_leaderboard is
+  'Ranking semanal publico via fn_weekly_leaderboard (SECURITY DEFINER). Expoe apenas colunas seguras; nunca email, id ou created_at.';
+
+grant select on public.weekly_leaderboard to authenticated;
