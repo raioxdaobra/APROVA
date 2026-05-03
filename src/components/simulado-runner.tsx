@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { KeyboardHintsOverlay } from '@/components/keyboard-hints-overlay';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { finalizeSimulado } from '@/app/simulado/actions';
@@ -141,6 +143,41 @@ export function SimuladoRunner({
   const goPrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
   const goNext = () => setCurrentIndex((i) => Math.min(total - 1, i + 1));
   const jumpTo = (idx: number) => setCurrentIndex(Math.max(0, Math.min(total - 1, idx)));
+
+  // Atalhos de teclado — desabilitados quando dialog de confirmação aberto
+  // (o dialog já tem seu próprio handler de ESC).
+  const shortcutsEnabled = !submitted && !confirmOpen;
+  const handleSelectRef = useRef(handleSelect);
+  handleSelectRef.current = handleSelect;
+  const goPrevRef = useRef(goPrev);
+  goPrevRef.current = goPrev;
+  const goNextRef = useRef(goNext);
+  goNextRef.current = goNext;
+
+  const shortcuts = useMemo(
+    () => ({
+      a: () => handleSelectRef.current('A'),
+      b: () => handleSelectRef.current('B'),
+      c: () => handleSelectRef.current('C'),
+      d: () => handleSelectRef.current('D'),
+      e: () => handleSelectRef.current('E'),
+      ArrowLeft: () => goPrevRef.current(),
+      ArrowRight: (e: KeyboardEvent) => {
+        e.preventDefault();
+        goNextRef.current();
+      },
+      ' ': (e: KeyboardEvent) => {
+        e.preventDefault();
+        goNextRef.current();
+      },
+      Enter: (e: KeyboardEvent) => {
+        e.preventDefault();
+        goNextRef.current();
+      },
+    }),
+    [],
+  );
+  useKeyboardShortcuts(shortcuts, { enabled: shortcutsEnabled });
 
   const timerColor =
     remainingSec < 60
@@ -300,6 +337,8 @@ export function SimuladoRunner({
           }}
         />
       ) : null}
+
+      <KeyboardHintsOverlay />
     </>
   );
 }
