@@ -1,9 +1,11 @@
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { AnalyticsProvider } from '@/components/analytics-provider';
+import { AuthProvider } from '@/components/auth-provider';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { inter, jetbrainsMono } from '@/lib/fonts';
+import { createClient } from '@/lib/supabase/server';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,7 +21,12 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   return (
     <html lang="pt-BR" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
@@ -31,8 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ThemeProvider>
-          {children}
-          <Toaster />
+          <AuthProvider initialSession={session}>
+            {children}
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
         <Suspense fallback={null}>
           <AnalyticsProvider />
