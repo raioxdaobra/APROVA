@@ -20,6 +20,28 @@ export type StudySessionType = 'quiz' | 'revisao' | 'simulado' | 'diagnostic';
 export type Discipline = 'matematica' | 'fisica' | 'quimica' | 'biologia' | 'humanas' | 'linguagens';
 export type AnswerLetter = 'A' | 'B' | 'C' | 'D' | 'E';
 export type UserQuestionStatus = 'correct' | 'wrong' | 'toreview';
+export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  ts: string;
+}
+
+export interface TheoryLink {
+  title: string;
+  url: string;
+  source: string;
+}
+
+export interface DailyMission {
+  id: string;
+  label: string;
+  goal: number;
+  progress: number;
+  completed: boolean;
+  xp_reward: number;
+}
 
 export interface Database {
   public: {
@@ -367,6 +389,248 @@ export interface Database {
           },
         ];
       };
+      question_solutions: {
+        Row: {
+          question_id: string;
+          content_md: string;
+          conclusion: AnswerLetter;
+          generated_by: string;
+          reviewed: boolean;
+          generated_at: string | null;
+        };
+        Insert: {
+          question_id: string;
+          content_md: string;
+          conclusion: AnswerLetter;
+          generated_by: string;
+          reviewed?: boolean;
+          generated_at?: string | null;
+        };
+        Update: {
+          question_id?: string;
+          content_md?: string;
+          conclusion?: AnswerLetter;
+          generated_by?: string;
+          reviewed?: boolean;
+          generated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'question_solutions_question_id_fkey';
+            columns: ['question_id'];
+            referencedRelation: 'questions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      subtopic_theory: {
+        Row: {
+          discipline: string;
+          subtopic: string;
+          summary_md: string;
+          links: TheoryLink[];
+          generated_at: string | null;
+        };
+        Insert: {
+          discipline: string;
+          subtopic: string;
+          summary_md: string;
+          links?: TheoryLink[];
+          generated_at?: string | null;
+        };
+        Update: {
+          discipline?: string;
+          subtopic?: string;
+          summary_md?: string;
+          links?: TheoryLink[];
+          generated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      question_chats: {
+        Row: {
+          id: string;
+          user_id: string;
+          question_id: string;
+          messages: ChatMessage[];
+          msg_count: number;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          question_id: string;
+          messages?: ChatMessage[];
+          msg_count?: number;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          question_id?: string;
+          messages?: ChatMessage[];
+          msg_count?: number;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'question_chats_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'question_chats_question_id_fkey';
+            columns: ['question_id'];
+            referencedRelation: 'questions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      daily_chat_usage: {
+        Row: {
+          user_id: string;
+          day: string;
+          msg_count: number;
+        };
+        Insert: {
+          user_id: string;
+          day: string;
+          msg_count?: number;
+        };
+        Update: {
+          user_id?: string;
+          day?: string;
+          msg_count?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'daily_chat_usage_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      global_chat_usage: {
+        Row: {
+          day: string;
+          msg_count: number;
+          by_provider: Record<string, number>;
+        };
+        Insert: {
+          day: string;
+          msg_count?: number;
+          by_provider?: Record<string, number>;
+        };
+        Update: {
+          day?: string;
+          msg_count?: number;
+          by_provider?: Record<string, number>;
+        };
+        Relationships: [];
+      };
+      achievements: {
+        Row: {
+          id: string;
+          title: string;
+          description: string;
+          icon: string;
+          rarity: AchievementRarity;
+        };
+        Insert: {
+          id: string;
+          title: string;
+          description: string;
+          icon: string;
+          rarity: AchievementRarity;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string;
+          icon?: string;
+          rarity?: AchievementRarity;
+        };
+        Relationships: [];
+      };
+      user_achievements: {
+        Row: {
+          user_id: string;
+          achievement_id: string;
+          unlocked_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          achievement_id: string;
+          unlocked_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          achievement_id?: string;
+          unlocked_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'user_achievements_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'user_achievements_achievement_id_fkey';
+            columns: ['achievement_id'];
+            referencedRelation: 'achievements';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      daily_missions: {
+        Row: {
+          user_id: string;
+          day: string;
+          missions: DailyMission[];
+        };
+        Insert: {
+          user_id: string;
+          day: string;
+          missions?: DailyMission[];
+        };
+        Update: {
+          user_id?: string;
+          day?: string;
+          missions?: DailyMission[];
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'daily_missions_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      app_settings: {
+        Row: {
+          key: string;
+          value: Json;
+          updated_at: string | null;
+        };
+        Insert: {
+          key: string;
+          value: Json;
+          updated_at?: string | null;
+        };
+        Update: {
+          key?: string;
+          value?: Json;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       weekly_leaderboard: {
@@ -377,6 +641,15 @@ export interface Database {
           xp: number | null;
           questions_answered: number | null;
           position: number;
+        };
+        Relationships: [];
+      };
+      question_stats: {
+        Row: {
+          question_id: string;
+          total_attempts: number;
+          total_correct: number;
+          correct_pct: number | null;
         };
         Relationships: [];
       };
