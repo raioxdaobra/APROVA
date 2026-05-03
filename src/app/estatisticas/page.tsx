@@ -5,6 +5,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
+import { slugify } from '@/lib/slug';
 import type { Discipline } from '@/lib/supabase/types';
 import { DeleteAllDialog } from './_components/delete-all-dialog';
 import { ExportButton } from './_components/export-button';
@@ -460,68 +461,85 @@ export default async function EstatisticasPage() {
             Por subtópico
           </h2>
           <div className="flex flex-col gap-2">
-            {DISCIPLINES.map((d) => {
-              const list = subtopicsByDiscipline.get(d) ?? [];
-              if (list.length === 0) return null;
-              const totalAvail = list.reduce((s, x) => s + x.total, 0);
-              const totalResolved = list.reduce((s, x) => s + x.resolved, 0);
-              return (
-                <details
-                  key={d}
-                  className="group rounded-lg border border-border bg-card"
-                >
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/50">
-                    <span>{DISCIPLINE_LABEL[d]}</span>
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {formatNumber(totalResolved)} / {formatNumber(totalAvail)} resolvidas
-                    </span>
-                  </summary>
-                  <div className="overflow-x-auto border-t border-border">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                          <th className="px-3 py-2 font-semibold">Subtópico</th>
-                          <th className="px-3 py-2 font-semibold">Resolvidas</th>
-                          <th className="px-3 py-2 font-semibold">% acerto</th>
-                          <th className="px-3 py-2 text-center font-semibold">Domínio</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {list.map((s) => (
-                          <tr
-                            key={`${d}-${s.subtopic}`}
-                            className="border-b border-border last:border-0"
-                          >
-                            <td className="px-3 py-2 text-foreground">{s.subtopic_short}</td>
-                            <td className="px-3 py-2 tabular-nums text-foreground">
-                              {formatNumber(s.resolved)} / {formatNumber(s.total)}
-                            </td>
-                            <td className="px-3 py-2 tabular-nums text-foreground">
-                              {formatPercent(s.correct, s.resolved)}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {s.mastered ? (
-                                <span
-                                  aria-label="Domínio confirmado"
-                                  title="Domínio confirmado"
-                                  className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-success-bg text-xs text-success"
-                                >
-                                  ✓
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground" aria-hidden>
-                                  —
-                                </span>
-                              )}
-                            </td>
+            {DISCIPLINES.filter((d) => (subtopicsByDiscipline.get(d) ?? []).length > 0).map(
+              (d, idx) => {
+                const list = subtopicsByDiscipline.get(d) ?? [];
+                const totalAvail = list.reduce((s, x) => s + x.total, 0);
+                const totalResolved = list.reduce((s, x) => s + x.resolved, 0);
+                return (
+                  <details
+                    key={d}
+                    className="group rounded-lg border border-border bg-card"
+                    {...(idx === 0 ? { open: true } : {})}
+                  >
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/50">
+                      <span>{DISCIPLINE_LABEL[d]}</span>
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {formatNumber(totalResolved)} / {formatNumber(totalAvail)} resolvidas
+                      </span>
+                    </summary>
+                    <div className="overflow-x-auto border-t border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                            <th className="px-3 py-2 font-semibold">Subtópico</th>
+                            <th className="px-3 py-2 font-semibold">Resolvidas</th>
+                            <th className="px-3 py-2 font-semibold">% acerto</th>
+                            <th className="px-3 py-2 text-center font-semibold">Domínio</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              );
-            })}
+                        </thead>
+                        <tbody>
+                          {list.map((s) => {
+                            const slug = slugify(s.subtopic_short || s.subtopic);
+                            const href = `/aprofundar/${d}/${slug}`;
+                            return (
+                              <tr
+                                key={`${d}-${s.subtopic}`}
+                                className="border-b border-border last:border-0 hover:bg-muted/40"
+                              >
+                                <td className="px-3 py-2 text-foreground">
+                                  <Link
+                                    href={href}
+                                    className="block text-primary hover:underline"
+                                  >
+                                    {s.subtopic_short}
+                                  </Link>
+                                </td>
+                                <td className="px-3 py-2 tabular-nums text-foreground">
+                                  <Link href={href} className="block">
+                                    {formatNumber(s.resolved)} / {formatNumber(s.total)}
+                                  </Link>
+                                </td>
+                                <td className="px-3 py-2 tabular-nums text-foreground">
+                                  <Link href={href} className="block">
+                                    {formatPercent(s.correct, s.resolved)}
+                                  </Link>
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  {s.mastered ? (
+                                    <span
+                                      aria-label="Domínio confirmado"
+                                      title="Domínio confirmado"
+                                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-success-bg text-xs text-success"
+                                    >
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground" aria-hidden>
+                                      —
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                );
+              },
+            )}
           </div>
         </section>
 
