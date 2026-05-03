@@ -34,6 +34,7 @@ export interface Database {
           daily_goal_questions: number | null;
           is_public_in_leaderboard: boolean | null;
           onboarding_completed: boolean;
+          favorite_discipline: Discipline | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -46,6 +47,7 @@ export interface Database {
           daily_goal_questions?: number | null;
           is_public_in_leaderboard?: boolean | null;
           onboarding_completed?: boolean;
+          favorite_discipline?: Discipline | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -58,6 +60,7 @@ export interface Database {
           daily_goal_questions?: number | null;
           is_public_in_leaderboard?: boolean | null;
           onboarding_completed?: boolean;
+          favorite_discipline?: Discipline | null;
           created_at?: string | null;
           updated_at?: string | null;
         };

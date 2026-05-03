@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,8 +30,10 @@ export function UserMenu({ displayName }: { displayName: string }) {
         {initial}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[12rem]">
-        <DropdownMenuItem disabled className="text-muted-foreground">
-          Configurações
+        <DropdownMenuItem asChild>
+          <Link href="/configuracoes" className="w-full cursor-pointer">
+            Configurações
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
