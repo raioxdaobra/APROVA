@@ -344,7 +344,7 @@ returns table (
   week_start date,
   xp int,
   questions_answered int,
-  position bigint
+  "position" bigint
 )
 language sql
 security definer
@@ -360,7 +360,7 @@ as $$
     rank() over (
       partition by wx.week_start
       order by wx.xp desc, wx.questions_answered desc
-    ) as position
+    ) as "position"
   from public.weekly_xp wx
   join public.profiles p on p.id = wx.user_id
   where p.is_public_in_leaderboard = true

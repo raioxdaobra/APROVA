@@ -73,6 +73,7 @@ export interface Database {
           image_url: string;
           correct_answer: AnswerLetter | null;
           annulled: boolean | null;
+          exam: string;
           created_at: string | null;
         };
         Insert: {
@@ -87,6 +88,7 @@ export interface Database {
           image_url: string;
           correct_answer?: AnswerLetter | null;
           annulled?: boolean | null;
+          exam?: string;
           created_at?: string | null;
         };
         Update: {
@@ -101,6 +103,7 @@ export interface Database {
           image_url?: string;
           correct_answer?: AnswerLetter | null;
           annulled?: boolean | null;
+          exam?: string;
           created_at?: string | null;
         };
         Relationships: [];
