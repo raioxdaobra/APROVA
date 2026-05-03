@@ -10,7 +10,9 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "typecheck": "tsc --noEmit",
-    "check:supabase": "tsx scripts/check-supabase-env.ts"
+    "check:supabase": "tsx scripts/check-supabase-env.ts",
+    "db:push": "tsx scripts/apply-migrations.ts",
+    "db:seed": "tsx scripts/seed-questions.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
@@ -18,14 +20,20 @@
     "@supabase/supabase-js": "^2.105.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "jsdom": "^29.1.1",
     "lucide-react": "^1.14.0",
     "next": "14.2.15",
+    "pg": "^8.20.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@types/jsdom": "^28.0.1",
     "@types/node": "20.14.10",
+    "@types/pg": "^8.20.0",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
     "autoprefixer": "10.4.19",
