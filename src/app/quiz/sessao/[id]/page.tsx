@@ -1,0 +1,97 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { QuizRunner, type QuizQuestion } from '@/components/quiz-runner';
+
+export const metadata = {
+  title: 'Sessão de quiz — APROVA',
+};
+
+export const dynamic = 'force-dynamic';
+
+interface PageProps {
+  params: { id: string };
+}
+
+export default async function QuizSessionPage({ params }: PageProps) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/');
+  }
+
+  const { data: session, error: sessionErr } = await supabase
+    .from('study_sessions')
+    .select('id, user_id, type, filters, ended_at')
+    .eq('id', params.id)
+    .single();
+  if (sessionErr || !session) {
+    redirect('/quiz');
+  }
+  if (session.user_id !== user.id || session.type !== 'quiz') {
+    redirect('/quiz');
+  }
+  if (session.ended_at) {
+    redirect(`/quiz/sessao/${params.id}/fim`);
+  }
+
+  const filters = (session.filters as { question_ids?: unknown } | null) ?? null;
+  const questionIds = Array.isArray(filters?.question_ids)
+    ? (filters!.question_ids.filter((v): v is string => typeof v === 'string'))
+    : [];
+
+  if (questionIds.length === 0) {
+    throw new Error('Sessão sem questões.');
+  }
+
+  const { data: questionRows, error: qErr } = await supabase
+    .from('questions')
+    .select(
+      'id, discipline, subtopic, subtopic_short, year, semester, question_num, image_url, annulled',
+    )
+    .in('id', questionIds);
+  if (qErr || !questionRows) {
+    throw new Error('Falha ao carregar questões.');
+  }
+
+  // Preserva ordem do filters.question_ids
+  const byId = new Map(questionRows.map((q) => [q.id, q]));
+  const ordered: QuizQuestion[] = questionIds
+    .map((id) => byId.get(id))
+    .filter((q): q is NonNullable<typeof q> => Boolean(q))
+    .map((q) => ({
+      id: q.id,
+      discipline: q.discipline,
+      subtopic: q.subtopic,
+      subtopic_short: q.subtopic_short,
+      year: q.year,
+      semester: q.semester,
+      question_num: q.question_num,
+      image_url: q.image_url,
+      annulled: q.annulled === true,
+    }));
+
+  // Marcação prévia "toreview"
+  const { data: statusRows } = await supabase
+    .from('user_question_status')
+    .select('question_id, status')
+    .eq('user_id', user.id)
+    .in('question_id', questionIds);
+  const initialReviewMarked: Record<string, boolean> = {};
+  for (const row of statusRows ?? []) {
+    if (row.status === 'toreview') {
+      initialReviewMarked[row.question_id] = true;
+    }
+  }
+
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6">
+      <QuizRunner
+        sessionId={session.id}
+        questions={ordered}
+        initialReviewMarked={initialReviewMarked}
+      />
+    </main>
+  );
+}
