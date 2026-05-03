@@ -70,18 +70,8 @@ export async function submitProfile(
     return { error: 'Não conseguimos salvar seu perfil. Tente de novo.' };
   }
 
-  const { error: streakError } = await supabase.from('streaks').upsert(
-    {
-      user_id: user.id,
-      current_streak: 0,
-      longest_streak: 0,
-    },
-    { onConflict: 'user_id' },
-  );
-
-  if (streakError) {
-    return { error: 'Perfil criado, mas falhou ao iniciar sua sequência. Tente continuar.' };
-  }
+  // streaks é populada pela trigger fn_update_streak_on_attempt na primeira
+  // attempt válida; INSERT direto não é permitido por RLS.
 
   return { ok: true };
 }
