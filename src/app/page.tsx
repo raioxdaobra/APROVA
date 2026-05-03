@@ -42,6 +42,8 @@ export default function HomePage() {
         Já tenho conta — entrar
       </Link>
 
+      <p className="text-xs text-muted-foreground">Acesso por aprovação. Cadastre-se e aguarde liberação.</p>
+
       <footer className="mt-8 flex flex-col items-center gap-3 text-xs text-muted-foreground">
         <p>Sem custo. Sem anúncios. Para vestibulandos, por vestibulandos.</p>
         <div className="flex gap-4">

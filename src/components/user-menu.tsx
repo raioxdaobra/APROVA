@@ -19,7 +19,13 @@ function initialOf(name: string): string {
   return String.fromCodePoint(codePoint).toUpperCase();
 }
 
-export function UserMenu({ displayName }: { displayName: string }) {
+export function UserMenu({
+  displayName,
+  isAdmin = false,
+}: {
+  displayName: string;
+  isAdmin?: boolean;
+}) {
   const initial = initialOf(displayName);
   const logoutFormRef = useRef<HTMLFormElement>(null);
 
@@ -32,6 +38,16 @@ export function UserMenu({ displayName }: { displayName: string }) {
         {initial}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[12rem]">
+        {isAdmin ? (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/usuarios" className="w-full cursor-pointer">
+                Admin
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem asChild>
           <Link href="/estatisticas" className="w-full cursor-pointer">
             Estatísticas

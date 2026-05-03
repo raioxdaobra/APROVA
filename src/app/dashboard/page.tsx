@@ -115,7 +115,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from('profiles')
-      .select('display_name, username, daily_goal_questions')
+      .select('display_name, username, daily_goal_questions, is_admin')
       .eq('id', user.id)
       .maybeSingle(),
     supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
@@ -287,7 +287,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <UserMenu displayName={displayName} />
+          <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
         </div>
       </header>
 

@@ -57,6 +57,8 @@ export interface Database {
           is_public_in_leaderboard: boolean | null;
           onboarding_completed: boolean;
           favorite_discipline: Discipline | null;
+          account_status: 'pending' | 'approved' | 'blocked';
+          is_admin: boolean;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -70,6 +72,8 @@ export interface Database {
           is_public_in_leaderboard?: boolean | null;
           onboarding_completed?: boolean;
           favorite_discipline?: Discipline | null;
+          account_status?: 'pending' | 'approved' | 'blocked';
+          is_admin?: boolean;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -83,6 +87,8 @@ export interface Database {
           is_public_in_leaderboard?: boolean | null;
           onboarding_completed?: boolean;
           favorite_discipline?: Discipline | null;
+          account_status?: 'pending' | 'approved' | 'blocked';
+          is_admin?: boolean;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -670,6 +676,22 @@ export interface Database {
           semester: number;
           question_num: number;
           image_url: string;
+        }>;
+      };
+      admin_set_account_status: {
+        Args: { target_user_id: string; new_status: string };
+        Returns: void;
+      };
+      admin_list_users: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          id: string;
+          email: string;
+          display_name: string;
+          username: string;
+          account_status: string;
+          is_admin: boolean;
+          created_at: string;
         }>;
       };
     };

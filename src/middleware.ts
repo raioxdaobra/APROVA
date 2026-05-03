@@ -15,6 +15,9 @@ const PUBLIC_ROUTES = new Set([
 const ONBOARDING_PREFIX = '/onboarding';
 const DIAGNOSTIC_ROUTE = '/diagnostico';
 const APP_ROUTE = '/dashboard';
+const PENDING_ROUTE = '/aguardando-aprovacao';
+const BLOCKED_ROUTE = '/conta-bloqueada';
+const ADMIN_PREFIX = '/admin';
 
 function isPublic(path: string): boolean {
   return (
@@ -67,18 +70,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(u);
   }
 
-  // Com sessao — checar onboarding
+  // Com sessao — checar onboarding + status da conta
   const { data: profile } = await supabase
     .from('profiles')
-    .select('onboarding_completed')
+    .select('onboarding_completed, account_status, is_admin')
     .eq('id', user.id)
     .maybeSingle();
   const completed = profile?.onboarding_completed === true;
+  const accountStatus = (profile?.account_status as 'pending' | 'approved' | 'blocked' | undefined) ?? 'pending';
+  const isAdmin = profile?.is_admin === true;
 
   // Logado em rota de auth → manda para destino certo
   if (path === '/' || path === '/login' || path === '/signup') {
     const u = request.nextUrl.clone();
-    u.pathname = completed ? APP_ROUTE : `${ONBOARDING_PREFIX}/perfil`;
+    if (!completed) {
+      u.pathname = `${ONBOARDING_PREFIX}/perfil`;
+    } else if (!isAdmin && accountStatus === 'blocked') {
+      u.pathname = BLOCKED_ROUTE;
+    } else if (!isAdmin && accountStatus === 'pending') {
+      u.pathname = PENDING_ROUTE;
+    } else {
+      u.pathname = APP_ROUTE;
+    }
     return NextResponse.redirect(u);
   }
 
@@ -99,6 +112,44 @@ export async function middleware(request: NextRequest) {
 
   // Já completou: não revisita onboarding
   if (completed && path.startsWith(ONBOARDING_PREFIX)) {
+    const u = request.nextUrl.clone();
+    u.pathname = APP_ROUTE;
+    return NextResponse.redirect(u);
+  }
+
+  // Account approval gate (admin bypass).
+  if (completed && !isAdmin) {
+    if (accountStatus === 'blocked') {
+      // Permite a própria página /conta-bloqueada e API auth
+      if (path !== BLOCKED_ROUTE && !path.startsWith('/api/') && !isPublic(path)) {
+        const u = request.nextUrl.clone();
+        u.pathname = BLOCKED_ROUTE;
+        return NextResponse.redirect(u);
+      }
+    } else if (accountStatus === 'pending') {
+      if (path !== PENDING_ROUTE && !path.startsWith('/api/') && !isPublic(path)) {
+        const u = request.nextUrl.clone();
+        u.pathname = PENDING_ROUTE;
+        return NextResponse.redirect(u);
+      }
+    } else {
+      // approved: bloqueia /admin/* para não-admins
+      if (path.startsWith(ADMIN_PREFIX)) {
+        const u = request.nextUrl.clone();
+        u.pathname = APP_ROUTE;
+        return NextResponse.redirect(u);
+      }
+      // Se já aprovado, não deixa ficar nas páginas de espera/bloqueio
+      if (path === PENDING_ROUTE || path === BLOCKED_ROUTE) {
+        const u = request.nextUrl.clone();
+        u.pathname = APP_ROUTE;
+        return NextResponse.redirect(u);
+      }
+    }
+  }
+
+  // Admin: também não deve ficar preso em /aguardando ou /bloqueada.
+  if (completed && isAdmin && (path === PENDING_ROUTE || path === BLOCKED_ROUTE)) {
     const u = request.nextUrl.clone();
     u.pathname = APP_ROUTE;
     return NextResponse.redirect(u);

@@ -135,7 +135,7 @@ export default async function EstatisticasPage() {
   ] = await Promise.all([
     supabase
       .from('profiles')
-      .select('username, display_name, is_public_in_leaderboard')
+      .select('username, display_name, is_public_in_leaderboard, is_admin')
       .eq('id', user.id)
       .maybeSingle(),
     supabase
@@ -315,7 +315,7 @@ export default async function EstatisticasPage() {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <UserMenu displayName={displayName} />
+          <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
         </div>
       </header>
 

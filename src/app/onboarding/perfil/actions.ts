@@ -50,6 +50,10 @@ export async function submitProfile(
       : undefined;
   const display_name = metadataDisplayName ?? user.email?.split('@')[0] ?? parsed.data.username;
 
+  // Admin master: eng.arocha@gmail.com OU user_metadata.is_admin === true
+  const metaIsAdmin = user.user_metadata?.is_admin === true;
+  const isMasterAdmin = metaIsAdmin || user.email === 'eng.arocha@gmail.com';
+
   const { error: profileError } = await supabase.from('profiles').upsert(
     {
       id: user.id,
@@ -58,6 +62,8 @@ export async function submitProfile(
       daily_goal_questions: 20,
       is_public_in_leaderboard: true,
       onboarding_completed: false,
+      account_status: isMasterAdmin ? 'approved' : 'pending',
+      is_admin: isMasterAdmin,
     },
     { onConflict: 'id' },
   );
