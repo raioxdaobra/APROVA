@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DifficultyChip } from '@/components/difficulty-chip';
+import { KeyboardHintsOverlay } from '@/components/keyboard-hints-overlay';
+import { PomodoroTimer } from '@/components/pomodoro-timer';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import {
@@ -24,6 +28,7 @@ export interface QuizQuestion {
   question_num: number;
   image_url: string;
   annulled: boolean;
+  correct_pct?: number | null;
 }
 
 const DISCIPLINE_LABEL: Record<string, string> = {
@@ -138,6 +143,37 @@ export function QuizRunner({
   const currentMarked = current ? reviewMarked[current.id] === true : false;
   const isLast = currentIndex === total - 1;
   const isFirst = currentIndex === 0;
+
+  // Refs para handlers — atualizados em cada render. Permite registrar atalhos
+  // de teclado antes do early return sem violar ordem de hooks.
+  const handleAnswerRef = useRef<(letter: AnswerLetter) => void>(() => {});
+  const handleNextRef = useRef<() => void>(() => {});
+  const handlePrevRef = useRef<() => void>(() => {});
+
+  const shortcuts = useMemo(
+    () => ({
+      a: () => handleAnswerRef.current('A'),
+      b: () => handleAnswerRef.current('B'),
+      c: () => handleAnswerRef.current('C'),
+      d: () => handleAnswerRef.current('D'),
+      e: () => handleAnswerRef.current('E'),
+      ArrowLeft: () => handlePrevRef.current(),
+      ArrowRight: (e: KeyboardEvent) => {
+        e.preventDefault();
+        handleNextRef.current();
+      },
+      ' ': (e: KeyboardEvent) => {
+        e.preventDefault();
+        handleNextRef.current();
+      },
+      Enter: (e: KeyboardEvent) => {
+        e.preventDefault();
+        handleNextRef.current();
+      },
+    }),
+    [],
+  );
+  useKeyboardShortcuts(shortcuts);
 
   if (!current) {
     return (
@@ -269,6 +305,12 @@ export function QuizRunner({
   const showFeedback = currentAnswer.selected !== null && !current.annulled;
   const correctLetter = currentAnswer.correct;
 
+  // Atualiza refs (declarados antes do early return) com os handlers atuais —
+  // assim os atalhos de teclado sempre disparam a versão mais recente.
+  handleAnswerRef.current = handleAnswer;
+  handleNextRef.current = handleNext;
+  handlePrevRef.current = handlePrev;
+
   return (
     <>
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -290,6 +332,7 @@ export function QuizRunner({
           <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
             {current.subtopic_short}
           </span>
+          <DifficultyChip correct_pct={current.correct_pct ?? null} />
           {current.annulled ? (
             <span className="inline-flex items-center rounded-full bg-warning-bg px-3 py-1 text-xs font-semibold text-warning">
               Anulada
@@ -435,6 +478,9 @@ export function QuizRunner({
           +{xpToast} XP
         </div>
       ) : null}
+
+      <PomodoroTimer />
+      <KeyboardHintsOverlay />
     </>
   );
 }

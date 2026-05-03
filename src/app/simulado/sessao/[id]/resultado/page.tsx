@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DifficultyChip } from '@/components/difficulty-chip';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/server';
 import { disciplineBg, disciplineLabel } from '@/app/simulado/config';
@@ -110,6 +111,34 @@ export default async function ResultadoPage({
   };
 
   const attemptList = (attempts ?? []) as unknown as Joined[];
+
+  // Estatísticas globais (chip de dificuldade). Tolera ausência da view.
+  const statsById = new Map<string, number>();
+  if (attemptList.length > 0) {
+    try {
+      const ids = attemptList.map((a) => a.question_id);
+      type StatsRow = { question_id: string; correct_pct: number | null };
+      type StatsQuery = {
+        from: (table: 'question_stats') => {
+          select: (cols: string) => {
+            in: (col: string, vals: string[]) => Promise<{ data: StatsRow[] | null }>;
+          };
+        };
+      };
+      const sb = supabase as unknown as StatsQuery;
+      const { data: statsRows } = await sb
+        .from('question_stats')
+        .select('question_id, correct_pct')
+        .in('question_id', ids);
+      for (const row of statsRows ?? []) {
+        if (typeof row.correct_pct === 'number') {
+          statsById.set(row.question_id, row.correct_pct);
+        }
+      }
+    } catch {
+      // ignora
+    }
+  }
 
   // Ordenar pela ordem do filters.question_ids para apresentação consistente.
   const orderIndex = new Map<string, number>();
@@ -259,6 +288,10 @@ export default async function ResultadoPage({
                 <span className="flex-1 truncate text-muted-foreground">
                   {q?.subtopic_short ?? q?.subtopic ?? '—'}
                 </span>
+                <DifficultyChip
+                  correct_pct={statsById.has(a.question_id) ? statsById.get(a.question_id)! : null}
+                  className="shrink-0"
+                />
                 <span className="flex shrink-0 items-center gap-1 text-xs">
                   <span
                     className={cn(

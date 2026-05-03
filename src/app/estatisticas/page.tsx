@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ShareButton } from '@/components/share-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { Card } from '@/components/ui/card';
@@ -346,6 +347,17 @@ export default async function EstatisticasPage() {
           <StatCard label="XP total" value={formatNumber(totalXp)} />
           <StatCard label="Ranking" value={rankingPosition} />
         </section>
+
+        {(streakRow?.current_streak ?? 0) > 0 ? (
+          <div className="-mt-3 flex items-center justify-end">
+            <ShareButton
+              type="streak"
+              value={streakRow?.current_streak ?? 0}
+              user={username}
+              label="Compartilhar sequência"
+            />
+          </div>
+        ) : null}
 
         {/* Gráfico semanal */}
         <section aria-labelledby="weekly-chart" className="flex flex-col gap-3">

@@ -55,6 +55,33 @@ export default async function QuizSessionPage({ params }: PageProps) {
     throw new Error('Falha ao carregar questões.');
   }
 
+  // Estatísticas globais por questão (% de acerto). View criada em worktree A;
+  // tolera ausência (chip não renderiza). Tipagem da DB ainda não conhece
+  // a view, então castamos via unknown.
+  const statsById = new Map<string, number>();
+  try {
+    type StatsRow = { question_id: string; correct_pct: number | null };
+    type StatsQuery = {
+      from: (table: 'question_stats') => {
+        select: (cols: string) => {
+          in: (col: string, vals: string[]) => Promise<{ data: StatsRow[] | null }>;
+        };
+      };
+    };
+    const sb = supabase as unknown as StatsQuery;
+    const { data: statsRows } = await sb
+      .from('question_stats')
+      .select('question_id, correct_pct')
+      .in('question_id', questionIds);
+    for (const row of statsRows ?? []) {
+      if (typeof row.correct_pct === 'number') {
+        statsById.set(row.question_id, row.correct_pct);
+      }
+    }
+  } catch {
+    // View pode ainda não existir — ignora.
+  }
+
   // Preserva ordem do filters.question_ids
   const byId = new Map(questionRows.map((q) => [q.id, q]));
   const ordered: QuizQuestion[] = questionIds
@@ -70,6 +97,7 @@ export default async function QuizSessionPage({ params }: PageProps) {
       question_num: q.question_num,
       image_url: q.image_url,
       annulled: q.annulled === true,
+      correct_pct: statsById.has(q.id) ? statsById.get(q.id)! : null,
     }));
 
   // Marcação prévia "toreview"
