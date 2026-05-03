@@ -75,17 +75,18 @@ const FORCE_ANNULLED_IDS = new Set([
 function normalizeId(id: string): string {
   // Garante formato '{ano}-{semestre}_Q{num}' onde num pode ter qualquer
   // numero de digitos. Re-emite com 2 digitos minimos (Q08 padrao do dataset).
-  const m = id.match(/^([0-9]{4})-([12])_Q([0-9]+)$/);
+  const m = /^([0-9]{4})-([12])_Q([0-9]+)$/.exec(id);
   if (!m) return id;
-  return `${m[1]}-${m[2]}_Q${String(parseInt(m[3], 10)).padStart(2, '0')}`;
+  const [, year, semester, num] = m as unknown as [string, string, string, string];
+  return `${year}-${semester}_Q${String(parseInt(num, 10)).padStart(2, '0')}`;
 }
 
 function readQuestions(): RawQuestion[] {
   const html = readFileSync(HTML_PATH, 'utf8');
-  const m = html.match(
-    /<script id="questions-data" type="application\/json">([\s\S]*?)<\/script>/
+  const m = /<script id="questions-data" type="application\/json">([\s\S]*?)<\/script>/.exec(
+    html
   );
-  if (!m) throw new Error('Bloco <script id="questions-data"> nao encontrado.');
+  if (!m || !m[1]) throw new Error('Bloco <script id="questions-data"> nao encontrado.');
   return JSON.parse(m[1]) as RawQuestion[];
 }
 
@@ -200,7 +201,9 @@ async function main() {
   }
 
   const url = new URL(SUPABASE_DB_URL);
-  const ref = url.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/)![1];
+  const refMatch = /^db\.([a-z0-9]+)\.supabase\.co$/.exec(url.hostname);
+  if (!refMatch || !refMatch[1]) throw new Error(`SUPABASE_DB_URL host inesperado: ${url.hostname}`);
+  const ref = refMatch[1];
   const pg = new Client({
     host: process.env.SUPABASE_POOLER_HOST ?? 'aws-1-us-east-2.pooler.supabase.com',
     port: 5432,
