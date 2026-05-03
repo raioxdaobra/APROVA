@@ -634,3 +634,11 @@ begin
   return new;
 end;
 $$;
+
+-- -----------------------------------------------------------------------------
+-- FIX 6 — Index em simulado_bonuses(user_id)
+-- -----------------------------------------------------------------------------
+-- A FK simulado_bonuses.user_id -> profiles.id nao tinha index, e queries
+-- como "quantos bonus de simulado o usuario X recebeu" varriam a tabela.
+create index if not exists idx_simulado_bonuses_user
+  on public.simulado_bonuses (user_id);
