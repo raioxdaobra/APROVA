@@ -15,8 +15,8 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type AttemptContext = 'quiz' | 'revisao' | 'simulado' | 'review';
-export type StudySessionType = 'quiz' | 'revisao' | 'simulado';
+export type AttemptContext = 'quiz' | 'revisao' | 'simulado' | 'review' | 'diagnostic';
+export type StudySessionType = 'quiz' | 'revisao' | 'simulado' | 'diagnostic';
 export type Discipline = 'matematica' | 'fisica' | 'quimica' | 'biologia' | 'humanas' | 'linguagens';
 export type AnswerLetter = 'A' | 'B' | 'C' | 'D' | 'E';
 export type UserQuestionStatus = 'correct' | 'wrong' | 'toreview';
@@ -33,6 +33,7 @@ export interface Database {
           target_exam: string | null;
           daily_goal_questions: number | null;
           is_public_in_leaderboard: boolean | null;
+          onboarding_completed: boolean;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -44,6 +45,7 @@ export interface Database {
           target_exam?: string | null;
           daily_goal_questions?: number | null;
           is_public_in_leaderboard?: boolean | null;
+          onboarding_completed?: boolean;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -55,6 +57,7 @@ export interface Database {
           target_exam?: string | null;
           daily_goal_questions?: number | null;
           is_public_in_leaderboard?: boolean | null;
+          onboarding_completed?: boolean;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -379,6 +382,19 @@ export interface Database {
       award_simulado_xp: {
         Args: { p_session_id: string };
         Returns: number;
+      };
+      get_diagnostic_questions: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          id: string;
+          discipline: string;
+          subtopic: string;
+          subtopic_short: string;
+          year: number;
+          semester: number;
+          question_num: number;
+          image_url: string;
+        }>;
       };
     };
     Enums: Record<string, never>;
