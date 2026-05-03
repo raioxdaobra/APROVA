@@ -12,74 +12,67 @@ export async function GET() {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
+  const userId = user.id;
+
   const [
-    { data: profile },
-    { data: attempts },
-    { data: sessions },
-    { data: status },
-    { data: weekly },
-    { data: streak },
-    { data: mastery },
+    profileRes,
+    attemptsRes,
+    sessionsRes,
+    weeklyXpRes,
+    streakRes,
+    statusRes,
+    masteryRes,
   ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select(
-        'id, username, display_name, city, target_exam, daily_goal_questions, is_public_in_leaderboard, onboarding_completed, created_at, updated_at',
-      )
-      .eq('id', user.id)
-      .maybeSingle(),
+    supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
     supabase
       .from('attempts')
-      .select('id, question_id, answer, is_correct, time_spent_sec, context, session_id, created_at')
-      .eq('user_id', user.id)
+      .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: true }),
     supabase
       .from('study_sessions')
-      .select('id, type, filters, started_at, ended_at, total_questions, correct_count, duration_sec')
-      .eq('user_id', user.id)
+      .select('*')
+      .eq('user_id', userId)
       .order('started_at', { ascending: true }),
     supabase
-      .from('user_question_status')
-      .select('question_id, status, updated_at')
-      .eq('user_id', user.id),
-    supabase
       .from('weekly_xp')
-      .select('week_start, xp, questions_answered')
-      .eq('user_id', user.id)
+      .select('*')
+      .eq('user_id', userId)
       .order('week_start', { ascending: true }),
+    supabase.from('streaks').select('*').eq('user_id', userId).maybeSingle(),
     supabase
-      .from('streaks')
-      .select('current_streak, longest_streak, last_active_date, updated_at')
-      .eq('user_id', user.id)
-      .maybeSingle(),
+      .from('user_question_status')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: true }),
     supabase
       .from('subtopic_mastery')
-      .select('discipline, subtopic, granted_at')
-      .eq('user_id', user.id),
+      .select('*')
+      .eq('user_id', userId)
+      .order('granted_at', { ascending: true }),
   ]);
 
-  const exportPayload = {
+  const payload = {
     exported_at: new Date().toISOString(),
-    schema_version: 1,
-    profile: profile ?? null,
-    streak: streak ?? null,
-    attempts: attempts ?? [],
-    study_sessions: sessions ?? [],
-    user_question_status: status ?? [],
-    weekly_xp: weekly ?? [],
-    subtopic_mastery: mastery ?? [],
+    user: { id: userId, email: user.email ?? null },
+    profile: profileRes.data ?? null,
+    streak: streakRes.data ?? null,
+    attempts: attemptsRes.data ?? [],
+    study_sessions: sessionsRes.data ?? [],
+    weekly_xp: weeklyXpRes.data ?? [],
+    user_question_status: statusRes.data ?? [],
+    subtopic_mastery: masteryRes.data ?? [],
   };
 
-  const username = profile?.username ?? 'aprova';
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const filename = `aprova-${username}-${dateStr}.json`;
+  const stamp = new Date().toISOString().slice(0, 10);
+  const filename = `aprova-export-${stamp}.json`;
 
-  return new NextResponse(JSON.stringify(exportPayload, null, 2), {
+  return new NextResponse(JSON.stringify(payload, null, 2), {
     status: 200,
     headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'content-disposition': `attachment; filename="${filename}"`,
-      'cache-control': 'no-store',
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store',
     },
   });
 }
