@@ -64,15 +64,8 @@ export default async function DashboardPage() {
           </CardHeader>
         </Card>
 
-        <Button
-          type="button"
-          size="lg"
-          disabled
-          title="Disponível em breve"
-          aria-disabled="true"
-          className="w-full"
-        >
-          Resolver questões aleatórias
+        <Button asChild size="lg" className="w-full">
+          <Link href="/quiz?random=true">Resolver questões aleatórias</Link>
         </Button>
       </main>
 
