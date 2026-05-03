@@ -4,6 +4,8 @@ Banco de questões oficiais do vestibular de Medicina da Unifor (Universidade de
 
 > *Resolva mais de 1.000 questões. 20 anos de vestibular Unifor Medicina, organizadas por matéria.*
 
+**Produção:** https://aprova-five.vercel.app · **Design preview:** https://aprova-five.vercel.app/design
+
 ## Documentos de referência
 
 - `PRD_Plataforma_Unifor_Medicina.md` — produto, telas, modelo de dados, fórmulas
@@ -40,5 +42,7 @@ Visite `/design` para ver o preview do design system.
 
 ## Deploy
 
-- `main` → produção (Vercel auto-deploy)
-- `develop` → preview deploy (Vercel auto-deploy)
+- Projeto Vercel: `engarocha-7771s-projects/aprova` (linkado via `.vercel/project.json`)
+- Produção: `vercel --prod` no diretório raiz
+- Preview: `vercel` (sem `--prod`)
+- Aliases automáticos: `aprova-five.vercel.app` (produção)
