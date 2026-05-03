@@ -82,10 +82,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(u);
   }
 
-  // Onboarding pendente: força fluxo
+  // Onboarding pendente: força fluxo. Exceção: rotas /api/* completam suas
+  // próprias verificações de auth — redirecionar /api/* quebra fetches dos
+  // próprios formulários do onboarding (ex.: check de username).
   if (
     !completed &&
     !path.startsWith(ONBOARDING_PREFIX) &&
+    !path.startsWith('/api/') &&
     path !== DIAGNOSTIC_ROUTE &&
     !isPublic(path)
   ) {
