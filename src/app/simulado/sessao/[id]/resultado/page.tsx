@@ -88,7 +88,7 @@ export default async function ResultadoPage({
   const { data: attempts, error: aErr } = await supabase
     .from('attempts')
     .select(
-      'question_id, answer, is_correct, questions:question_id(id, discipline, subtopic, subtopic_short, year, semester, question_num, correct_answer)',
+      'question_id, answer, is_correct, questions:question_id(id, discipline, subtopic, subtopic_short, year, semester, question_num, correct_answer, image_url)',
     )
     .eq('session_id', session.id);
   if (aErr) {
@@ -108,6 +108,7 @@ export default async function ResultadoPage({
       semester: number;
       question_num: number;
       correct_answer: AnswerLetter | null;
+      image_url: string;
     } | null;
   };
 
@@ -183,7 +184,7 @@ export default async function ResultadoPage({
   );
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-4 px-4 py-6">
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-4 px-4 py-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-foreground">
           Resultado do simulado
@@ -319,6 +320,8 @@ export default async function ResultadoPage({
                     questionId={a.question_id}
                     discipline={q.discipline}
                     subtopic={q.subtopic}
+                    imageUrl={q.image_url}
+                    imageAlt={`Questão ${q.question_num} de ${q.year}.${q.semester} — ${disciplineLabel(q.discipline)}`}
                   >
                     {rowContent}
                   </QuestionResultExpander>

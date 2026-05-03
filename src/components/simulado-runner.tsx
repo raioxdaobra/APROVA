@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { KeyboardHintsOverlay } from '@/components/keyboard-hints-overlay';
+import { QuestionLayout } from '@/components/question-layout';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -196,6 +197,118 @@ export function SimuladoRunner({
     );
   }
 
+  const imageAlt = `Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`;
+
+  const imageSlot = (
+    <Card className="overflow-hidden p-0">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={current.image_url}
+        alt={imageAlt}
+        width={1200}
+        height={800}
+        className="h-auto w-full"
+        loading={currentIndex === 0 ? 'eager' : 'lazy'}
+      />
+    </Card>
+  );
+
+  const headerSlot = (
+    <div className="flex items-center justify-between gap-2">
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white',
+          disciplineBg(current.discipline),
+        )}
+      >
+        {disciplineLabel(current.discipline)}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {current.year}.{current.semester} · Q{current.question_num}
+      </span>
+    </div>
+  );
+
+  const alternativesSlot = (
+    <div className="flex flex-col gap-2">
+      {ANSWER_LETTERS.map((letter) => {
+        const isSelected = selectedLetter === letter;
+        return (
+          <button
+            key={letter}
+            type="button"
+            disabled={submitted}
+            onClick={() => handleSelect(letter)}
+            aria-pressed={isSelected}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left text-base font-medium transition-colors duration-motion-base disabled:opacity-40',
+              isSelected
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-border bg-card text-foreground hover:bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-full border font-semibold',
+                isSelected
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border',
+              )}
+            >
+              {letter}
+            </span>
+            <span>Alternativa {letter}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const footerSlot = (
+    <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
+      <Button
+        type="button"
+        variant="secondary"
+        size="md"
+        onClick={goPrev}
+        disabled={submitted || currentIndex === 0}
+      >
+        Anterior
+      </Button>
+      <Button
+        type="button"
+        variant="destructive"
+        size="md"
+        onClick={() => setConfirmOpen(true)}
+        disabled={submitted}
+      >
+        Finalizar agora
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        size="md"
+        onClick={goNext}
+        disabled={submitted || currentIndex === total - 1}
+      >
+        Próxima
+      </Button>
+    </div>
+  );
+
+  const bodySlot = (
+    <>
+      {headerSlot}
+      {alternativesSlot}
+      {errorMsg ? (
+        <p className="text-sm text-destructive" role="alert">
+          {errorMsg}
+        </p>
+      ) : null}
+      {footerSlot}
+    </>
+  );
+
   return (
     <>
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
@@ -217,104 +330,16 @@ export function SimuladoRunner({
         </span>
       </header>
 
-      <section className="flex flex-col gap-4 px-4 py-4">
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className={cn(
-              'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white',
-              disciplineBg(current.discipline),
-            )}
-          >
-            {disciplineLabel(current.discipline)}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {current.year}.{current.semester} · Q{current.question_num}
-          </span>
-        </div>
-
-        <Card className="overflow-hidden p-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={current.image_url}
-            alt={`Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`}
-            width={1200}
-            height={800}
-            className="h-auto w-full"
-            loading={currentIndex === 0 ? 'eager' : 'lazy'}
-          />
-        </Card>
-
-        <div className="flex flex-col gap-2">
-          {ANSWER_LETTERS.map((letter) => {
-            const isSelected = selectedLetter === letter;
-            return (
-              <button
-                key={letter}
-                type="button"
-                disabled={submitted}
-                onClick={() => handleSelect(letter)}
-                aria-pressed={isSelected}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left text-base font-medium transition-colors duration-motion-base disabled:opacity-40',
-                  isSelected
-                    ? 'border-primary bg-primary/10 text-foreground'
-                    : 'border-border bg-card text-foreground hover:bg-muted',
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-flex h-8 w-8 items-center justify-center rounded-full border font-semibold',
-                    isSelected
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border',
-                  )}
-                >
-                  {letter}
-                </span>
-                <span>Alternativa {letter}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {errorMsg ? (
-          <p className="text-sm text-destructive" role="alert">
-            {errorMsg}
-          </p>
-        ) : null}
+      <section className="px-4 py-4">
+        <QuestionLayout
+          image={imageSlot}
+          body={bodySlot}
+          imageUrl={current.image_url}
+          imageAlt={imageAlt}
+        />
       </section>
 
       <footer className="flex flex-col gap-3 border-t border-border bg-background px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="md"
-            onClick={goPrev}
-            disabled={submitted || currentIndex === 0}
-          >
-            Anterior
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="md"
-            onClick={() => setConfirmOpen(true)}
-            disabled={submitted}
-          >
-            Finalizar agora
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="md"
-            onClick={goNext}
-            disabled={submitted || currentIndex === total - 1}
-          >
-            Próxima
-          </Button>
-        </div>
-
         <GridNav
           total={total}
           currentIndex={currentIndex}

@@ -9,6 +9,7 @@ import { HelpPanel } from '@/components/help-panel';
 import { DifficultyChip } from '@/components/difficulty-chip';
 import { KeyboardHintsOverlay } from '@/components/keyboard-hints-overlay';
 import { PomodoroTimer } from '@/components/pomodoro-timer';
+import { QuestionLayout } from '@/components/question-layout';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -356,56 +357,61 @@ export function QuizRunner({
   handleNextRef.current = handleNext;
   handlePrevRef.current = handlePrev;
 
-  return (
-    <>
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white',
-              disciplineBg(current.discipline),
-            )}
-          >
-            {disciplineLabel(current.discipline)}
-          </span>
-          <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-            {current.year}.{current.semester}
-          </span>
-          <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-            #{current.question_num}
-          </span>
-          <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-            {current.subtopic_short}
-          </span>
-          <DifficultyChip correct_pct={current.correct_pct ?? null} />
-          {current.annulled ? (
-            <span className="inline-flex items-center rounded-full bg-warning-bg px-3 py-1 text-xs font-semibold text-warning">
-              Anulada
-            </span>
-          ) : null}
-        </div>
-        <span className="text-xs font-medium text-muted-foreground">
-          {currentIndex + 1} / {total}
+  const imageAlt = `Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`;
+
+  const imageSlot = (
+    <Card className="overflow-hidden p-0">
+      <div className="relative w-full bg-stone-100">
+        <Image
+          src={current.image_url}
+          alt={imageAlt}
+          width={1200}
+          height={800}
+          sizes="(max-width: 1024px) 100vw, 60vw"
+          className="h-auto w-full rounded-lg"
+          priority={currentIndex === 0}
+          unoptimized
+        />
+      </div>
+    </Card>
+  );
+
+  const headerSlot = (
+    <header className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white',
+            disciplineBg(current.discipline),
+          )}
+        >
+          {disciplineLabel(current.discipline)}
         </span>
-      </header>
+        <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+          {current.year}.{current.semester}
+        </span>
+        <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+          #{current.question_num}
+        </span>
+        <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+          {current.subtopic_short}
+        </span>
+        <DifficultyChip correct_pct={current.correct_pct ?? null} />
+        {current.annulled ? (
+          <span className="inline-flex items-center rounded-full bg-warning-bg px-3 py-1 text-xs font-semibold text-warning">
+            Anulada
+          </span>
+        ) : null}
+      </div>
+      <span className="text-xs font-medium text-muted-foreground">
+        {currentIndex + 1} / {total}
+      </span>
+    </header>
+  );
 
-      <Card className="overflow-hidden p-0">
-        <div className="relative w-full bg-stone-100">
-          <Image
-            src={current.image_url}
-            alt={`Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`}
-            width={1200}
-            height={800}
-            sizes="(max-width: 768px) 100vw, 768px"
-            className="h-auto w-full max-w-3xl rounded-lg"
-            priority={currentIndex === 0}
-            unoptimized
-          />
-        </div>
-      </Card>
-
-      <div className="flex flex-col gap-2">
-        {ANSWER_LETTERS.map((letter) => {
+  const alternativesSlot = (
+    <div className="flex flex-col gap-2">
+      {ANSWER_LETTERS.map((letter) => {
           const isSelected = currentAnswer.selected === letter;
           const isCorrect = correctLetter === letter;
           let stateClass = '';
@@ -449,7 +455,51 @@ export function QuizRunner({
             </Button>
           );
         })}
+    </div>
+  );
+
+  const footerSlot = (
+    <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <button
+        type="button"
+        onClick={handleToggleReview}
+        className={cn(
+          'inline-flex items-center gap-2 self-start rounded px-2 py-1 text-sm font-medium transition-colors',
+          currentMarked
+            ? 'text-warning hover:bg-warning-bg'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        <span aria-hidden>{currentMarked ? '★' : '☆'}</span>
+        {currentMarked ? 'Marcada para revisar' : 'Marcar p/ revisar depois'}
+      </button>
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={handlePrev}
+          disabled={isFirst}
+        >
+          ← Anterior
+        </Button>
+        <Button
+          type="button"
+          size="md"
+          onClick={handleNext}
+          disabled={finishing}
+        >
+          {isLast ? (finishing ? 'Finalizando…' : 'Finalizar') : 'Próxima →'}
+        </Button>
       </div>
+    </div>
+  );
+
+  const bodySlot = (
+    <>
+      {headerSlot}
+      {alternativesSlot}
 
       {current.annulled ? (
         <div className="rounded-lg bg-warning-bg p-3 text-sm text-warning" role="status">
@@ -488,45 +538,22 @@ export function QuizRunner({
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          onClick={handleToggleReview}
-          className={cn(
-            'inline-flex items-center gap-2 self-start rounded px-2 py-1 text-sm font-medium transition-colors',
-            currentMarked
-              ? 'text-warning hover:bg-warning-bg'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <span aria-hidden>{currentMarked ? '★' : '☆'}</span>
-          {currentMarked ? 'Marcada para revisar' : 'Marcar p/ revisar depois'}
-        </button>
+      {footerSlot}
+    </>
+  );
 
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="md"
-            onClick={handlePrev}
-            disabled={isFirst}
-          >
-            ← Anterior
-          </Button>
-          <Button
-            type="button"
-            size="md"
-            onClick={handleNext}
-            disabled={finishing}
-          >
-            {isLast ? (finishing ? 'Finalizando…' : 'Finalizar') : 'Próxima →'}
-          </Button>
-        </div>
-      </div>
+  return (
+    <>
+      <QuestionLayout
+        image={imageSlot}
+        body={bodySlot}
+        imageUrl={current.image_url}
+        imageAlt={imageAlt}
+      />
 
       {xpToast !== null ? (
         <div
-          className="pointer-events-none fixed right-4 top-4 z-50 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-lg transition-opacity"
+          className="pointer-events-none fixed right-4 top-4 z-[60] rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-lg transition-opacity"
           role="status"
         >
           +{xpToast} XP
