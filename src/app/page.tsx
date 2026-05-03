@@ -24,14 +24,16 @@ export default function HomePage() {
       </div>
 
       <div className="flex w-4/5 max-w-[360px] flex-col gap-3">
-        <form action={signInWithGoogle}>
-          <Button type="submit" variant="primary" size="lg" className="w-full gap-2">
-            <GoogleIcon />
-            Entrar com Google
-          </Button>
-        </form>
+        {process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === 'true' ? (
+          <form action={signInWithGoogle}>
+            <Button type="submit" variant="primary" size="lg" className="w-full gap-2">
+              <GoogleIcon />
+              Entrar com Google
+            </Button>
+          </form>
+        ) : null}
 
-        <Button asChild variant="secondary" size="lg" className="w-full">
+        <Button asChild variant="primary" size="lg" className="w-full">
           <Link href="/signup">Criar conta com email</Link>
         </Button>
       </div>
