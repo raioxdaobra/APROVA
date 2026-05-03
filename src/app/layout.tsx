@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { AnalyticsProvider } from '@/components/analytics-provider';
 import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from '@/components/ui/sonner';
 import { inter, jetbrainsMono } from '@/lib/fonts';
 import './globals.css';
 
@@ -29,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
         <Suspense fallback={null}>
           <AnalyticsProvider />
         </Suspense>
