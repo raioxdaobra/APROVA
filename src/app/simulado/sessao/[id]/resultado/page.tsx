@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { QuestionResultExpander } from '@/components/question-result-expander';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/server';
 import { disciplineBg, disciplineLabel } from '@/app/simulado/config';
@@ -234,15 +235,8 @@ export default async function ResultadoPage({
               : isWrong
                 ? 'border-l-error'
                 : 'border-l-neutral-200';
-            return (
-              // TODO: link to review when PR 5 lands
-              <li
-                key={a.question_id}
-                className={cn(
-                  'flex items-center gap-3 rounded-md border border-border border-l-4 bg-card px-3 py-2 text-sm',
-                  borderTone,
-                )}
-              >
+            const rowContent = (
+              <>
                 <span className="w-6 text-xs font-semibold text-muted-foreground tabular-nums">
                   {idx + 1}
                 </span>
@@ -277,6 +271,27 @@ export default async function ResultadoPage({
                     {q?.correct_answer ?? '—'}
                   </span>
                 </span>
+              </>
+            );
+            return (
+              <li
+                key={a.question_id}
+                className={cn(
+                  'rounded-md border border-border border-l-4 text-sm',
+                  borderTone,
+                )}
+              >
+                {q ? (
+                  <QuestionResultExpander
+                    questionId={a.question_id}
+                    discipline={q.discipline}
+                    subtopic={q.subtopic}
+                  >
+                    {rowContent}
+                  </QuestionResultExpander>
+                ) : (
+                  <div className="flex items-center gap-3 px-3 py-2">{rowContent}</div>
+                )}
               </li>
             );
           })}
