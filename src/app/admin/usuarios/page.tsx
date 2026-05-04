@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/server';
 import { approveUser, blockUser, unblockUser } from './actions';
+import { InviteForm } from './_components/invite-form';
 
 export const metadata = {
   title: 'Admin · Usuários — APROVA',
@@ -85,6 +86,10 @@ export default async function AdminUsersPage() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-16">
+        <section className="mb-6 rounded-lg border border-border bg-card p-4">
+          <InviteForm />
+        </section>
+
         {error ? (
           <p className="text-sm text-destructive">Erro ao carregar usuários: {error.message}</p>
         ) : null}

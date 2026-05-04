@@ -59,6 +59,23 @@ export async function submitGameScore(
     } = await supabase.auth.getUser();
     if (!user) return EMPTY;
 
+    // Gate: só conta no ranking se o user atingiu 15min de foco hoje
+    // (admin entra livre no jogo via gate-bypass na page, mas só pontua se cumpriu).
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Fortaleza',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const { data: focusRow } = await supabase
+      .from('daily_focus_minutes')
+      .select('minutes')
+      .eq('user_id', user.id)
+      .eq('day', today)
+      .maybeSingle();
+    const focusMinutes = focusRow?.minutes ?? 0;
+    const scoreCounts = focusMinutes >= 15;
+
     // Pega o melhor score atual antes do insert pra detectar new best.
     const { data: previousBest } = await supabase
       .from('game_scores')
@@ -70,7 +87,25 @@ export async function submitGameScore(
       .maybeSingle();
 
     const previousBestScore = (previousBest as { score: number } | null)?.score ?? -1;
-    const isNewBest = safeScore > previousBestScore;
+    const isNewBest = scoreCounts && safeScore > previousBestScore;
+
+    if (!scoreCounts) {
+      // Score não persiste; só retorna leaderboard sem inserir (modo avaliação admin).
+      const { data: lb } = await supabase
+        .from('game_leaderboard')
+        .select('username, display_name, best_score, plays, position')
+        .eq('game_id', game_id)
+        .order('position', { ascending: true })
+        .limit(10);
+      const leaderboard = (lb ?? []).map((row) => ({
+        username: row.username,
+        display_name: row.display_name,
+        best_score: row.best_score,
+        plays: row.plays,
+        position: row.position,
+      })) as LeaderboardRow[];
+      return { ok: true, best_score: previousBestScore >= 0 ? previousBestScore : null, is_new_best: false, leaderboard };
+    }
 
     const { error: insertError } = await supabase.from('game_scores').insert({
       user_id: user.id,

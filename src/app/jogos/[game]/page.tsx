@@ -46,16 +46,16 @@ export default async function GamePage({ params }: PageProps) {
     redirect('/');
   }
 
-  // Gate: precisa ter ≥ FOCUS_GATE_MINUTES de foco hoje.
+  // Gate: precisa ter ≥ FOCUS_GATE_MINUTES de foco hoje. Admins entram livres
+  // (mas score só conta no ranking se atingiram o gate — tratado em submitScore).
   const day = fortalezaIsoDay();
-  const { data: focusRow } = await supabase
-    .from('daily_focus_minutes')
-    .select('minutes')
-    .eq('user_id', user.id)
-    .eq('day', day)
-    .maybeSingle();
+  const [{ data: focusRow }, { data: profileRow }] = await Promise.all([
+    supabase.from('daily_focus_minutes').select('minutes').eq('user_id', user.id).eq('day', day).maybeSingle(),
+    supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle(),
+  ]);
   const focusMinutes = focusRow?.minutes ?? 0;
-  if (focusMinutes < FOCUS_GATE_MINUTES) {
+  const isAdmin = profileRow?.is_admin === true;
+  if (focusMinutes < FOCUS_GATE_MINUTES && !isAdmin) {
     redirect('/jogos');
   }
 
