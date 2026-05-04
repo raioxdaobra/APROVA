@@ -19,16 +19,16 @@ type GameLoader = () => Promise<{ default: ComponentType }>;
 // W5/W6 substitui null por `() => import('./<id>/Game')` quando o jogo
 // estiver pronto. Mantemos o map pra que webpack consiga gerar os chunks.
 const REGISTRY: Record<GameId, GameLoader | null> = {
-  mate_speed: null,
-  wordle: null,
-  memory_periodic: null,
-  snake_anatomy: null,
-  '2048': null,
-  trunfo: null,
-  corrida: null,
-  sudoku: null,
-  logica: null,
-  hanoi: null,
+  mate_speed: () => import('@/games/mate-speed/Game'),
+  wordle: () => import('@/games/wordle/Game'),
+  memory_periodic: () => import('@/games/memory-periodic/Game'),
+  snake_anatomy: () => import('@/games/snake-anatomy/Game'),
+  '2048': () => import('@/games/2048/Game'),
+  trunfo: () => import('@/games/trunfo/Game'),
+  corrida: () => import('@/games/corrida/Game'),
+  sudoku: () => import('@/games/sudoku/Game'),
+  logica: () => import('@/games/logica/Game'),
+  hanoi: () => import('@/games/hanoi/Game'),
 };
 
 export async function getGameComponent(
