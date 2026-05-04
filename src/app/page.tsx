@@ -1,94 +1,89 @@
-import { Suspense } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { InstallPrompt } from '@/components/install-prompt';
-import { OAuthErrorToast } from '@/components/oauth-error-toast';
-import { signInWithGoogle } from '@/app/(auth-actions)/google';
+import { HeroSection } from '@/components/landing/hero-section';
+import { ShowcaseSection } from '@/components/landing/showcase-section';
+import { FeaturesSection } from '@/components/landing/features-section';
+import { TrilhaPreviewSection } from '@/components/landing/trilha-preview-section';
+import { PricingSection } from '@/components/landing/pricing-section';
+import { TestimonialsSection } from '@/components/landing/testimonials-section';
+import { FaqSection } from '@/components/landing/faq-section';
+import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-8 px-4 py-10 text-center">
-      <Suspense fallback={null}>
-        <OAuthErrorToast />
-      </Suspense>
+    <main className="flex flex-col bg-background text-foreground">
+      <HeroSection />
+      <ShowcaseSection />
+      <FeaturesSection />
+      <TrilhaPreviewSection />
+      <PricingSection />
+      <TestimonialsSection />
+      <FaqSection />
 
-      <h1 className="text-5xl font-semibold tracking-tight text-primary">APROVA</h1>
+      {/* CTA final */}
+      <section className="container mx-auto max-w-4xl px-4 py-16 sm:py-24">
+        <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-background to-primary/5 p-10 text-center shadow-lg sm:p-16">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-30"
+            style={{
+              background:
+                'radial-gradient(ellipse 50% 50% at 50% 50%, rgba(196,99,59,0.25), transparent 70%)',
+            }}
+          />
+          <div className="relative">
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Sua aprovação começa hoje.
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-base text-muted-foreground">
+              Crie sua conta em 30 segundos. Sem cartão. Sem compromisso.
+            </p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button
+                asChild
+                variant="primary"
+                size="lg"
+                className="w-full shadow-[0_0_40px_-12px_rgba(196,99,59,0.6)] sm:w-auto"
+              >
+                <Link href="/signup">Começar grátis</Link>
+              </Button>
+              <Button asChild variant="secondary" size="lg" className="w-full sm:w-auto">
+                <Link href="/login">Já tenho conta</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-semibold leading-tight text-foreground sm:text-[28px]">
-          Resolva mais de 1.000 questões da Unifor Medicina.
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          20 anos de vestibular, organizados por matéria.
-        </p>
-      </div>
-
-      <div className="flex w-4/5 max-w-[360px] flex-col gap-3">
-        {process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === 'true' ? (
-          <form action={signInWithGoogle}>
-            <Button type="submit" variant="primary" size="lg" className="w-full gap-2">
-              <GoogleIcon />
-              Entrar com Google
-            </Button>
-          </form>
-        ) : null}
-
-        <Button asChild variant="primary" size="lg" className="w-full">
-          <Link href="/signup">Criar conta com email</Link>
-        </Button>
-      </div>
-
-      <Link href="/login" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-        Já tenho conta — entrar
-      </Link>
-
-      <p className="text-xs text-muted-foreground">Acesso por aprovação. Cadastre-se e aguarde liberação.</p>
-
-      <footer className="mt-8 flex flex-col items-center gap-3 text-xs text-muted-foreground">
-        <p>Sem custo. Sem anúncios. Para vestibulandos, por vestibulandos.</p>
-        <div className="flex gap-4">
-          <Link href="/sobre" className="hover:underline">
-            Sobre
-          </Link>
-          <Link href="/privacidade" className="hover:underline">
-            Privacidade
-          </Link>
-          <Link href="/termos" className="hover:underline">
-            Termos
-          </Link>
+      <footer className="border-t border-border bg-card">
+        <div className="container mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-10 sm:flex-row sm:justify-between">
+          <div className="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
+            <span className="text-2xl font-semibold tracking-tight text-primary">APROVA</span>
+            <p className="text-xs text-muted-foreground">
+              Feito em Fortaleza, pra quem vai passar na Unifor Medicina.
+            </p>
+          </div>
+          <nav
+            aria-label="Links institucionais"
+            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground"
+          >
+            <Link href="/sobre" className="hover:text-foreground hover:underline">
+              Sobre
+            </Link>
+            <Link href="/privacidade" className="hover:text-foreground hover:underline">
+              Privacidade
+            </Link>
+            <Link href="/termos" className="hover:text-foreground hover:underline">
+              Termos
+            </Link>
+            <Link href="/login" className="hover:text-foreground hover:underline">
+              Entrar
+            </Link>
+          </nav>
         </div>
       </footer>
 
       <InstallPrompt />
     </main>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fill="#FFFFFF"
-        d="M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.2086 1.125-.8427 2.0782-1.7959 2.7164v2.2581h2.9087c1.7018-1.5668 2.6836-3.874 2.6836-6.615z"
-      />
-      <path
-        fill="#FFFFFF"
-        d="M9 18c2.43 0 4.4673-.806 5.9564-2.1805l-2.9087-2.2581c-.806.54-1.8368.8595-3.0477.8595-2.344 0-4.3282-1.5832-5.036-3.7104H.9573v2.3318C2.4382 15.9831 5.4818 18 9 18z"
-      />
-      <path
-        fill="#FFFFFF"
-        d="M3.964 10.71c-.18-.54-.2823-1.1168-.2823-1.71s.1023-1.17.2823-1.71V4.9582H.9573C.3477 6.1731 0 7.5477 0 9s.3477 2.8268.9573 4.0418L3.964 10.71z"
-      />
-      <path
-        fill="#FFFFFF"
-        d="M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5813-2.5814C13.4632.8918 11.426 0 9 0 5.4818 0 2.4382 2.0168.9573 4.9582L3.964 7.29C4.6718 5.1627 6.656 3.5795 9 3.5795z"
-      />
-    </svg>
   );
 }
