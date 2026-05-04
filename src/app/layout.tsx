@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { AnalyticsProvider } from '@/components/analytics-provider';
 import { AuthProvider } from '@/components/auth-provider';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
@@ -18,6 +19,32 @@ export const metadata: Metadata = {
     capable: true,
     title: 'APROVA',
     statusBarStyle: 'default',
+    startupImage: [
+      // iPhone SE / 5/5s/5c (640x1136 @2x)
+      {
+        url: '/icons/splash-iphone-640x1136.png',
+        media:
+          '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)',
+      },
+      // iPhone 6/7/8 (750x1334 @2x)
+      {
+        url: '/icons/splash-iphone-750x1334.png',
+        media:
+          '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)',
+      },
+      // iPhone X / XS / 11 Pro / 12 mini / 13 mini (1125x2436 @3x)
+      {
+        url: '/icons/splash-iphone-1125x2436.png',
+        media:
+          '(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)',
+      },
+      // iPhone XS Max / 11 Pro Max (1242x2688 @3x)
+      {
+        url: '/icons/splash-iphone-1242x2688.png',
+        media:
+          '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)',
+      },
+    ],
   },
   icons: {
     icon: '/favicon.ico',
@@ -50,6 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeProvider>
           <AuthProvider initialSession={session}>
             {children}
+            <MobileBottomNav />
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

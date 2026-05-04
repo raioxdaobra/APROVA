@@ -9,7 +9,10 @@ interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
 }
 
-const DISMISS_KEY = 'aprova-install-dismissed';
+const DISMISS_KEY = 'aprova-install-dismissed-at';
+const FIRST_QUESTION_KEY = 'aprova-first-question-completed';
+const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const ENGAGEMENT_DELAY_MS = 60 * 1000; // 60 seconds of navigation
 
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
@@ -24,28 +27,42 @@ function isIos(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
+function readDismissedAt(): number | null {
+  try {
+    const raw = window.localStorage.getItem(DISMISS_KEY);
+    if (!raw) return null;
+    const ts = Number.parseInt(raw, 10);
+    return Number.isFinite(ts) ? ts : null;
+  } catch {
+    return null;
+  }
+}
+
+function isDismissedRecently(): boolean {
+  const ts = readDismissedAt();
+  if (ts === null) return false;
+  return Date.now() - ts < DISMISS_TTL_MS;
+}
+
+function hasCompletedFirstQuestion(): boolean {
+  try {
+    return window.localStorage.getItem(FIRST_QUESTION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function InstallPrompt(): JSX.Element | null {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIos, setShowIos] = useState(false);
-  const [dismissed, setDismissed] = useState(true);
+  const [eligible, setEligible] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let storedDismiss = false;
-    try {
-      storedDismiss = window.localStorage.getItem(DISMISS_KEY) === '1';
-    } catch {
-      storedDismiss = false;
-    }
-    if (storedDismiss) {
-      setDismissed(true);
+
+    if (isStandalone() || isDismissedRecently()) {
       return;
     }
-    if (isStandalone()) {
-      setDismissed(true);
-      return;
-    }
-    setDismissed(false);
 
     const onBeforeInstall = (e: Event): void => {
       e.preventDefault();
@@ -56,7 +73,7 @@ export function InstallPrompt(): JSX.Element | null {
     const onInstalled = (): void => {
       setDeferred(null);
       setShowIos(false);
-      setDismissed(true);
+      setEligible(false);
     };
     window.addEventListener('appinstalled', onInstalled);
 
@@ -64,19 +81,58 @@ export function InstallPrompt(): JSX.Element | null {
       setShowIos(true);
     }
 
+    // Engagement gates: 60s timer OR first-question signal (whichever first).
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const markEligible = (): void => {
+      setEligible(true);
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    if (hasCompletedFirstQuestion()) {
+      markEligible();
+    } else {
+      timer = setTimeout(markEligible, ENGAGEMENT_DELAY_MS);
+    }
+
+    const onFirstQuestion = (): void => {
+      try {
+        window.localStorage.setItem(FIRST_QUESTION_KEY, '1');
+      } catch {
+        // no-op
+      }
+      markEligible();
+    };
+    window.addEventListener('aprova:question-completed', onFirstQuestion);
+
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key === FIRST_QUESTION_KEY && e.newValue === '1') {
+        markEligible();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
+      window.removeEventListener('aprova:question-completed', onFirstQuestion);
+      window.removeEventListener('storage', onStorage);
+      if (timer !== null) clearTimeout(timer);
     };
   }, []);
 
   const handleDismiss = (): void => {
     try {
-      window.localStorage.setItem(DISMISS_KEY, '1');
+      window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
     } catch {
       // no-op
     }
-    setDismissed(true);
+    setDeferred(null);
+    setShowIos(false);
+    setEligible(false);
   };
 
   const handleInstall = async (): Promise<void> => {
@@ -91,7 +147,7 @@ export function InstallPrompt(): JSX.Element | null {
     handleDismiss();
   };
 
-  if (dismissed) return null;
+  if (!eligible) return null;
   if (!deferred && !showIos) return null;
 
   const message = deferred
@@ -103,6 +159,7 @@ export function InstallPrompt(): JSX.Element | null {
       role="dialog"
       aria-label="Instalar APROVA"
       className="fixed inset-x-0 bottom-0 z-40 mx-auto flex w-full max-w-sm items-center gap-3 border-t border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
     >
       <p className="flex-1 text-sm text-foreground">{message}</p>
       {deferred ? (
