@@ -54,6 +54,11 @@ export function UserMenu({
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
+          <Link href="/jogos" className="w-full cursor-pointer">
+            Jogos
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <Link href="/ranking" className="w-full cursor-pointer">
             Ranking
           </Link>
