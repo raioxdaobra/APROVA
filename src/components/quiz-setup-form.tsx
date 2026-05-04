@@ -10,9 +10,12 @@ import {
   countQuestions,
   getSubtopics,
   startQuizSessionAndRedirect,
+  checkQuestionsCapAction,
   type QuizFilters,
 } from '@/app/quiz/actions';
 import type { Discipline } from '@/lib/supabase/types';
+import { PaywallModal } from '@/components/paywall-modal';
+import { isStripeEnabledClient } from '@/lib/billing/stripe-client';
 
 const DISCIPLINE_OPTIONS: Array<{ value: Discipline | ''; label: string }> = [
   { value: '', label: 'Todas' },
@@ -68,6 +71,7 @@ export function QuizSetupForm({ years }: { years: number[] }) {
   const [counting, setCounting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, startTransition] = useTransition();
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const filters = useMemo(() => toFilters(state), [state]);
 
@@ -119,6 +123,11 @@ export function QuizSetupForm({ years }: { years: number[] }) {
     track('quiz_setup_started', { mode, ...filters });
     startTransition(async () => {
       try {
+        const cap = await checkQuestionsCapAction();
+        if (!cap.allowed) {
+          setPaywallOpen(true);
+          return;
+        }
         await startQuizSessionAndRedirect({ filters, mode });
       } catch (err) {
         if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
@@ -263,6 +272,13 @@ export function QuizSetupForm({ years }: { years: number[] }) {
           Aleatório
         </Button>
       </div>
+
+      <PaywallModal
+        open={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        reason="questions"
+        fallback={!isStripeEnabledClient()}
+      />
     </Card>
   );
 }

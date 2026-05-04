@@ -5,6 +5,10 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { AnswerLetter, Discipline, Json } from '@/lib/supabase/types';
 import { SIMULADO_DISCIPLINE_OPTIONS } from './config';
+import {
+  checkSimuladoCap,
+  incrementUsageCounter,
+} from '@/lib/billing/caps';
 
 const startSchema = z.object({
   total: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(90)]),
@@ -91,6 +95,12 @@ export async function startSimulado(input: StartSimuladoInput): Promise<void> {
     redirect('/');
   }
 
+  // Cap check (free tier = 1 simulado lifetime).
+  const cap = await checkSimuladoCap(supabase, user.id);
+  if (!cap.allowed) {
+    throw new Error('Limite de simulados grátis atingido. Assine o Pro.');
+  }
+
   // Carrega pool de questões não anuladas (apenas id + discipline).
   let poolQuery = supabase
     .from('questions')
@@ -151,7 +161,34 @@ export async function startSimulado(input: StartSimuladoInput): Promise<void> {
     throw new Error('Falha ao iniciar simulado.');
   }
 
+  // Incrementa contador de simulados usados (free tier).
+  await incrementUsageCounter(supabase, user.id, 'simulados_used_count');
+
   redirect(`/simulado/sessao/${created.id}`);
+}
+
+export type SimuladoCapResult = {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  plan: 'free' | 'pro';
+};
+
+export async function checkSimuladoCapAction(): Promise<SimuladoCapResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { allowed: false, used: 0, limit: 0, plan: 'free' };
+  }
+  const cap = await checkSimuladoCap(supabase, user.id);
+  return {
+    allowed: cap.allowed,
+    used: cap.used,
+    limit: Number.isFinite(cap.limit) ? cap.limit : 0,
+    plan: cap.plan,
+  };
 }
 
 const finalizeAnswerSchema = z.object({
