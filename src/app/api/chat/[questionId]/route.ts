@@ -22,6 +22,8 @@ import { chatSystemPrompt } from '@/lib/llm/prompts';
 import { RateLimitError } from '@/lib/llm/types';
 import type { ChatMessage } from '@/lib/llm/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getPlanInfo, FREE_CHAT_DAILY_LIMIT } from '@/lib/billing/caps';
+import type { Database } from '@/lib/supabase/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -162,8 +164,34 @@ export async function POST(
 
   const questionId = context.params.questionId;
 
-  // Cost guards
+  // Plan-aware cost guards: free plan = 5/dia; pro/global hard cap = 100/dia.
   try {
+    const planInfo = await getPlanInfo(
+      supabase as unknown as SupabaseClient<Database>,
+      user.id,
+    );
+    if (!planInfo.isPro) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: usage } = await (supabase as SupabaseClient)
+        .from('daily_chat_usage')
+        .select('msg_count')
+        .eq('user_id', user.id)
+        .eq('day', today)
+        .maybeSingle();
+      const used = Number(
+        (usage as { msg_count?: number } | null)?.msg_count ?? 0,
+      );
+      if (used >= FREE_CHAT_DAILY_LIMIT) {
+        return NextResponse.json(
+          {
+            error: 'rate_limited',
+            scope: 'plan_free',
+            message: `Plano grátis limitado a ${FREE_CHAT_DAILY_LIMIT} perguntas/dia. Assine o Pro para chat ilimitado.`,
+          },
+          { status: 429 },
+        );
+      }
+    }
     await checkUserCap(supabase, user.id);
     await checkGlobalCap(supabase);
   } catch (err) {

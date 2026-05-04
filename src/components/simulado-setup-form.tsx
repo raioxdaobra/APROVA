@@ -4,7 +4,9 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { startSimulado } from '@/app/simulado/actions';
+import { startSimulado, checkSimuladoCapAction } from '@/app/simulado/actions';
+import { PaywallModal } from '@/components/paywall-modal';
+import { isStripeEnabledClient } from '@/lib/billing/stripe-client';
 import {
   SIMULADO_TOTAL_OPTIONS,
   SIMULADO_TIME_OPTIONS,
@@ -36,12 +38,18 @@ export function SimuladoSetupForm() {
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
     startTransition(async () => {
       try {
+        const cap = await checkSimuladoCapAction();
+        if (!cap.allowed) {
+          setPaywallOpen(true);
+          return;
+        }
         await startSimulado({
           total,
           time_limit_min: timeMin,
@@ -133,6 +141,13 @@ export function SimuladoSetupForm() {
       <Button type="submit" size="lg" disabled={isPending} className="w-full">
         {isPending ? 'Preparando...' : 'Começar simulado'}
       </Button>
+
+      <PaywallModal
+        open={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        reason="simulado"
+        fallback={!isStripeEnabledClient()}
+      />
     </form>
   );
 }

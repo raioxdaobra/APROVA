@@ -4,6 +4,10 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { AnswerLetter, Json } from '@/lib/supabase/types';
+import {
+  checkQuestionsCap,
+  incrementUsageCounter,
+} from '@/lib/billing/caps';
 
 const EXAM = 'unifor-medicina';
 const MAX_QUIZ_QUESTIONS = 60;
@@ -243,6 +247,27 @@ export async function startQuizSessionAndRedirect(input: StartQuizInput): Promis
   redirect(`/quiz/sessao/${res.sessionId}`);
 }
 
+export type QuizCapResult =
+  | { allowed: true; used: number; limit: number; plan: 'free' | 'pro' }
+  | { allowed: false; used: number; limit: number; plan: 'free' | 'pro' };
+
+export async function checkQuestionsCapAction(): Promise<QuizCapResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { allowed: false, used: 0, limit: 0, plan: 'free' };
+  }
+  const cap = await checkQuestionsCap(supabase, user.id);
+  return {
+    allowed: cap.allowed,
+    used: cap.used,
+    limit: Number.isFinite(cap.limit) ? cap.limit : 0,
+    plan: cap.plan,
+  };
+}
+
 const submitAttemptSchema = z.object({
   session_id: z.string().uuid(),
   question_id: z.string().min(1),
@@ -310,6 +335,9 @@ export async function submitAttempt(input: SubmitAttemptInput): Promise<SubmitAt
   if (insertErr) {
     return { ok: false, error: 'Falha ao salvar resposta.' };
   }
+
+  // Incrementa contador de uso (free tier — pro skip via helper).
+  await incrementUsageCounter(supabase, user.id, 'questions_used_count');
 
   // Atualiza status pessoal (correct/wrong) — não sobrescreve 'toreview' implicitamente
   if (!annulled) {
