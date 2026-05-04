@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { QuestionLayout } from '@/components/question-layout';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { finishDiagnostic } from '@/app/diagnostico/actions';
@@ -163,7 +164,26 @@ export function DiagnosticRunner({
 
   const submitting = phase === 'submitting' || isPending;
 
-  return (
+  const imageAlt = `Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`;
+
+  const imageSlot = (
+    <Card className="overflow-hidden p-0">
+      <div className="relative w-full">
+        <Image
+          src={current.image_url}
+          alt={imageAlt}
+          width={1200}
+          height={800}
+          sizes="(max-width: 1024px) 100vw, 60vw"
+          className="h-auto w-full"
+          priority={currentIndex === 0}
+          unoptimized
+        />
+      </div>
+    </Card>
+  );
+
+  const bodySlot = (
     <>
       <header className="flex items-start justify-between gap-3">
         <span
@@ -178,21 +198,6 @@ export function DiagnosticRunner({
           {currentIndex + 1} / {total}
         </span>
       </header>
-
-      <Card className="overflow-hidden p-0">
-        <div className="relative w-full">
-          <Image
-            src={current.image_url}
-            alt={`Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`}
-            width={1200}
-            height={800}
-            sizes="(max-width: 768px) 100vw, 768px"
-            className="h-auto w-full"
-            priority={currentIndex === 0}
-            unoptimized
-          />
-        </div>
-      </Card>
 
       <div className="flex flex-col gap-2">
         {ANSWER_LETTERS.map((letter) => (
@@ -223,6 +228,15 @@ export function DiagnosticRunner({
         <p className="text-center text-sm text-muted-foreground">Salvando suas respostas…</p>
       ) : null}
     </>
+  );
+
+  return (
+    <QuestionLayout
+      image={imageSlot}
+      body={bodySlot}
+      imageUrl={current.image_url}
+      imageAlt={imageAlt}
+    />
   );
 }
 

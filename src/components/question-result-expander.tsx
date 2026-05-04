@@ -1,15 +1,22 @@
 'use client';
 /**
  * Expander de uma linha de resultado de simulado.
- * Ao clicar em "Ver explicação", abre o HelpPanel da questão.
+ * Ao expandir, mostra mini-versão do `QuestionLayout` (imagem à esquerda em
+ * desktop, explicação à direita) — sem fullscreen, mas com lightbox.
  */
 import { useState, type ReactNode } from 'react';
+import { Card } from '@/components/ui/card';
 import { HelpPanel } from '@/components/help-panel';
+import { QuestionLayout } from '@/components/question-layout';
 
 interface Props {
   questionId: string;
   discipline: string;
   subtopic: string;
+  /** URL da imagem da questão. Quando ausente, omite a coluna de imagem. */
+  imageUrl?: string;
+  /** Alt da imagem para a11y. */
+  imageAlt?: string;
   /** Conteúdo do row (cabeçalho da linha, número, badges, etc.) */
   children: ReactNode;
 }
@@ -18,9 +25,20 @@ export function QuestionResultExpander({
   questionId,
   discipline,
   subtopic,
+  imageUrl,
+  imageAlt,
   children,
 }: Props) {
   const [open, setOpen] = useState(false);
+
+  const helpPanel = (
+    <HelpPanel
+      questionId={questionId}
+      discipline={discipline}
+      subtopic={subtopic}
+    />
+  );
+
   return (
     <div className="rounded-md border border-border bg-card">
       <button
@@ -36,11 +54,27 @@ export function QuestionResultExpander({
       </button>
       {open ? (
         <div className="border-t border-border p-3">
-          <HelpPanel
-            questionId={questionId}
-            discipline={discipline}
-            subtopic={subtopic}
-          />
+          {imageUrl ? (
+            <QuestionLayout
+              enableFullscreen={false}
+              image={
+                <Card className="overflow-hidden p-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUrl}
+                    alt={imageAlt ?? 'Imagem da questão'}
+                    className="h-auto w-full"
+                    loading="lazy"
+                  />
+                </Card>
+              }
+              body={helpPanel}
+              imageUrl={imageUrl}
+              imageAlt={imageAlt ?? 'Imagem da questão'}
+            />
+          ) : (
+            helpPanel
+          )}
         </div>
       ) : null}
     </div>
