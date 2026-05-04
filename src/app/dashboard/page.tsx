@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { RankBadge } from '@/components/rank-badge';
 import { DailyMissionsCard } from '@/components/daily-missions-card';
+import { PomodoroRestModal } from '@/components/pomodoro-rest-modal';
 import { VestibularCountdown } from '@/components/vestibular-countdown';
 import { createClient } from '@/lib/supabase/server';
 
@@ -299,7 +300,7 @@ export default async function DashboardPage() {
         <DailyMissionsCard />
 
         <section aria-label="Modos de estudo" className="-mx-4 px-4">
-          <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
+          <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0">
             <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
               <CardTitle className="text-base">Quiz por disciplina</CardTitle>
               <CardDescription>Escolha a matéria e treine focado.</CardDescription>
@@ -323,6 +324,15 @@ export default async function DashboardPage() {
               </CardDescription>
               <Button asChild variant="secondary" size="sm" className="mt-2">
                 <Link href="/quiz?status=wrong">Revisar</Link>
+              </Button>
+            </Card>
+            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
+              <CardTitle className="text-base">Jogos</CardTitle>
+              <CardDescription>
+                10 mini-games. Estude 15 min hoje e desbloqueie.
+              </CardDescription>
+              <Button asChild variant="secondary" size="sm" className="mt-2">
+                <Link href="/jogos">Abrir lobby</Link>
               </Button>
             </Card>
           </div>
@@ -438,6 +448,8 @@ export default async function DashboardPage() {
           Termos
         </Link>
       </footer>
+
+      <PomodoroRestModal />
     </div>
   );
 }

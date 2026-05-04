@@ -1,11 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { incrementFocusMinutes } from '@/app/jogos/actions';
 
 export type PomodoroPhase = 'focus' | 'break';
 
 const FOCUS_SEC = 25 * 60;
 const BREAK_SEC = 5 * 60;
+const FOCUS_MIN = 25;
+
+/** Evento global emitido quando um ciclo de foco termina. */
+export const FOCUS_COMPLETE_EVENT = 'aprova:focus-complete';
+
+export interface FocusCompleteDetail {
+  /** Total acumulado de minutos focados hoje (após o incremento). */
+  totalToday: number;
+  /** Minutos creditados pelo ciclo que acabou de fechar. */
+  minutesCredited: number;
+}
 
 const STORAGE_KEY = 'aprova-pomodoro-state';
 
@@ -112,6 +124,7 @@ export function usePomodoro(): UsePomodoroResult {
   useEffect(() => {
     if (!state.running) return;
     if (computedRemaining > 0) return;
+    const endingPhase = state.phase;
     setState((prev) => {
       const nextPhase: PomodoroPhase = prev.phase === 'focus' ? 'break' : 'focus';
       const nextLen = phaseLength(nextPhase);
@@ -128,7 +141,33 @@ export function usePomodoro(): UsePomodoroResult {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate([60, 40, 60]);
     }
-  }, [computedRemaining, state.running]);
+    // Quando um ciclo de FOCO termina, credita 25 min em daily_focus_minutes
+    // e dispara evento global pra UI sugerir descanso/jogos.
+    if (endingPhase === 'focus') {
+      void incrementFocusMinutes(FOCUS_MIN)
+        .then((res) => {
+          if (typeof window === 'undefined') return;
+          const detail: FocusCompleteDetail = {
+            totalToday: res.totalToday,
+            minutesCredited: FOCUS_MIN,
+          };
+          window.dispatchEvent(
+            new CustomEvent<FocusCompleteDetail>(FOCUS_COMPLETE_EVENT, { detail }),
+          );
+        })
+        .catch(() => {
+          // Falha silenciosa — graceful (offline, sessão expirada, etc).
+          if (typeof window === 'undefined') return;
+          const detail: FocusCompleteDetail = {
+            totalToday: 0,
+            minutesCredited: FOCUS_MIN,
+          };
+          window.dispatchEvent(
+            new CustomEvent<FocusCompleteDetail>(FOCUS_COMPLETE_EVENT, { detail }),
+          );
+        });
+    }
+  }, [computedRemaining, state.running, state.phase]);
 
   const start = useCallback(() => {
     setState((prev) => {
