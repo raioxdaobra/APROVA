@@ -35,6 +35,26 @@ export type GameId =
   | 'logica'
   | 'hanoi';
 
+export type TrilhaRankId =
+  | 'calouro'
+  | 'pre_vest'
+  | 'estudante'
+  | 'aspirante'
+  | 'vestibulando'
+  | 'expert'
+  | 'genio'
+  | 'aprovado';
+
+export type TrilhaGoalType =
+  | 'answer_questions'
+  | 'answer_correct'
+  | 'complete_simulado'
+  | 'master_subtopics'
+  | 'reach_streak'
+  | 'complete_diagnostic'
+  | 'play_game'
+  | 'focus_minutes';
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -761,6 +781,82 @@ export interface Database {
           },
         ];
       };
+      trilha_stations: {
+        Row: {
+          id: string;
+          rank_id: TrilhaRankId;
+          position: number;
+          title: string;
+          description: string;
+          goal_type: TrilhaGoalType;
+          goal_target: number;
+          goal_filter: Json | null;
+          xp_reward: number;
+          badge_reward: string | null;
+        };
+        Insert: {
+          id: string;
+          rank_id: TrilhaRankId;
+          position: number;
+          title: string;
+          description: string;
+          goal_type: TrilhaGoalType;
+          goal_target: number;
+          goal_filter?: Json | null;
+          xp_reward: number;
+          badge_reward?: string | null;
+        };
+        Update: {
+          id?: string;
+          rank_id?: TrilhaRankId;
+          position?: number;
+          title?: string;
+          description?: string;
+          goal_type?: TrilhaGoalType;
+          goal_target?: number;
+          goal_filter?: Json | null;
+          xp_reward?: number;
+          badge_reward?: string | null;
+        };
+        Relationships: [];
+      };
+      user_trilha_progress: {
+        Row: {
+          user_id: string;
+          station_id: string;
+          progress: number;
+          completed: boolean;
+          completed_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          station_id: string;
+          progress?: number;
+          completed?: boolean;
+          completed_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          station_id?: string;
+          progress?: number;
+          completed?: boolean;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'user_trilha_progress_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'user_trilha_progress_station_id_fkey';
+            columns: ['station_id'];
+            referencedRelation: 'trilha_stations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {
       weekly_leaderboard: {
@@ -791,6 +887,24 @@ export interface Database {
           best_score: number;
           plays: number;
           position: number;
+        };
+        Relationships: [];
+      };
+      user_trilha_full: {
+        Row: {
+          id: string;
+          rank_id: TrilhaRankId;
+          position: number;
+          title: string;
+          description: string;
+          goal_type: TrilhaGoalType;
+          goal_target: number;
+          goal_filter: Json | null;
+          xp_reward: number;
+          badge_reward: string | null;
+          user_progress: number;
+          user_completed: boolean;
+          completed_at: string | null;
         };
         Relationships: [];
       };

@@ -299,7 +299,7 @@ export default async function DashboardPage() {
         <DailyMissionsCard />
 
         <section aria-label="Modos de estudo" className="-mx-4 px-4">
-          <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
+          <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0">
             <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
               <CardTitle className="text-base">Quiz por disciplina</CardTitle>
               <CardDescription>Escolha a matéria e treine focado.</CardDescription>
@@ -323,6 +323,15 @@ export default async function DashboardPage() {
               </CardDescription>
               <Button asChild variant="secondary" size="sm" className="mt-2">
                 <Link href="/quiz?status=wrong">Revisar</Link>
+              </Button>
+            </Card>
+            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
+              <CardTitle className="text-base">Trilha</CardTitle>
+              <CardDescription>
+                40 estações para conquistar, do Calouro ao Aprovado.
+              </CardDescription>
+              <Button asChild variant="secondary" size="sm" className="mt-2">
+                <Link href="/trilha">Ver trilha</Link>
               </Button>
             </Card>
           </div>

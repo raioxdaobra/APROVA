@@ -17,7 +17,8 @@
     "gen:solutions": "tsx scripts/generate-solutions.ts",
     "gen:theory": "tsx scripts/generate-theory.ts",
     "gen:achievements": "tsx scripts/seed-achievements.ts",
-    "gen:stats": "tsx scripts/refresh-question-stats.ts"
+    "gen:stats": "tsx scripts/refresh-question-stats.ts",
+    "gen:trilha": "tsx scripts/seed-trilha.ts"
   },
   "dependencies": {
     "@cerebras/cerebras_cloud_sdk": "^1.64.1",
