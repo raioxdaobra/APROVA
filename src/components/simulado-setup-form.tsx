@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -39,13 +40,15 @@ export function SimuladoSetupForm() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const previewFreeMode = searchParams?.get('preview') === 'free';
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
     startTransition(async () => {
       try {
-        const cap = await checkSimuladoCapAction();
+        const cap = await checkSimuladoCapAction({ previewFreeMode });
         if (!cap.allowed) {
           setPaywallOpen(true);
           return;

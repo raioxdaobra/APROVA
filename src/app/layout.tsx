@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
+import { AdminBanner } from '@/components/admin-banner';
 import { AnalyticsProvider } from '@/components/analytics-provider';
 import { AuthProvider } from '@/components/auth-provider';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
@@ -64,6 +65,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     data: { session },
   } = await supabase.auth.getSession();
 
+  let isAdmin = false;
+  if (session?.user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    isAdmin = profile?.is_admin === true;
+  }
+
   return (
     <html lang="pt-BR" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
@@ -76,6 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ThemeProvider>
           <AuthProvider initialSession={session}>
+            <AdminBanner isAdmin={isAdmin} />
             {children}
             <MobileBottomNav />
             <Toaster />

@@ -29,7 +29,7 @@ const FAQS: FaqItem[] = [
   {
     question: 'As questões são realmente da prova oficial?',
     answer:
-      'Todas as 680+ questões vêm de provas oficiais da Unifor Medicina dos últimos 20 anos. Cada questão é marcada com ano, matéria e dificuldade. Questões anuladas pela banca são excluídas do banco.',
+      'Todas as 1.000+ questões vêm de provas oficiais da Unifor Medicina dos últimos 20 anos. Cada questão é marcada com ano, matéria e dificuldade. Questões anuladas pela banca são excluídas do banco.',
   },
   {
     question: 'A IA é confiável pra estudar pra prova?',

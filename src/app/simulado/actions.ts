@@ -171,10 +171,12 @@ export type SimuladoCapResult = {
   allowed: boolean;
   used: number;
   limit: number;
-  plan: 'free' | 'pro';
+  plan: 'free' | 'pro' | 'admin';
 };
 
-export async function checkSimuladoCapAction(): Promise<SimuladoCapResult> {
+export async function checkSimuladoCapAction(
+  options: { previewFreeMode?: boolean } = {},
+): Promise<SimuladoCapResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -182,7 +184,7 @@ export async function checkSimuladoCapAction(): Promise<SimuladoCapResult> {
   if (!user) {
     return { allowed: false, used: 0, limit: 0, plan: 'free' };
   }
-  const cap = await checkSimuladoCap(supabase, user.id);
+  const cap = await checkSimuladoCap(supabase, user.id, options);
   return {
     allowed: cap.allowed,
     used: cap.used,

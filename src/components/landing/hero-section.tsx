@@ -2,10 +2,12 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { OAuthErrorToast } from '@/components/oauth-error-toast';
+import { AuroraBackground } from '@/components/landing/aurora-background';
+import { HeroCountUp } from '@/components/landing/hero-count-up';
 import { signInWithGoogle } from '@/app/(auth-actions)/google';
 
 /**
- * Hero da landing: gradient cobre→stone animado, headline forte, CTAs.
+ * Hero da landing: aurora animado, headline com count-up, CTAs.
  * Server Component — usa form action para Google OAuth (escondido por feature flag).
  */
 export function HeroSection() {
@@ -17,29 +19,7 @@ export function HeroSection() {
       className="relative isolate overflow-hidden"
       aria-labelledby="hero-title"
     >
-      {/* Gradient animado de fundo */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 -z-10 bg-gradient-to-b from-primary-light via-background to-background"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 opacity-60"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(196,99,59,0.18), transparent 70%), radial-gradient(ellipse 50% 40% at 80% 20%, rgba(168,81,40,0.12), transparent 70%)',
-        }}
-      />
-      {/* Grid sutil em cima do gradient */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.04] dark:opacity-[0.08]"
-        style={{
-          backgroundImage:
-            'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
+      <AuroraBackground className="-z-10 opacity-[0.07] dark:opacity-[0.12]" />
 
       <Suspense fallback={null}>
         <OAuthErrorToast />
@@ -55,11 +35,8 @@ export function HeroSection() {
           id="hero-title"
           className="max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
-          Resolva mais de{' '}
-          <span className="bg-gradient-to-r from-primary via-primary-dark to-primary bg-clip-text text-transparent">
-            1.000 questões
-          </span>{' '}
-          da Unifor Medicina.
+          Resolva mais de <HeroCountUp target={1000} />{' '}
+          questões da Unifor Medicina.
         </h1>
 
         <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
@@ -72,7 +49,7 @@ export function HeroSection() {
             asChild
             variant="primary"
             size="lg"
-            className="group relative w-full overflow-hidden shadow-[0_0_40px_-12px_rgba(196,99,59,0.6)] hover:shadow-[0_0_50px_-8px_rgba(196,99,59,0.8)] sm:w-auto"
+            className="aurora-cta group relative w-full overflow-hidden sm:w-auto"
           >
             <Link href="/signup">
               <span className="relative z-10">Começar grátis</span>

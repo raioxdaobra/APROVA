@@ -119,6 +119,30 @@ export async function getYears(): Promise<number[]> {
   return [...set].sort((a, b) => b - a);
 }
 
+export interface DisciplineFrequency {
+  discipline: string;
+  count: number;
+}
+
+export async function getDisciplineFrequency(): Promise<DisciplineFrequency[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('questions')
+    .select('discipline, annulled')
+    .eq('exam', EXAM);
+  if (error || !data) return [];
+  const counts = new Map<string, number>();
+  for (const row of data) {
+    if (row.annulled) continue;
+    const d = row.discipline as string | null;
+    if (!d) continue;
+    counts.set(d, (counts.get(d) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([discipline, count]) => ({ discipline, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 export async function countQuestions(input: QuizFilters): Promise<number> {
   const parsed = filtersSchema.safeParse(input);
   if (!parsed.success) return 0;
@@ -248,10 +272,12 @@ export async function startQuizSessionAndRedirect(input: StartQuizInput): Promis
 }
 
 export type QuizCapResult =
-  | { allowed: true; used: number; limit: number; plan: 'free' | 'pro' }
-  | { allowed: false; used: number; limit: number; plan: 'free' | 'pro' };
+  | { allowed: true; used: number; limit: number; plan: 'free' | 'pro' | 'admin' }
+  | { allowed: false; used: number; limit: number; plan: 'free' | 'pro' | 'admin' };
 
-export async function checkQuestionsCapAction(): Promise<QuizCapResult> {
+export async function checkQuestionsCapAction(
+  options: { previewFreeMode?: boolean } = {},
+): Promise<QuizCapResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -259,7 +285,7 @@ export async function checkQuestionsCapAction(): Promise<QuizCapResult> {
   if (!user) {
     return { allowed: false, used: 0, limit: 0, plan: 'free' };
   }
-  const cap = await checkQuestionsCap(supabase, user.id);
+  const cap = await checkQuestionsCap(supabase, user.id, options);
   return {
     allowed: cap.allowed,
     used: cap.used,
