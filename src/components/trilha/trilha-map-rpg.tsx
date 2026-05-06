@@ -440,10 +440,11 @@ function TrilhaStationNode({
         )}
       </button>
 
-      {/* Título embaixo */}
+      {/* Título embaixo (multi-linha, sem truncar) */}
       <span
         className={cn(
-          'mt-2 max-w-[120px] truncate text-center text-[11px] font-medium',
+          'mt-2 max-w-[140px] text-center text-[11px] font-medium leading-tight',
+          'whitespace-normal break-words',
           isLocked ? 'text-muted-foreground' : 'text-foreground',
         )}
         title={station.title}
