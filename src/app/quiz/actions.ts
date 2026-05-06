@@ -281,6 +281,126 @@ export async function startQuizSessionAndRedirect(input: StartQuizInput): Promis
   redirect(`/quiz/sessao/${res.sessionId}`);
 }
 
+const topicsQuizSchema = z.object({
+  topics: z
+    .array(
+      z.object({
+        discipline: disciplineSchema,
+        subtopic: z.string().min(1),
+      }),
+    )
+    .min(1)
+    .max(50),
+  mode: z.enum(['sequencial', 'aleatorio']).optional(),
+});
+
+export type StartTopicsQuizInput = z.infer<typeof topicsQuizSchema>;
+
+/**
+ * Inicia uma sessão de quiz cobrindo um conjunto de pares (discipline,subtopic).
+ * Usado pelo CTA "Estudar o que MAIS CAI" no `<TopicMapMatrix mode='quiz'>`.
+ * Faz amostra aleatória do pool combinado (até MAX_QUIZ_QUESTIONS).
+ */
+export async function startTopicsQuizAndRedirect(
+  input: StartTopicsQuizInput,
+): Promise<void> {
+  const parsed = topicsQuizSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error('Tópicos inválidos.');
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('Sessão expirada.');
+  }
+
+  const mode = parsed.data.mode ?? 'aleatorio';
+  const pairs = parsed.data.topics;
+
+  // Busca ids para cada disciplina, filtrando subtópicos no cliente — uma round-trip por disciplina.
+  const byDiscipline = new Map<string, string[]>();
+  for (const p of pairs) {
+    const list = byDiscipline.get(p.discipline) ?? [];
+    list.push(p.subtopic);
+    byDiscipline.set(p.discipline, list);
+  }
+
+  const idChunks: Array<{ id: string; year: number; semester: number; question_num: number }> = [];
+  for (const [discipline, subs] of byDiscipline) {
+    const { data: rows, error } = await supabase
+      .from('questions')
+      .select('id, year, semester, question_num, subtopic, annulled')
+      .eq('exam', EXAM)
+      .eq('discipline', discipline)
+      .in('subtopic', subs)
+      .eq('annulled', false);
+    if (error || !rows) continue;
+    for (const r of rows) {
+      idChunks.push({
+        id: r.id,
+        year: r.year,
+        semester: r.semester,
+        question_num: r.question_num,
+      });
+    }
+  }
+
+  if (idChunks.length === 0) {
+    throw new Error('Nenhuma questão corresponde aos tópicos.');
+  }
+
+  if (mode === 'sequencial') {
+    idChunks.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      if (a.semester !== b.semester) return a.semester - b.semester;
+      return a.question_num - b.question_num;
+    });
+  } else {
+    for (let i = idChunks.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const a = idChunks[i];
+      const b = idChunks[j];
+      if (a && b) {
+        idChunks[i] = b;
+        idChunks[j] = a;
+      }
+    }
+  }
+
+  const limited = idChunks.slice(0, MAX_QUIZ_QUESTIONS);
+  const questionIds = limited.map((r) => r.id);
+
+  const filtersJson: Json = {
+    discipline: null,
+    subtopic: null,
+    year: null,
+    status: 'todas',
+    hide_annulled: true,
+    mode,
+    question_ids: questionIds,
+    topics: pairs,
+    source: 'mais-cai',
+  };
+
+  const { data: created, error: insertErr } = await supabase
+    .from('study_sessions')
+    .insert({
+      user_id: user.id,
+      type: 'quiz',
+      filters: filtersJson,
+    })
+    .select('id')
+    .single();
+  if (insertErr || !created) {
+    throw new Error('Falha ao criar sessão.');
+  }
+
+  redirect(`/quiz/sessao/${created.id}`);
+}
+
 export type QuizCapResult =
   | { allowed: true; used: number; limit: number; plan: 'free' | 'pro' | 'admin' }
   | { allowed: false; used: number; limit: number; plan: 'free' | 'pro' | 'admin' };
