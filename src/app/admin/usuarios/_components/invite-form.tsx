@@ -1,13 +1,23 @@
 'use client';
 
-import { useActionState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { inviteUser } from '../actions';
 
 const initialState: { error?: string; ok?: boolean } | null = null;
 
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="primary" disabled={pending}>
+      {pending ? 'Enviando…' : 'Enviar convite'}
+    </Button>
+  );
+}
+
 export function InviteForm() {
-  const [state, formAction, pending] = useActionState(inviteUser, initialState);
+  const [state, formAction] = useFormState(inviteUser, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -29,9 +39,7 @@ export function InviteForm() {
           className="h-10 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
-      <Button type="submit" variant="primary" disabled={pending}>
-        {pending ? 'Enviando…' : 'Enviar convite'}
-      </Button>
+      <SubmitButton />
       {state?.error ? (
         <p role="alert" className="text-xs text-destructive sm:ml-3">
           {state.error}
