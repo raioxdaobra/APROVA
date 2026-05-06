@@ -25,6 +25,16 @@ const DISCIPLINE_OPTIONS: Array<{ value: Discipline | ''; label: string }> = [
   { value: 'quimica', label: 'Química' },
   { value: 'biologia', label: 'Biologia' },
   { value: 'humanas', label: 'Humanas' },
+  { value: 'linguagens', label: 'Linguagens' },
+];
+
+const DISCIPLINE_VALUES: Discipline[] = [
+  'matematica',
+  'fisica',
+  'quimica',
+  'biologia',
+  'humanas',
+  'linguagens',
 ];
 
 const STATUS_OPTIONS: Array<{ value: 'todas' | 'correct' | 'wrong' | 'toreview'; label: string }> = [
@@ -59,8 +69,21 @@ export function QuizSetupForm({ years }: { years: number[] }) {
   const statusId = useId();
   const hideId = useId();
 
+  const searchParams = useSearchParams();
+  const previewFreeMode = searchParams?.get('preview') === 'free';
+
+  // Hidrata state inicial a partir de query params (?discipline=X&subtopic=Y)
+  // Usado pelos chips do <TopicMapMatrix mode='quiz'> e drill-down.
+  const initialDisciplineParam = searchParams?.get('discipline') ?? '';
+  const initialSubtopicParam = searchParams?.get('subtopic') ?? '';
+  const initialDiscipline: Discipline | '' = (DISCIPLINE_VALUES as string[]).includes(
+    initialDisciplineParam,
+  )
+    ? (initialDisciplineParam as Discipline)
+    : '';
+
   const [state, setState] = useState<FormState>({
-    discipline: '',
+    discipline: initialDiscipline,
     subtopic: '',
     year: '',
     status: 'todas',
@@ -73,9 +96,7 @@ export function QuizSetupForm({ years }: { years: number[] }) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, startTransition] = useTransition();
   const [paywallOpen, setPaywallOpen] = useState(false);
-
-  const searchParams = useSearchParams();
-  const previewFreeMode = searchParams?.get('preview') === 'free';
+  const subtopicHydratedRef = useRef(false);
 
   const filters = useMemo(() => toFilters(state), [state]);
 
@@ -87,12 +108,25 @@ export function QuizSetupForm({ years }: { years: number[] }) {
       return;
     }
     void getSubtopics(state.discipline).then((list) => {
-      if (!cancelled) setSubtopics(list);
+      if (cancelled) return;
+      setSubtopics(list);
+      // Hidrata subtopic do query param na primeira carga, se ainda não foi feito
+      // e o subtopic existe na lista carregada.
+      if (
+        !subtopicHydratedRef.current &&
+        initialSubtopicParam &&
+        list.includes(initialSubtopicParam)
+      ) {
+        subtopicHydratedRef.current = true;
+        setState((prev) => ({ ...prev, subtopic: initialSubtopicParam }));
+      } else if (!subtopicHydratedRef.current) {
+        subtopicHydratedRef.current = true;
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [state.discipline]);
+  }, [state.discipline, initialSubtopicParam]);
 
   // Conta questões com debounce
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

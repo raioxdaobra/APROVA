@@ -5,10 +5,12 @@ import {
   DisciplineBarChart,
   type DisciplineRow,
 } from '@/components/stats/discipline-bar-chart';
+import { TopicMapMatrix } from '@/components/topic-map-matrix';
 import {
-  TopicTreemap,
-  type DisciplineTreeNode,
-} from '@/components/stats/topic-treemap';
+  buildDisciplineProgress,
+  type DisciplineProgress,
+  type DisciplineTopicNode,
+} from '@/lib/stats/topic-frequency';
 import {
   WeeklyXpChart,
   type WeeklyXpPoint,
@@ -342,18 +344,24 @@ export default async function EstatisticasPage() {
     };
   });
 
-  // Treemap: top tópicos por disciplina (a partir de TODAS as questões disponíveis,
+  // Mapa de tópicos: top por disciplina (a partir de TODAS as questões disponíveis,
   // não apenas as resolvidas pelo usuário — mostra o que a banca cobra mais).
-  const treemapData: DisciplineTreeNode[] = DISCIPLINES.map((d) => {
+  const topicMatrixData: DisciplineTopicNode[] = DISCIPLINES.map((d) => {
     const list = subtopicsByDiscipline.get(d) ?? [];
     const topics = list
       .map((s) => ({ topic: s.subtopic_short || s.subtopic, count: s.total }))
       .sort((a, b) => b.count - a.count);
     const count = topics.reduce((acc, t) => acc + t.count, 0);
     return { discipline: d, count, topics };
-  })
-    .filter((node) => node.count > 0)
-    .sort((a, b) => b.count - a.count);
+  });
+
+  // Progresso pessoal por disciplina pra mini-barra do card.
+  const progressByDiscipline: Record<string, DisciplineProgress> = {};
+  for (const d of DISCIPLINES) {
+    const total = totalsByDiscipline.get(d) ?? 0;
+    const resolved = resolvedByDiscipline.get(d) ?? { total: 0, correct: 0 };
+    progressByDiscipline[d] = buildDisciplineProgress(total, resolved.total, resolved.correct);
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -436,16 +444,22 @@ export default async function EstatisticasPage() {
           </Card>
         </section>
 
-        {/* Treemap de tópicos mais cobrados */}
-        <section aria-labelledby="topic-treemap" className="flex flex-col gap-3">
+        {/* Mapa de tópicos — cards equivalentes com selo MAIS CAI */}
+        <section aria-labelledby="topic-map" className="flex flex-col gap-3">
           <div className="flex items-end justify-between">
-            <h2 id="topic-treemap" className="text-lg font-semibold text-foreground">
+            <h2 id="topic-map" className="text-lg font-semibold text-foreground">
               Tópicos mais cobrados
             </h2>
-            <span className="text-xs text-muted-foreground">clique numa disciplina pra expandir</span>
+            <span className="text-xs text-muted-foreground">
+              top-3 destacado por disciplina
+            </span>
           </div>
           <Card className="p-4">
-            <TopicTreemap data={treemapData} topicsPerDiscipline={8} />
+            <TopicMapMatrix
+              data={topicMatrixData}
+              progress={progressByDiscipline}
+              mode="explore"
+            />
           </Card>
         </section>
 
