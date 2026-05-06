@@ -60,7 +60,7 @@ export interface TopicMapMatrixProps {
   progress?: Record<string, DisciplineProgress>;
   /**
    * explore = expande accordion in-place;
-   * quiz = navega pra /quiz?discipline=X&subtopic=Y;
+   * quiz = chips toggleable se controlado (selectedTopics+onToggleTopic), senão navega;
    * simulado = toggle de seleção (precisa selectedTopics+onToggleTopic).
    */
   mode: 'explore' | 'quiz' | 'simulado';
@@ -68,6 +68,8 @@ export interface TopicMapMatrixProps {
   selectedTopics?: Set<string>;
   /** Callback de toggle. Obrigatório em mode='simulado'. */
   onToggleTopic?: (topicId: string) => void;
+  /** Esconde o header CTA + descrição (parent renderiza seus próprios CTAs). */
+  hideHeader?: boolean;
 }
 
 /**
@@ -83,6 +85,7 @@ export function TopicMapMatrix({
   mode,
   selectedTopics,
   onToggleTopic,
+  hideHeader = false,
 }: TopicMapMatrixProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -115,9 +118,18 @@ export function TopicMapMatrix({
   });
 
   const isSimulado = mode === 'simulado';
+  // Em mode='quiz', se o parent passou callback de toggle, tratamos como controlado
+  // (mesmo modelo do simulado: chip vira checkbox). Caso contrário mantém legacy
+  // de navegar pra /quiz?discipline=X&subtopic=Y.
+  const isControlledQuiz = mode === 'quiz' && typeof onToggleTopic === 'function';
+  const isToggleable = isSimulado || isControlledQuiz;
   const selected = selectedTopics ?? new Set<string>();
 
   const handleChipClick = (discipline: string, subtopic: string) => {
+    if (isToggleable) {
+      onToggleTopic?.(topicIdOf(discipline, subtopic));
+      return;
+    }
     if (mode === 'quiz') {
       const params = new URLSearchParams();
       params.set('discipline', discipline);
@@ -129,10 +141,6 @@ export function TopicMapMatrix({
         params.set('subject', subjectTab);
       }
       router.push(`/quiz?${params.toString()}`);
-      return;
-    }
-    if (isSimulado) {
-      onToggleTopic?.(topicIdOf(discipline, subtopic));
       return;
     }
     // explore: alterna accordion
@@ -185,40 +193,41 @@ export function TopicMapMatrix({
     });
   };
 
-  // Header CTA varia por modo
+  // Header CTA legado — só visível em mode='explore' (estatisticas).
+  // Em /quiz e /simulado o parent renderiza CTAs próprios abaixo do mapa.
+  const showHeader = !hideHeader;
   const ctaLabel = isSimulado
     ? '⚡ Simulado focado nos que mais caem'
     : 'Estudar o que MAIS CAI (top-3 por disciplina)';
-  const ctaSubtitle = isSimulado
-    ? 'Selecione tópicos manualmente ou clique abaixo'
-    : 'Cards equivalentes · top-3 com selo MAIS CAI';
 
   return (
     <div className="flex flex-col gap-4">
-      {/* CTA superior */}
-      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col">
-          <h2 className="text-base font-semibold text-foreground">
-            Mapa de tópicos
-          </h2>
-          <p className="text-xs text-muted-foreground">{ctaSubtitle}</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleStudyTop3}
-          disabled={submitting}
-          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label={ctaLabel}
-        >
-          {!isSimulado ? <BookOpen className="h-4 w-4" aria-hidden="true" /> : null}
-          {submitting ? 'Carregando…' : ctaLabel}
-        </button>
-      </div>
+      {showHeader ? (
+        <>
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col">
+              <h2 className="text-base font-semibold text-foreground">
+                Mapa de tópicos
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleStudyTop3}
+              disabled={submitting}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label={ctaLabel}
+            >
+              {!isSimulado ? <BookOpen className="h-4 w-4" aria-hidden="true" /> : null}
+              {submitting ? 'Carregando…' : ctaLabel}
+            </button>
+          </div>
 
-      {errorMsg ? (
-        <p className="text-sm text-destructive" role="alert">
-          {errorMsg}
-        </p>
+          {errorMsg ? (
+            <p className="text-sm text-destructive" role="alert">
+              {errorMsg}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
       {/* Grid de cards equivalentes */}
@@ -266,15 +275,20 @@ export function TopicMapMatrix({
                 : top3Raw;
           const top3Set = new Set(top3.map((t) => t.topic));
           const prog = progress?.[d.discipline];
-          // explore E simulado podem expandir accordion
+          // explore, simulado e quiz controlado podem expandir accordion
           const isExpanded =
-            expanded === d.discipline && (mode === 'explore' || isSimulado);
+            expanded === d.discipline && (mode === 'explore' || isToggleable);
 
-          // Conta tópicos selecionados nesta disciplina (só simulado)
-          const selectedCountInDiscipline = isSimulado
-            ? filteredTopics.filter((t) =>
-                selected.has(topicIdOf(d.discipline, t.topic)),
-              ).length
+          // Conta tópicos selecionados nesta disciplina (todo modo toggleable)
+          // — inclui também o caso "discipline:*" (toda a disciplina).
+          const allId = `${d.discipline}:*`;
+          const allSelected = isToggleable && selected.has(allId);
+          const selectedCountInDiscipline = isToggleable
+            ? allSelected
+              ? filteredTopics.length
+              : filteredTopics.filter((t) =>
+                  selected.has(topicIdOf(d.discipline, t.topic)),
+                ).length
             : 0;
           const totalTopicsInDiscipline = filteredTopics.length;
           const isAnySelected = selectedCountInDiscipline > 0;
@@ -286,7 +300,7 @@ export function TopicMapMatrix({
               style={{
                 borderTopWidth: '3px',
                 borderTopColor: `hsl(var(${accent}))`,
-                borderColor: isSimulado && isAnySelected
+                borderColor: isToggleable && isAnySelected
                   ? `hsl(var(${accent}) / 0.6)`
                   : undefined,
               }}
@@ -299,7 +313,7 @@ export function TopicMapMatrix({
                 >
                   {label}
                 </h3>
-                {isSimulado ? (
+                {isToggleable ? (
                   <span
                     className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium tabular-nums"
                     style={{
@@ -502,13 +516,14 @@ export function TopicMapMatrix({
                   {top3.map((t) => {
                     const isHot = top3Set.has(t.topic);
                     const tid = topicIdOf(d.discipline, t.topic);
-                    const isSelected = isSimulado && selected.has(tid);
+                    const isSelected =
+                      isToggleable && (allSelected || selected.has(tid));
                     return (
                       <li key={t.topic}>
                         <button
                           type="button"
                           onClick={() => handleChipClick(d.discipline, t.topic)}
-                          aria-pressed={isSimulado ? isSelected : undefined}
+                          aria-pressed={isToggleable ? isSelected : undefined}
                           className="group inline-flex min-h-[28px] items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2"
                           style={{
                             backgroundColor: isSelected
@@ -550,8 +565,8 @@ export function TopicMapMatrix({
                 </p>
               )}
 
-              {/* Explore/Simulado: botão "Ver todos" abaixo */}
-              {(mode === 'explore' || isSimulado) && filteredTopics.length > 3 ? (
+              {/* Explore/Simulado/Quiz controlado: botão "Ver todos" abaixo */}
+              {(mode === 'explore' || isToggleable) && filteredTopics.length > 3 ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -586,7 +601,8 @@ export function TopicMapMatrix({
                       const pct = (t.count / max) * 100;
                       const isHot = top3Set.has(t.topic);
                       const tid = topicIdOf(d.discipline, t.topic);
-                      const isSelected = isSimulado && selected.has(tid);
+                      const isSelected =
+                        isToggleable && (allSelected || selected.has(tid));
 
                       const row = (
                         <>
@@ -623,8 +639,9 @@ export function TopicMapMatrix({
                         </>
                       );
 
-                      // Em simulado, cada tópico é toggleável (botão com tap-target ≥44px)
-                      if (isSimulado) {
+                      // Em modo toggleable (simulado ou quiz controlado), cada
+                      // tópico é toggleável (botão com tap-target ≥44px)
+                      if (isToggleable) {
                         return (
                           <button
                             key={t.topic}
