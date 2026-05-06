@@ -98,6 +98,7 @@ export interface Database {
           is_admin: boolean;
           plan: Plan;
           plan_expires_at: string | null;
+          trial_ends_at: string | null;
           questions_used_count: number;
           simulados_used_count: number;
           created_at: string | null;
@@ -117,6 +118,7 @@ export interface Database {
           is_admin?: boolean;
           plan?: Plan;
           plan_expires_at?: string | null;
+          trial_ends_at?: string | null;
           questions_used_count?: number;
           simulados_used_count?: number;
           created_at?: string | null;
@@ -136,6 +138,7 @@ export interface Database {
           is_admin?: boolean;
           plan?: Plan;
           plan_expires_at?: string | null;
+          trial_ends_at?: string | null;
           questions_used_count?: number;
           simulados_used_count?: number;
           created_at?: string | null;
