@@ -1,0 +1,39 @@
+name: Deploy to Vercel (production)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Cancela deploys em andamento se chegar push novo no main
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: team_c1QoyCqoSDWsXBmglEQYKMrV
+  VERCEL_PROJECT_ID: prj_yrOmX2agJ0mKS3aJyWyMlOkEboAZ
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel environment (production)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
