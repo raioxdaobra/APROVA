@@ -52,6 +52,11 @@ export const metadata: Metadata = {
     icon: '/favicon.ico',
     apple: '/icons/apple-touch-icon.png',
   },
+  // `apple-mobile-web-app-capable` é deprecated (Chrome warning).
+  // Adiciona o equivalente moderno `mobile-web-app-capable`.
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {
