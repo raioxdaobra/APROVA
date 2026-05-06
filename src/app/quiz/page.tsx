@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { QuizSetupForm } from '@/components/quiz-setup-form';
+import { QuizSelectionShell } from '@/components/quiz/quiz-selection-shell';
 import { QuizTopicDrilldown } from '@/components/quiz-topic-drilldown';
-import { TopicMapMatrix } from '@/components/topic-map-matrix';
 import { getTopicFrequency, getYears, startQuizSession } from './actions';
 
 export const metadata = {
@@ -39,16 +38,7 @@ export default async function QuizPage({ searchParams }: QuizPageProps) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 py-6">
-      <section
-        aria-labelledby="topic-map-quiz"
-        className="rounded-lg border border-border bg-card p-4"
-      >
-        <h2 id="topic-map-quiz" className="sr-only">
-          Mapa de tópicos
-        </h2>
-        <TopicMapMatrix data={topicFreq} mode="quiz" />
-      </section>
-      <QuizSetupForm years={years} />
+      <QuizSelectionShell data={topicFreq} years={years} />
       <QuizTopicDrilldown data={topicFreq} />
     </main>
   );

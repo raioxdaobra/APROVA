@@ -17,6 +17,11 @@ import {
 import type { Discipline, HumanasSubject, Language } from '@/lib/supabase/types';
 import { PaywallModal } from '@/components/paywall-modal';
 import { isStripeEnabledClient } from '@/lib/billing/stripe-client';
+import {
+  type SelectionState,
+  makeItem,
+  makeAllItem,
+} from '@/lib/quiz/selection';
 
 const LANGUAGE_OPTIONS: Array<{ value: Language | 'tudo'; label: string }> = [
   { value: 'tudo', label: 'Tudo' },
@@ -91,7 +96,22 @@ function toFilters(s: FormState): QuizFilters {
   };
 }
 
-export function QuizSetupForm({ years }: { years: number[] }) {
+export interface QuizSetupFormProps {
+  years: number[];
+  /**
+   * PR 29 — Quando passado, o formulário escreve no Set compartilhado a cada
+   * mudança de disciplina/subtópico (`makeItem`/`makeAllItem`). Y/status/etc
+   * permanecem locais ao form.
+   */
+  controlledSelection?: SelectionState;
+  onSelectionChange?: (next: SelectionState) => void;
+}
+
+export function QuizSetupForm({
+  years,
+  controlledSelection,
+  onSelectionChange,
+}: QuizSetupFormProps) {
   const disciplineId = useId();
   const subtopicId = useId();
   const yearId = useId();
@@ -200,6 +220,36 @@ export function QuizSetupForm({ years }: { years: number[] }) {
       }
       return next;
     });
+
+    // PR 29: quando controlado, espelha picks na seleção global.
+    if (onSelectionChange && controlledSelection) {
+      const nextDiscipline = key === 'discipline' ? (value as Discipline | '') : state.discipline;
+      const nextSubtopic = key === 'subtopic' ? String(value) : state.subtopic;
+      // Mudança de disciplina: trocar -> reset itens daquela disciplina + adicionar wildcard.
+      // Mudança de subtopic: substituir wildcard por subtopic específico (se vazio, vira wildcard).
+      if (key === 'discipline' && nextDiscipline !== '') {
+        const nextSet = new Set(controlledSelection);
+        // Remove itens da disciplina anterior (não — só atualiza atual).
+        // Adiciona wildcard pra nova disciplina (se ainda não houver subtopic).
+        // Limpa qualquer subtopic específico dessa nova disciplina pra padronizar.
+        for (const it of [...nextSet]) {
+          if (it.startsWith(`${nextDiscipline}:`)) nextSet.delete(it);
+        }
+        nextSet.add(makeAllItem(nextDiscipline));
+        onSelectionChange(nextSet);
+      } else if (key === 'subtopic' && state.discipline !== '') {
+        const nextSet = new Set(controlledSelection);
+        for (const it of [...nextSet]) {
+          if (it.startsWith(`${state.discipline}:`)) nextSet.delete(it);
+        }
+        if (nextSubtopic === '') {
+          nextSet.add(makeAllItem(state.discipline));
+        } else {
+          nextSet.add(makeItem(state.discipline, nextSubtopic));
+        }
+        onSelectionChange(nextSet);
+      }
+    }
   };
 
   const start = (mode: 'sequencial' | 'aleatorio') => {
