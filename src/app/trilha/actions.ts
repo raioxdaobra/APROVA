@@ -1,20 +1,30 @@
 'use server';
 
 /**
- * Server actions da Trilha RPG (PR 26).
+ * Server actions da Trilha RPG (PR 26 + PR 27).
  *
  * `startStationAndRedirect` valida que a estação está desbloqueada para o
  * user, monta uma sessão de quiz com N questões filtradas por discipline +
  * subtopic, marca `filters.trilha_station_id` na session e redireciona pra
- * `/quiz/sessao/[id]`.
+ * `/quiz/sessao/[id]`. Também faz `bump_trilha_streak` antes de criar a
+ * sessão, registrando o multiplier no `filters` (PR 27).
+ *
+ * `saveTrilhaOrder` (PR 27) persiste a ordem customizada dos ranks 2-5.
  *
  * O cálculo de pass/fail é feito ao final da sessão (via `correct_count` /
  * `total_questions`) — a view `user_trilha_full_v2` reflete automaticamente.
  */
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { Json } from '@/lib/supabase/types';
+import { bumpTrilhaStreak, streakMultiplier } from '@/lib/trilha/streak';
+import {
+  isValidTrilhaOrder,
+  setUserTrilhaOrder,
+  type TrilhaOrderPicks,
+} from '@/lib/trilha/order';
 
 const inputSchema = z.object({
   stationId: z.string().min(1).max(50),
@@ -119,7 +129,11 @@ async function startStation(stationId: string): Promise<StartStationResult> {
   const limited = shuffled.slice(0, station.question_count);
   const questionIds = limited.map((r) => r.id);
 
-  // 4) Cria study_session com flag trilha_station_id nos filters.
+  // 4) Bump streak (PR 27) e calcula multiplier para registrar nos filters.
+  const newStreak = await bumpTrilhaStreak(supabase, user.id);
+  const mult = streakMultiplier(newStreak);
+
+  // 5) Cria study_session com flag trilha_station_id nos filters.
   const filtersJson: Json = {
     trilha_station_id: station.id,
     discipline: station.discipline,
@@ -127,6 +141,8 @@ async function startStation(stationId: string): Promise<StartStationResult> {
     mode: 'aleatorio',
     is_boss: station.is_boss,
     question_ids: questionIds,
+    streak_days: newStreak,
+    xp_multiplier: mult,
   };
 
   const { data: created, error: insertErr } = await supabase
@@ -152,4 +168,39 @@ export async function startStationAndRedirect(stationId: string): Promise<void> 
     throw new Error(res.error);
   }
   redirect(`/quiz/sessao/${res.sessionId}`);
+}
+
+const orderSchema = z.tuple([
+  z.number().int().min(2).max(5),
+  z.number().int().min(2).max(5),
+  z.number().int().min(2).max(5),
+  z.number().int().min(2).max(5),
+]);
+
+/**
+ * PR 27 — Persiste a ordem customizada dos ranks 2-5 da trilha do user
+ * autenticado. Lança erro se inválido. Revalida `/trilha` ao final.
+ */
+export async function saveTrilhaOrder(picks: TrilhaOrderPicks): Promise<void> {
+  const parsed = orderSchema.safeParse(picks);
+  if (!parsed.success) {
+    throw new Error('Picks inválidos.');
+  }
+  if (!isValidTrilhaOrder(parsed.data)) {
+    throw new Error('Cada rank precisa aparecer apenas uma vez.');
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('Sessão expirada.');
+  }
+
+  const res = await setUserTrilhaOrder(supabase, user.id, parsed.data);
+  if (!res.ok) {
+    throw new Error(res.error);
+  }
+  revalidatePath('/trilha');
 }

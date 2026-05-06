@@ -3,13 +3,16 @@ import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
-import { TrilhaMapRPG } from '@/components/trilha/trilha-map-rpg';
+import { TrilhaClient } from '@/components/trilha/trilha-client';
 import { createClient } from '@/lib/supabase/server';
 import {
   TRILHA_RANK_THEMES,
   calcOverallProgress,
   type TrilhaStationRPG,
 } from '@/lib/trilha/stations';
+import { getUserTrilhaOrder } from '@/lib/trilha/order';
+import { getTrilhaPeers } from '@/lib/trilha/peers';
+import { getTrilhaStreakInfo, streakMultiplier } from '@/lib/trilha/streak';
 
 export const metadata = {
   title: 'Trilha — APROVA',
@@ -26,7 +29,7 @@ export default async function TrilhaPage() {
     redirect('/');
   }
 
-  const [profileRes, stationsRes] = await Promise.all([
+  const [profileRes, stationsRes, order, peers, streakInfo] = await Promise.all([
     supabase
       .from('profiles')
       .select('display_name, username, is_admin')
@@ -40,6 +43,9 @@ export default async function TrilhaPage() {
     })
       .from('user_trilha_full_v2')
       .select('*'),
+    getUserTrilhaOrder(supabase, user.id),
+    getTrilhaPeers(supabase, user.id),
+    getTrilhaStreakInfo(supabase, user.id),
   ]);
 
   const profile = profileRes.data;
@@ -59,6 +65,8 @@ export default async function TrilhaPage() {
       ranksCompletedSet.add(st.rank);
     }
   }
+
+  const mult = streakMultiplier(streakInfo.streakDays);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -120,7 +128,13 @@ export default async function TrilhaPage() {
             </Button>
           </div>
         ) : (
-          <TrilhaMapRPG stations={stations} />
+          <TrilhaClient
+            stations={stations}
+            initialOrder={order}
+            peers={peers}
+            streakDays={streakInfo.streakDays}
+            streakMultiplier={mult}
+          />
         )}
       </main>
     </div>
