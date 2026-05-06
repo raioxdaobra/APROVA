@@ -22,9 +22,12 @@ export const FREE_QUESTIONS_LIMIT = 30;
 export const FREE_SIMULADOS_LIMIT = 1;
 export const FREE_CHAT_DAILY_LIMIT = 5;
 
+export type EffectivePlan = Plan | 'admin';
+
 export interface PlanInfo {
   plan: Plan;
   isPro: boolean;
+  isAdmin: boolean;
   questionsUsed: number;
   simuladosUsed: number;
   planExpiresAt: string | null;
@@ -34,7 +37,12 @@ export interface CapResult {
   allowed: boolean;
   used: number;
   limit: number;
-  plan: Plan;
+  plan: EffectivePlan;
+}
+
+export interface CapOptions {
+  /** Quando true, ignora bypass admin e simula plano free. */
+  previewFreeMode?: boolean;
 }
 
 function isProActive(plan: Plan, planExpiresAt: string | null): boolean {
@@ -51,7 +59,7 @@ export async function getPlanInfo(
 ): Promise<PlanInfo> {
   const { data } = await supabase
     .from('profiles')
-    .select('plan, plan_expires_at, questions_used_count, simulados_used_count')
+    .select('plan, plan_expires_at, questions_used_count, simulados_used_count, is_admin')
     .eq('id', userId)
     .maybeSingle();
 
@@ -60,6 +68,7 @@ export async function getPlanInfo(
   return {
     plan,
     isPro: isProActive(plan, planExpiresAt),
+    isAdmin: data?.is_admin === true,
     questionsUsed: Number(data?.questions_used_count ?? 0),
     simuladosUsed: Number(data?.simulados_used_count ?? 0),
     planExpiresAt,
@@ -68,13 +77,18 @@ export async function getPlanInfo(
 
 /**
  * Verifica se o usuário pode iniciar uma nova sessão de quiz / responder mais
- * questões. Pro = sempre permitido. Free = bloqueia quando atingir 30.
+ * questões. Admin (sem previewFreeMode) = ilimitado. Pro = sempre permitido.
+ * Free = bloqueia quando atingir 30.
  */
 export async function checkQuestionsCap(
   supabase: SupabaseClient<Database>,
   userId: string,
+  options: CapOptions = {},
 ): Promise<CapResult> {
   const info = await getPlanInfo(supabase, userId);
+  if (info.isAdmin && !options.previewFreeMode) {
+    return { allowed: true, used: info.questionsUsed, limit: Infinity, plan: 'admin' };
+  }
   if (info.isPro) {
     return { allowed: true, used: info.questionsUsed, limit: Infinity, plan: info.plan };
   }
@@ -92,8 +106,12 @@ export async function checkQuestionsCap(
 export async function checkSimuladoCap(
   supabase: SupabaseClient<Database>,
   userId: string,
+  options: CapOptions = {},
 ): Promise<CapResult> {
   const info = await getPlanInfo(supabase, userId);
+  if (info.isAdmin && !options.previewFreeMode) {
+    return { allowed: true, used: info.simuladosUsed, limit: Infinity, plan: 'admin' };
+  }
   if (info.isPro) {
     return { allowed: true, used: info.simuladosUsed, limit: Infinity, plan: info.plan };
   }
@@ -120,13 +138,14 @@ export async function incrementUsageCounter(
 ): Promise<void> {
   const { data } = await supabase
     .from('profiles')
-    .select('plan, plan_expires_at, questions_used_count, simulados_used_count')
+    .select('plan, plan_expires_at, questions_used_count, simulados_used_count, is_admin')
     .eq('id', userId)
     .maybeSingle();
   if (!data) return;
 
   const plan = (data.plan as Plan | undefined) ?? 'free';
   const expiresAt = (data.plan_expires_at as string | null | undefined) ?? null;
+  if (data.is_admin === true) return; // Admin não conta uso.
   if (isProActive(plan, expiresAt)) return; // Pro não conta uso.
 
   const current =

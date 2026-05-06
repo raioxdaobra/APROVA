@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -73,6 +74,9 @@ export function QuizSetupForm({ years }: { years: number[] }) {
   const [submitting, startTransition] = useTransition();
   const [paywallOpen, setPaywallOpen] = useState(false);
 
+  const searchParams = useSearchParams();
+  const previewFreeMode = searchParams?.get('preview') === 'free';
+
   const filters = useMemo(() => toFilters(state), [state]);
 
   // Carrega subtopics quando disciplina muda
@@ -123,7 +127,7 @@ export function QuizSetupForm({ years }: { years: number[] }) {
     track('quiz_setup_started', { mode, ...filters });
     startTransition(async () => {
       try {
-        const cap = await checkQuestionsCapAction();
+        const cap = await checkQuestionsCapAction({ previewFreeMode });
         if (!cap.allowed) {
           setPaywallOpen(true);
           return;

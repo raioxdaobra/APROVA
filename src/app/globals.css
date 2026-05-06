@@ -31,6 +31,14 @@
     --border: #e7e5e4;
     --text-primary: #1c1917;
     --text-secondary: #78716c;
+
+    /* Acentos por área (HSL para componibilidade com Tailwind utilities) */
+    --accent-quiz: 22 100% 56%;        /* laranja (alinhado ao primary) */
+    --accent-simulado: 217 91% 60%;    /* azul cobalto */
+    --accent-trilha: 142 76% 45%;      /* verde-esmeralda */
+    --accent-jogos: 270 76% 60%;       /* roxo */
+    --accent-ranking: 38 92% 55%;      /* âmbar */
+    --accent-chat: 173 70% 50%;        /* teal */
   }
 
   .dark {
@@ -91,5 +99,83 @@
   :focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Aurora hero background — 3 blobs em radial-gradient pulsando */
+  @keyframes aurora-drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 0.55;
+    }
+    33% {
+      transform: translate3d(2%, -3%, 0) scale(1.08);
+      opacity: 0.7;
+    }
+    66% {
+      transform: translate3d(-3%, 2%, 0) scale(0.95);
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes aurora-grid-breathe {
+    0%,
+    100% {
+      opacity: 0.03;
+    }
+    50% {
+      opacity: 0.08;
+    }
+  }
+
+  @keyframes aurora-cta-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 32px -10px rgba(196, 99, 59, 0.55);
+    }
+    50% {
+      box-shadow: 0 0 56px -8px rgba(196, 99, 59, 0.85);
+    }
+  }
+
+  .aurora-blob {
+    animation: aurora-drift 8s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+  .aurora-blob.delay-1 {
+    animation-delay: -2.5s;
+  }
+  .aurora-blob.delay-2 {
+    animation-delay: -5s;
+  }
+
+  .aurora-grid {
+    animation: aurora-grid-breathe 8s ease-in-out infinite;
+    will-change: opacity;
+  }
+
+  .aurora-cta {
+    animation: aurora-cta-pulse 4s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-blob,
+    .aurora-grid,
+    .aurora-cta {
+      animation: none !important;
+    }
+  }
+
+  @keyframes install-slide {
+    0% {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
 }

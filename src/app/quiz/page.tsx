@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { QuizSetupForm } from '@/components/quiz-setup-form';
-import { getYears, startQuizSession } from './actions';
+import { QuizDisciplineFrequency } from '@/components/quiz-discipline-frequency';
+import { getDisciplineFrequency, getYears, startQuizSession } from './actions';
 
 export const metadata = {
   title: 'Quiz — APROVA',
@@ -33,11 +34,12 @@ export default async function QuizPage({ searchParams }: QuizPageProps) {
     }
   }
 
-  const years = await getYears();
+  const [years, frequency] = await Promise.all([getYears(), getDisciplineFrequency()]);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6">
       <QuizSetupForm years={years} />
+      <QuizDisciplineFrequency data={frequency} />
     </main>
   );
 }

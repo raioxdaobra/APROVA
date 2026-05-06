@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { InstallPrompt } from '@/components/install-prompt';
 import { HeroSection } from '@/components/landing/hero-section';
 import { ShowcaseSection } from '@/components/landing/showcase-section';
-import { FeaturesSection } from '@/components/landing/features-section';
+import { FeatureCards } from '@/components/landing/feature-cards';
 import { TrilhaPreviewSection } from '@/components/landing/trilha-preview-section';
 import { PricingSection } from '@/components/landing/pricing-section';
 import { TestimonialsSection } from '@/components/landing/testimonials-section';
@@ -14,7 +14,7 @@ export default function HomePage() {
     <main className="flex flex-col bg-background text-foreground">
       <HeroSection />
       <ShowcaseSection />
-      <FeaturesSection />
+      <FeatureCards />
       <TrilhaPreviewSection />
       <PricingSection />
       <TestimonialsSection />

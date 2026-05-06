@@ -21,25 +21,33 @@ export interface PaywallModalProps {
 
 const REASON_COPY: Record<PaywallReason, { title: string; subtitle: string }> = {
   questions: {
-    title: 'Limite gratuito atingido',
+    title: 'Você está pegando o ritmo 🔥',
     subtitle:
-      'Você usou as 30 questões grátis. Continue praticando ilimitadamente com o plano Pro.',
+      'Já resolveu suas 30 questões grátis. Estude com TUDO o que cai na Unifor — 20 anos de prova oficial.',
   },
   simulado: {
-    title: 'Simulado gratuito utilizado',
+    title: 'Você está pegando o ritmo 🔥',
     subtitle:
-      'Você já fez seu simulado grátis. No Pro você pode simular quantas vezes quiser.',
+      'Já fez seu simulado grátis. Treine quantas vezes quiser com o banco completo Unifor — 20 anos de prova oficial.',
   },
   chat: {
-    title: 'Limite diário do chat IA',
+    title: 'Você está pegando o ritmo 🔥',
     subtitle:
-      'Você atingiu 5 perguntas no tira-dúvidas hoje. Pro tem chat ilimitado.',
+      'Atingiu 5 perguntas no chat IA hoje. Libere tira-dúvidas ilimitado e estude sem freio.',
   },
   generic: {
-    title: 'Recurso exclusivo do Pro',
-    subtitle: 'Desbloqueie tudo com o plano Pro.',
+    title: 'Você está pegando o ritmo 🔥',
+    subtitle: 'Libere tudo do APROVA com a versão completa.',
   },
 };
+
+const PRO_BULLETS: string[] = [
+  'Banco completo: 1.000+ questões oficiais Unifor',
+  'Simulados ilimitados, no formato real',
+  'IA tira-dúvidas 24/7 em qualquer questão',
+  'Ranking semanal de Fortaleza',
+  '10 mini-games premium pra fixar conceitos',
+];
 
 export function PaywallModal({
   open,
@@ -129,53 +137,72 @@ export function PaywallModal({
 
         {fallback ? (
           <div className="flex flex-col gap-4">
-            <Card className="bg-muted/30">
-              <p className="text-sm text-foreground">
-                <strong>Em breve.</strong> A assinatura Pro estará disponível em
-                breve. Para acesso antecipado, entre em contato:
-              </p>
-              <p className="mt-2 text-sm font-medium text-primary">
-                eng.arocha@gmail.com
+            <Card className="border-primary/40 bg-primary/5">
+              <p className="text-sm leading-relaxed text-foreground">
+                <strong className="text-primary">Pagamento liberado em 48h.</strong> Garanta acesso antecipado com{' '}
+                <strong>50% off</strong> pelo email{' '}
+                <a
+                  href="mailto:eng.arocha@gmail.com?subject=Acesso%20antecipado%20APROVA%20-%2050%25%20off"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  eng.arocha@gmail.com
+                </a>
+                .
               </p>
             </Card>
+            <ul className="flex flex-col gap-1.5 text-sm text-foreground">
+              {PRO_BULLETS.map((b) => (
+                <li key={b} className="flex items-start gap-2">
+                  <span aria-hidden className="text-primary">
+                    ✓
+                  </span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button variant="secondary" onClick={handleLogout}>
+              <Button variant="ghost" onClick={handleLogout}>
                 Sair
               </Button>
-              <Button variant="ghost" onClick={onClose}>
+              <Button variant="secondary" onClick={onClose}>
                 Fechar
               </Button>
             </div>
           </div>
         ) : (
           <>
+            <ul className="mb-4 flex flex-col gap-1.5 text-sm text-foreground">
+              {PRO_BULLETS.map((b) => (
+                <li key={b} className="flex items-start gap-2">
+                  <span aria-hidden className="text-primary">
+                    ✓
+                  </span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <PlanCard
-                title="Mensal"
-                price="R$ 14,90"
-                period="/mês"
-                bullets={[
-                  'Questões ilimitadas',
-                  'Simulados ilimitados',
-                  'Chat IA ilimitado',
-                  'Sem fidelidade',
-                ]}
-                selected={selected === 'monthly'}
-                onSelect={() => setSelected('monthly')}
-              />
               <PlanCard
                 title="Anual"
                 price="R$ 119"
                 period="/ano"
-                badge="33% off"
+                badge="Mais escolhido"
                 bullets={[
-                  'Tudo do Mensal',
                   'Equivale a R$ 9,92/mês',
                   '12 meses garantidos',
-                  'Melhor custo-benefício',
+                  '33% mais barato que mensal',
                 ]}
+                featured
                 selected={selected === 'annual'}
                 onSelect={() => setSelected('annual')}
+              />
+              <PlanCard
+                title="Mensal"
+                price="R$ 14,90"
+                period="/mês"
+                bullets={['Sem fidelidade', 'Cancela a qualquer momento']}
+                selected={selected === 'monthly'}
+                onSelect={() => setSelected('monthly')}
               />
             </div>
 
@@ -185,16 +212,25 @@ export function PaywallModal({
               </p>
             ) : null}
 
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button variant="ghost" onClick={onClose} disabled={isPending}>
-                Agora não
+            <div className="mt-5 flex flex-col gap-2">
+              <Button onClick={handleCheckout} disabled={isPending} size="lg" className="w-full">
+                {isPending
+                  ? 'Abrindo checkout...'
+                  : selected === 'annual'
+                  ? 'Garantir minha vaga → R$ 119/ano'
+                  : 'Garantir minha vaga → R$ 14,90/mês'}
               </Button>
-              <Button onClick={handleCheckout} disabled={isPending}>
-                {isPending ? 'Abrindo checkout...' : 'Assinar Pro'}
-              </Button>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isPending}
+                className="text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Continuar com 30 questões grátis
+              </button>
             </div>
             <p className="mt-3 text-center text-xs text-muted-foreground">
-              Cartão ou PIX via Stripe. Cancele quando quiser.
+              Cancela quando quiser · 7 dias de garantia · PIX ou cartão
             </p>
           </>
         )}
@@ -209,6 +245,7 @@ function PlanCard({
   period,
   bullets,
   badge,
+  featured,
   selected,
   onSelect,
 }: {
@@ -217,6 +254,7 @@ function PlanCard({
   period: string;
   bullets: string[];
   badge?: string;
+  featured?: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -233,12 +271,15 @@ function PlanCard({
       }}
       aria-pressed={selected}
       className={cn(
-        'relative cursor-pointer transition-colors duration-motion-base',
-        selected ? 'border-primary bg-primary-light' : 'hover:border-primary/40',
+        'relative cursor-pointer transition-all duration-motion-base',
+        featured && !selected && 'border-2 border-primary/60',
+        selected
+          ? 'border-2 border-primary bg-primary-light shadow-[0_0_24px_-12px_rgba(196,99,59,0.7)]'
+          : 'hover:border-primary/50',
       )}
     >
       {badge ? (
-        <span className="absolute -top-2 right-3 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+        <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
           {badge}
         </span>
       ) : null}
