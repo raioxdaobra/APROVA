@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  APROVA — Símbolo principal (com fundo cobre)
+  Conceito: letra "A" geométrica em branco, com checkmark integrado no
+  espaço do crossbar tradicional. Comunica "aprovação".
+
+  Sistema:
+  - Canvas 256x256
+  - Fundo cobre #C4633B com cantos arredondados (radius 22% — estilo iOS)
+  - "A": duas pernas diagonais brancas, peso 30 (~12% da altura)
+  - Checkmark branco no lugar do crossbar — contido dentro do triângulo do A
+  - Stroke-linecap=round em tudo (cantos suaves)
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="256" height="256" viewBox="0 0 256 256"
+     role="img" aria-label="APROVA">
+
+  <!-- Fundo cobre com cantos arredondados (iOS-style) -->
+  <rect id="bg" x="0" y="0" width="256" height="256" rx="56" ry="56" fill="#C4633B"/>
+
+  <!-- Perna esquerda do A: do apex (128, 56) até pé esquerdo (52, 212) -->
+  <line x1="128" y1="56" x2="52" y2="212"
+        stroke="#FFFFFF" stroke-width="30"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Perna direita do A: do apex até pé direito -->
+  <line x1="128" y1="56" x2="204" y2="212"
+        stroke="#FFFFFF" stroke-width="30"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Checkmark integrado no crossbar.
+       Geometria contida no triângulo interno do A:
+       - Início: 84,162 (encosta na perna esquerda no terço inferior)
+       - Vértice (gancho do check): 110,184 (ponto baixo do V)
+       - Final: 162,128 (sobe e termina antes da perna direita) -->
+  <polyline points="84,162 110,184 162,128"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="20"
+            stroke-linecap="round"
+            stroke-linejoin="round"/>
+</svg>

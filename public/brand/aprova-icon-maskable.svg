@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  APROVA — Símbolo MASKABLE (PWA Android)
+  Conceito: igual ao símbolo principal, mas com:
+  - Fundo cobre full-bleed (Android crops em formas variáveis: círculo, squircle,
+    teardrop). Sem cantos arredondados próprios.
+  - Conteúdo dentro de safe area de ~80% (margem 28px nas bordas).
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="256" height="256" viewBox="0 0 256 256"
+     role="img" aria-label="APROVA">
+
+  <!-- Fundo cobre full-bleed (sem cantos — Android cropa) -->
+  <rect x="0" y="0" width="256" height="256" fill="#C4633B"/>
+
+  <!-- A perna esquerda — geometria comprimida pra caber em 80% safe (28..228) -->
+  <line x1="128" y1="78" x2="68" y2="200"
+        stroke="#FFFFFF" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- A perna direita -->
+  <line x1="128" y1="78" x2="188" y2="200"
+        stroke="#FFFFFF" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Checkmark integrado, totalmente contido dentro do triângulo do A -->
+  <polyline points="92,160 112,178 156,134"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="17"
+            stroke-linecap="round"
+            stroke-linejoin="round"/>
+</svg>

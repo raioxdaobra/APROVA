@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  APROVA — Logo principal (símbolo + wordmark)
+  Uso: header, marketing, integrações (Mercado Pago marketplace badges, etc).
+
+  Layout (viewBox 320x96):
+  - Símbolo à esquerda (ocupa 80x80, com 8px padding vertical)
+  - Wordmark "APROVA" à direita (com 16px de espaçamento do símbolo)
+  - Letras geométricas, sans-serif, peso bold, tracking ligeiro
+
+  Cores:
+  - Símbolo: cobre #C4633B (badge com cantos arredondados, marca branca)
+  - Wordmark: slate-900 #0F172A (alto contraste em fundos claros)
+  - Em fundos escuros usar a variante mono.svg ou aplicar filtro CSS
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="320" height="96" viewBox="0 0 320 96"
+     role="img" aria-label="APROVA">
+
+  <!-- ==================== SÍMBOLO (80x80, x=8) ==================== -->
+  <g id="symbol" transform="translate(8, 8)">
+    <!-- Badge cobre arredondado (radius 22% de 80 = ~18) -->
+    <rect x="0" y="0" width="80" height="80" rx="18" ry="18" fill="#C4633B"/>
+
+    <!-- Perna esquerda (escala 80x80, mesma proporção do icon) -->
+    <line x1="40" y1="18" x2="17.5" y2="64"
+          stroke="#FFFFFF" stroke-width="9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Perna direita -->
+    <line x1="40" y1="18" x2="62.5" y2="64"
+          stroke="#FFFFFF" stroke-width="9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Checkmark crossbar -->
+    <polyline points="25,46 33.5,55 53.5,33"
+              fill="none" stroke="#FFFFFF" stroke-width="7"
+              stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- ==================== WORDMARK ==================== -->
+  <!-- "APROVA" em sans-serif geométrico, peso 800.
+       Posição: x=104 (80 símbolo + 8 padding + 16 gap), centralizado vertical.
+       Fonte: system-ui fallback chain pra garantir render sem dependência externa.
+       Tracking: letter-spacing 0.02em pra dar respiro entre letras. -->
+  <text x="104" y="64"
+        font-family="Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="44" font-weight="800"
+        letter-spacing="2"
+        fill="#0F172A">APROVA</text>
+</svg>
