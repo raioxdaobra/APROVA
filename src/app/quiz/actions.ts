@@ -8,6 +8,7 @@ import {
   checkQuestionsCap,
   incrementUsageCounter,
 } from '@/lib/billing/caps';
+import { classifyLanguage, classifySubject } from '@/lib/stats/sub-filters';
 
 const EXAM = 'unifor-medicina';
 const MAX_QUIZ_QUESTIONS = 60;
@@ -22,6 +23,8 @@ const disciplineSchema = z.enum([
 ]);
 
 const statusSchema = z.enum(['todas', 'correct', 'wrong', 'toreview']);
+const languageSchema = z.enum(['portugues', 'ingles', 'espanhol']);
+const subjectSchema = z.enum(['historia', 'geografia', 'filosofia', 'sociologia']);
 
 const filtersSchema = z.object({
   discipline: disciplineSchema.nullable().optional(),
@@ -29,6 +32,10 @@ const filtersSchema = z.object({
   year: z.number().int().min(1900).max(3000).nullable().optional(),
   status: statusSchema.optional(),
   hide_annulled: z.boolean().optional(),
+  /** Sub-filtro só aplicado quando discipline === 'linguagens'. */
+  language: languageSchema.nullable().optional(),
+  /** Sub-filtro só aplicado quando discipline === 'humanas'. */
+  subject: subjectSchema.nullable().optional(),
 });
 
 export type QuizFilters = z.infer<typeof filtersSchema>;
@@ -39,6 +46,8 @@ interface NormalizedFilters {
   year: number | null;
   status: 'todas' | 'correct' | 'wrong' | 'toreview';
   hide_annulled: boolean;
+  language: 'portugues' | 'ingles' | 'espanhol' | null;
+  subject: 'historia' | 'geografia' | 'filosofia' | 'sociologia' | null;
 }
 
 function normalizeFilters(input: QuizFilters): NormalizedFilters {
@@ -48,7 +57,33 @@ function normalizeFilters(input: QuizFilters): NormalizedFilters {
     year: input.year ?? null,
     status: input.status ?? 'todas',
     hide_annulled: input.hide_annulled ?? true,
+    language: input.language ?? null,
+    subject: input.subject ?? null,
   };
+}
+
+interface QuestionMetaRow {
+  id: string;
+  discipline: string;
+  subtopic: string;
+}
+
+/**
+ * Aplica sub-filtros (language/subject) usando a mesma classificação do
+ * helper `sub-filters.ts`. Roda no client/server pra evitar dependência
+ * da view SQL `questions_classified`.
+ */
+function filterBySubFilter<T extends QuestionMetaRow>(
+  rows: T[],
+  f: Pick<NormalizedFilters, 'discipline' | 'language' | 'subject'>,
+): T[] {
+  if (f.discipline === 'linguagens' && f.language) {
+    return rows.filter((r) => classifyLanguage(r.subtopic) === f.language);
+  }
+  if (f.discipline === 'humanas' && f.subject) {
+    return rows.filter((r) => classifySubject(r.subtopic) === f.subject);
+  }
+  return rows;
 }
 
 async function loadCandidateQuestionIds(
@@ -58,7 +93,7 @@ async function loadCandidateQuestionIds(
 ): Promise<string[]> {
   let query = supabase
     .from('questions')
-    .select('id')
+    .select('id, discipline, subtopic')
     .eq('exam', EXAM);
 
   if (f.discipline) query = query.eq('discipline', f.discipline);
@@ -68,7 +103,10 @@ async function loadCandidateQuestionIds(
 
   const { data: questionRows, error } = await query;
   if (error || !questionRows) return [];
-  let ids = questionRows.map((q) => q.id);
+
+  // Sub-filtro de Linguagens (PT/ING/ESP) ou Humanas (Hist/Geo/Filo/Soc).
+  const filteredRows = filterBySubFilter(questionRows, f);
+  let ids = filteredRows.map((q) => q.id);
   if (ids.length === 0) return [];
 
   if (f.status !== 'todas') {
@@ -208,16 +246,18 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
     return { ok: false, error: 'Falha ao carregar questões.' };
   }
 
-  let pool = rows;
+  // Sub-filtro de Linguagens/Humanas (mesma regex que a view 0024).
+  const subFiltered = filterBySubFilter(rows, f);
+  let pool = subFiltered;
   if (f.status !== 'todas') {
     const { data: statusRows } = await supabase
       .from('user_question_status')
       .select('question_id')
       .eq('user_id', user.id)
       .eq('status', f.status)
-      .in('question_id', rows.map((r) => r.id));
+      .in('question_id', subFiltered.map((r) => r.id));
     const allowed = new Set((statusRows ?? []).map((r) => r.question_id));
-    pool = rows.filter((r) => allowed.has(r.id));
+    pool = subFiltered.filter((r) => allowed.has(r.id));
   }
 
   if (pool.length === 0) {
@@ -253,6 +293,8 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
     year: f.year,
     status: f.status,
     hide_annulled: f.hide_annulled,
+    language: f.language,
+    subject: f.subject,
     mode,
     question_ids: questionIds,
   };
@@ -292,6 +334,9 @@ const topicsQuizSchema = z.object({
     .min(1)
     .max(50),
   mode: z.enum(['sequencial', 'aleatorio']).optional(),
+  /** Sub-filtros opcionais aplicados sobre os tópicos selecionados. */
+  language: languageSchema.nullable().optional(),
+  subject: subjectSchema.nullable().optional(),
 });
 
 export type StartTopicsQuizInput = z.infer<typeof topicsQuizSchema>;
@@ -319,6 +364,8 @@ export async function startTopicsQuizAndRedirect(
 
   const mode = parsed.data.mode ?? 'aleatorio';
   const pairs = parsed.data.topics;
+  const language = parsed.data.language ?? null;
+  const subject = parsed.data.subject ?? null;
 
   // Busca ids para cada disciplina, filtrando subtópicos no cliente — uma round-trip por disciplina.
   const byDiscipline = new Map<string, string[]>();
@@ -332,13 +379,19 @@ export async function startTopicsQuizAndRedirect(
   for (const [discipline, subs] of byDiscipline) {
     const { data: rows, error } = await supabase
       .from('questions')
-      .select('id, year, semester, question_num, subtopic, annulled')
+      .select('id, year, semester, question_num, discipline, subtopic, annulled')
       .eq('exam', EXAM)
       .eq('discipline', discipline)
       .in('subtopic', subs)
       .eq('annulled', false);
     if (error || !rows) continue;
-    for (const r of rows) {
+    // Aplica sub-filtro só na disciplina relevante.
+    const filtered = filterBySubFilter(rows, {
+      discipline,
+      language,
+      subject,
+    });
+    for (const r of filtered) {
       idChunks.push({
         id: r.id,
         year: r.year,
@@ -379,6 +432,8 @@ export async function startTopicsQuizAndRedirect(
     year: null,
     status: 'todas',
     hide_annulled: true,
+    language,
+    subject,
     mode,
     question_ids: questionIds,
     topics: pairs,

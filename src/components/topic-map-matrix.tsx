@@ -9,6 +9,21 @@ import {
   getTopTopicsByDiscipline,
 } from '@/lib/stats/topic-frequency';
 import { startTopicsQuizAndRedirect } from '@/app/quiz/actions';
+import {
+  classifyLanguage,
+  classifySubject,
+  LANGUAGE_SHORT_LABEL,
+  SUBJECT_SHORT_LABEL,
+} from '@/lib/stats/sub-filters';
+import type { HumanasSubject, Language } from '@/lib/supabase/types';
+
+const LANGUAGE_TABS: ReadonlyArray<Language> = ['portugues', 'ingles', 'espanhol'];
+const SUBJECT_TABS: ReadonlyArray<HumanasSubject> = [
+  'historia',
+  'geografia',
+  'filosofia',
+  'sociologia',
+];
 
 const DISCIPLINE_LABELS: Record<string, string> = {
   matematica: 'Matemática',
@@ -73,6 +88,9 @@ export function TopicMapMatrix({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [submitting, startTransition] = useTransition();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Mini-tabs por card (sub-filtro local). null = "tudo".
+  const [languageTab, setLanguageTab] = useState<Language | null>(null);
+  const [subjectTab, setSubjectTab] = useState<HumanasSubject | null>(null);
 
   // Ordena disciplinas conforme DISPLAY_ORDER, aproveitando dados existentes
   const disciplinesByKey = useMemo(() => {
@@ -101,8 +119,16 @@ export function TopicMapMatrix({
 
   const handleChipClick = (discipline: string, subtopic: string) => {
     if (mode === 'quiz') {
-      const url = `/quiz?discipline=${encodeURIComponent(discipline)}&subtopic=${encodeURIComponent(subtopic)}`;
-      router.push(url);
+      const params = new URLSearchParams();
+      params.set('discipline', discipline);
+      params.set('subtopic', subtopic);
+      if (discipline === 'linguagens' && languageTab) {
+        params.set('language', languageTab);
+      }
+      if (discipline === 'humanas' && subjectTab) {
+        params.set('subject', subjectTab);
+      }
+      router.push(`/quiz?${params.toString()}`);
       return;
     }
     if (isSimulado) {
@@ -200,7 +226,44 @@ export function TopicMapMatrix({
         {orderedDisciplines.map((d) => {
           const accent = ACCENT_VARS[d.discipline] ?? '--accent-quiz';
           const label = DISCIPLINE_LABELS[d.discipline] ?? d.discipline;
-          const top3 = top3ByDiscipline.get(d.discipline) ?? [];
+          const isLinguagens = d.discipline === 'linguagens';
+          const isHumanas = d.discipline === 'humanas';
+
+          // Mini-tabs: contagens por idioma (Linguagens) ou matéria (Humanas).
+          const languageCounts: Record<Language, number> | null = isLinguagens
+            ? { portugues: 0, ingles: 0, espanhol: 0 }
+            : null;
+          const subjectCounts: Record<HumanasSubject, number> | null = isHumanas
+            ? { historia: 0, geografia: 0, filosofia: 0, sociologia: 0 }
+            : null;
+          if (languageCounts) {
+            for (const t of d.topics) {
+              const cls = classifyLanguage(t.topic);
+              if (cls) languageCounts[cls] += t.count;
+            }
+          }
+          if (subjectCounts) {
+            for (const t of d.topics) {
+              const cls = classifySubject(t.topic);
+              if (cls) subjectCounts[cls] += t.count;
+            }
+          }
+
+          // Aplica filtro local da mini-tab quando ativo.
+          const filteredTopics =
+            isLinguagens && languageTab
+              ? d.topics.filter((t) => classifyLanguage(t.topic) === languageTab)
+              : isHumanas && subjectTab
+                ? d.topics.filter((t) => classifySubject(t.topic) === subjectTab)
+                : d.topics;
+
+          const top3Raw = top3ByDiscipline.get(d.discipline) ?? [];
+          const top3 =
+            isLinguagens && languageTab
+              ? top3Raw.filter((t) => classifyLanguage(t.topic) === languageTab)
+              : isHumanas && subjectTab
+                ? top3Raw.filter((t) => classifySubject(t.topic) === subjectTab)
+                : top3Raw;
           const top3Set = new Set(top3.map((t) => t.topic));
           const prog = progress?.[d.discipline];
           // explore E simulado podem expandir accordion
@@ -209,11 +272,11 @@ export function TopicMapMatrix({
 
           // Conta tópicos selecionados nesta disciplina (só simulado)
           const selectedCountInDiscipline = isSimulado
-            ? d.topics.filter((t) =>
+            ? filteredTopics.filter((t) =>
                 selected.has(topicIdOf(d.discipline, t.topic)),
               ).length
             : 0;
-          const totalTopicsInDiscipline = d.topics.length;
+          const totalTopicsInDiscipline = filteredTopics.length;
           const isAnySelected = selectedCountInDiscipline > 0;
 
           return (
@@ -263,6 +326,132 @@ export function TopicMapMatrix({
                   </span>
                 )}
               </header>
+
+              {/* Mini-tabs por idioma (Linguagens) ou matéria (Humanas) */}
+              {isLinguagens && languageCounts ? (
+                <div
+                  role="tablist"
+                  aria-label="Filtrar por idioma"
+                  className="flex flex-wrap gap-1"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={languageTab === null}
+                    onClick={() => setLanguageTab(null)}
+                    className="inline-flex min-h-[28px] items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2"
+                    style={{
+                      backgroundColor:
+                        languageTab === null
+                          ? `hsl(var(${accent}) / 0.18)`
+                          : 'transparent',
+                      borderColor:
+                        languageTab === null
+                          ? `hsl(var(${accent}) / 0.5)`
+                          : 'hsl(var(--border))',
+                      color:
+                        languageTab === null
+                          ? `hsl(var(${accent}))`
+                          : 'hsl(var(--muted-foreground))',
+                    }}
+                  >
+                    Tudo
+                  </button>
+                  {LANGUAGE_TABS.map((lang) => {
+                    const cnt = languageCounts[lang];
+                    if (cnt === 0) return null;
+                    const active = languageTab === lang;
+                    return (
+                      <button
+                        key={lang}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() =>
+                          setLanguageTab((prev) => (prev === lang ? null : lang))
+                        }
+                        className="inline-flex min-h-[28px] items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2"
+                        style={{
+                          backgroundColor: active
+                            ? `hsl(var(${accent}) / 0.18)`
+                            : 'transparent',
+                          borderColor: active
+                            ? `hsl(var(${accent}) / 0.5)`
+                            : 'hsl(var(--border))',
+                          color: active
+                            ? `hsl(var(${accent}))`
+                            : 'hsl(var(--muted-foreground))',
+                        }}
+                      >
+                        <span>{LANGUAGE_SHORT_LABEL[lang]}</span>
+                        <span className="opacity-70">{cnt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {isHumanas && subjectCounts ? (
+                <div
+                  role="tablist"
+                  aria-label="Filtrar por matéria"
+                  className="flex flex-wrap gap-1"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={subjectTab === null}
+                    onClick={() => setSubjectTab(null)}
+                    className="inline-flex min-h-[28px] items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2"
+                    style={{
+                      backgroundColor:
+                        subjectTab === null
+                          ? `hsl(var(${accent}) / 0.18)`
+                          : 'transparent',
+                      borderColor:
+                        subjectTab === null
+                          ? `hsl(var(${accent}) / 0.5)`
+                          : 'hsl(var(--border))',
+                      color:
+                        subjectTab === null
+                          ? `hsl(var(${accent}))`
+                          : 'hsl(var(--muted-foreground))',
+                    }}
+                  >
+                    Tudo
+                  </button>
+                  {SUBJECT_TABS.map((sub) => {
+                    const cnt = subjectCounts[sub];
+                    if (cnt === 0) return null;
+                    const active = subjectTab === sub;
+                    return (
+                      <button
+                        key={sub}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() =>
+                          setSubjectTab((prev) => (prev === sub ? null : sub))
+                        }
+                        className="inline-flex min-h-[28px] items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2"
+                        style={{
+                          backgroundColor: active
+                            ? `hsl(var(${accent}) / 0.18)`
+                            : 'transparent',
+                          borderColor: active
+                            ? `hsl(var(${accent}) / 0.5)`
+                            : 'hsl(var(--border))',
+                          color: active
+                            ? `hsl(var(${accent}))`
+                            : 'hsl(var(--muted-foreground))',
+                        }}
+                      >
+                        <span>{SUBJECT_SHORT_LABEL[sub]}</span>
+                        <span className="opacity-70">{cnt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
 
               {/* Mini barra de progresso */}
               <div className="flex flex-col gap-1">
@@ -362,7 +551,7 @@ export function TopicMapMatrix({
               )}
 
               {/* Explore/Simulado: botão "Ver todos" abaixo */}
-              {(mode === 'explore' || isSimulado) && d.topics.length > 3 ? (
+              {(mode === 'explore' || isSimulado) && filteredTopics.length > 3 ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -375,7 +564,7 @@ export function TopicMapMatrix({
                   aria-controls={`topics-all-${d.discipline}`}
                 >
                   <span>
-                    {isExpanded ? 'Ocultar' : 'Ver todos'} os {d.topics.length} tópicos
+                    {isExpanded ? 'Ocultar' : 'Ver todos'} os {filteredTopics.length} tópicos
                   </span>
                   <ChevronRight
                     className="h-3.5 w-3.5 transition-transform"
@@ -392,8 +581,8 @@ export function TopicMapMatrix({
                   className="-mx-4 -mb-4 mt-1 flex flex-col gap-1.5 border-t border-border bg-muted/30 px-4 py-3"
                 >
                   {(() => {
-                    const max = Math.max(1, ...d.topics.map((t) => t.count));
-                    return d.topics.map((t) => {
+                    const max = Math.max(1, ...filteredTopics.map((t) => t.count));
+                    return filteredTopics.map((t) => {
                       const pct = (t.count / max) * 100;
                       const isHot = top3Set.has(t.topic);
                       const tid = topicIdOf(d.discipline, t.topic);

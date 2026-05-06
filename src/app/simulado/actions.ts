@@ -9,6 +9,7 @@ import {
   checkSimuladoCap,
   incrementUsageCounter,
 } from '@/lib/billing/caps';
+import { classifyLanguage, classifySubject } from '@/lib/stats/sub-filters';
 
 const startSchema = z.object({
   total: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(90)]),
@@ -195,6 +196,13 @@ const multiTopicSchema = z.object({
     .max(120),
   /** Tempo total opcional em minutos. Default = ~2.5 min/q (ajustado pra MIN/MAX). */
   time_limit_min: z.number().int().min(15).max(360).optional(),
+  /** Sub-filtro opcional aplicado só sobre tópicos de Linguagens. */
+  language: z.enum(['portugues', 'ingles', 'espanhol']).nullable().optional(),
+  /** Sub-filtro opcional aplicado só sobre tópicos de Humanas. */
+  subject: z
+    .enum(['historia', 'geografia', 'filosofia', 'sociologia'])
+    .nullable()
+    .optional(),
 });
 
 export type StartMultiTopicSimuladoInput = z.infer<typeof multiTopicSchema>;
@@ -215,6 +223,8 @@ export async function startMultiTopicSimuladoAndRedirect(
     throw new Error('Tópicos inválidos.');
   }
   const { topics, time_limit_min } = parsed.data;
+  const language = parsed.data.language ?? null;
+  const subject = parsed.data.subject ?? null;
 
   const supabase = await createClient();
   const {
@@ -248,6 +258,21 @@ export async function startMultiTopicSimuladoAndRedirect(
       .or('annulled.is.null,annulled.eq.false');
     if (error || !rows) continue;
     for (const r of rows) {
+      // Sub-filtro: só aplica na disciplina pertinente.
+      if (
+        discipline === 'linguagens' &&
+        language &&
+        classifyLanguage(r.subtopic as string) !== language
+      ) {
+        continue;
+      }
+      if (
+        discipline === 'humanas' &&
+        subject &&
+        classifySubject(r.subtopic as string) !== subject
+      ) {
+        continue;
+      }
       pool.push({ id: r.id, discipline: r.discipline as string });
     }
   }
@@ -272,6 +297,8 @@ export async function startMultiTopicSimuladoAndRedirect(
     discipline_filter: 'todas',
     multi_topic: true,
     topics,
+    language,
+    subject,
   };
 
   const { data: created, error: insertErr } = await supabase
