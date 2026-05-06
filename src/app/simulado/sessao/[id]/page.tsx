@@ -72,7 +72,7 @@ export default async function SimuladoSessionPage({
   const { data: questionRows, error: qErr } = await supabase
     .from('questions')
     .select(
-      'id, discipline, subtopic, subtopic_short, year, semester, question_num, image_url',
+      'id, discipline, subtopic, subtopic_short, year, semester, question_num, image_url, description',
     )
     .in('id', filters.question_ids);
   if (qErr || !questionRows) {
@@ -95,6 +95,7 @@ export default async function SimuladoSessionPage({
         semester: q.semester,
         question_num: q.question_num,
         image_url: q.image_url,
+        description: (q as { description?: string | null }).description ?? '',
       });
     }
   }

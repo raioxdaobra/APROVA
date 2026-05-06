@@ -20,6 +20,7 @@ export interface DiagnosticQuestion {
   semester: number;
   question_num: number;
   image_url: string;
+  description?: string;
 }
 
 interface RecordedAnswer {
@@ -166,7 +167,8 @@ export function DiagnosticRunner({
 
   const imageAlt = `Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`;
 
-  const imageSlot = (
+  const hasImage = Boolean(current.image_url && current.image_url.trim().length > 0);
+  const imageSlot = hasImage ? (
     <Card className="overflow-hidden p-0">
       <div className="relative w-full">
         <Image
@@ -179,6 +181,12 @@ export function DiagnosticRunner({
           priority={currentIndex === 0}
           unoptimized
         />
+      </div>
+    </Card>
+  ) : (
+    <Card className="overflow-hidden">
+      <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap text-foreground sm:prose-base">
+        {current.description ?? '(Enunciado indisponível.)'}
       </div>
     </Card>
   );

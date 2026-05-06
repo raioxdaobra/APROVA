@@ -58,6 +58,7 @@ export default async function DiagnosticoPage() {
     semester: q.semester,
     question_num: q.question_num,
     image_url: q.image_url,
+    description: (q as { description?: string | null }).description ?? '',
   }));
 
   return (

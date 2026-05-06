@@ -34,6 +34,7 @@ export interface QuizQuestion {
   semester: number;
   question_num: number;
   image_url: string;
+  description?: string;
   annulled: boolean;
   correct_pct?: number | null;
 }
@@ -134,10 +135,10 @@ export function QuizRunner({
     }
   }, [currentIndex, questions]);
 
-  // Prefetch da próxima imagem
+  // Prefetch da próxima imagem (só quando tem imagem)
   useEffect(() => {
     const next = questions[currentIndex + 1];
-    if (!next) return;
+    if (!next || !next.image_url || next.image_url.trim().length === 0) return;
     const img = new window.Image();
     img.src = next.image_url;
   }, [currentIndex, questions]);
@@ -359,7 +360,8 @@ export function QuizRunner({
 
   const imageAlt = `Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`;
 
-  const imageSlot = (
+  const hasImage = Boolean(current.image_url && current.image_url.trim().length > 0);
+  const imageSlot = hasImage ? (
     <Card className="overflow-hidden p-0">
       <div className="relative w-full bg-stone-100">
         <Image
@@ -372,6 +374,12 @@ export function QuizRunner({
           priority={currentIndex === 0}
           unoptimized
         />
+      </div>
+    </Card>
+  ) : (
+    <Card className="overflow-hidden">
+      <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap text-foreground sm:prose-base">
+        {current.description ?? '(Enunciado indisponível.)'}
       </div>
     </Card>
   );

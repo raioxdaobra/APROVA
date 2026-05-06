@@ -22,6 +22,7 @@ export interface SimuladoQuestion {
   semester: number;
   question_num: number;
   image_url: string;
+  description?: string;
 }
 
 const ANSWER_LETTERS: AnswerLetter[] = ['A', 'B', 'C', 'D', 'E'];
@@ -199,7 +200,8 @@ export function SimuladoRunner({
 
   const imageAlt = `Questão ${current.question_num} de ${current.year}.${current.semester} — ${disciplineLabel(current.discipline)}`;
 
-  const imageSlot = (
+  const hasImage = Boolean(current.image_url && current.image_url.trim().length > 0);
+  const imageSlot = hasImage ? (
     <Card className="overflow-hidden p-0">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -210,6 +212,12 @@ export function SimuladoRunner({
         className="h-auto w-full"
         loading={currentIndex === 0 ? 'eager' : 'lazy'}
       />
+    </Card>
+  ) : (
+    <Card className="overflow-hidden">
+      <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap text-foreground sm:prose-base">
+        {current.description ?? '(Enunciado indisponível.)'}
+      </div>
     </Card>
   );
 

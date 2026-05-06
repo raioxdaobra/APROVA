@@ -48,7 +48,7 @@ export default async function QuizSessionPage({ params }: PageProps) {
   const { data: questionRows, error: qErr } = await supabase
     .from('questions')
     .select(
-      'id, discipline, subtopic, subtopic_short, year, semester, question_num, image_url, annulled',
+      'id, discipline, subtopic, subtopic_short, year, semester, question_num, image_url, description, annulled',
     )
     .in('id', questionIds);
   if (qErr || !questionRows) {
@@ -96,6 +96,7 @@ export default async function QuizSessionPage({ params }: PageProps) {
       semester: q.semester,
       question_num: q.question_num,
       image_url: q.image_url,
+      description: (q as { description?: string | null }).description ?? '',
       annulled: q.annulled === true,
       correct_pct: statsById.has(q.id) ? statsById.get(q.id)! : null,
     }));
