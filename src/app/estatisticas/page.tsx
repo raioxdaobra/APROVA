@@ -1,6 +1,18 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ShareButton } from '@/components/share-button';
+import {
+  DisciplineBarChart,
+  type DisciplineRow,
+} from '@/components/stats/discipline-bar-chart';
+import {
+  TopicTreemap,
+  type DisciplineTreeNode,
+} from '@/components/stats/topic-treemap';
+import {
+  WeeklyXpChart,
+  type WeeklyXpPoint,
+} from '@/components/stats/weekly-xp-chart';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { Card } from '@/components/ui/card';
@@ -217,10 +229,23 @@ export default async function EstatisticasPage() {
     if (a.is_correct === true) bucket.correct += 1;
   }
 
-  const maxWeekTotal = Math.max(
-    1,
-    ...Array.from(weekBuckets.values()).map((b) => b.total),
-  );
+  // Pontos para o LineChart de XP semanal
+  const xpByWeekStart = new Map<string, number>();
+  for (const row of weeklyXpRows ?? []) {
+    if (!row.week_start) continue;
+    xpByWeekStart.set(row.week_start, (xpByWeekStart.get(row.week_start) ?? 0) + (row.xp ?? 0));
+  }
+  const weeklyXpPoints: WeeklyXpPoint[] = weekStarts.map((ws) => {
+    const bucket = weekBuckets.get(ws) ?? { total: 0, correct: 0 };
+    const accuracy = bucket.total === 0 ? null : Math.round((bucket.correct / bucket.total) * 100);
+    return {
+      weekStart: ws,
+      weekLabel: formatWeekLabel(ws),
+      xp: xpByWeekStart.get(ws) ?? 0,
+      questions: bucket.total,
+      accuracyPct: accuracy,
+    };
+  });
 
   // Tabela por disciplina
   const allQuestions: QuestionRow[] = (questionsAll ?? []).filter((q) => !q.annulled);
@@ -305,6 +330,31 @@ export default async function EstatisticasPage() {
     list.sort((a, b) => a.subtopic_short.localeCompare(b.subtopic_short, 'pt-BR'));
   }
 
+  // Linha de dados pro gráfico de barras por disciplina
+  const disciplineChartRows: DisciplineRow[] = DISCIPLINES.map((d) => {
+    const total = totalsByDiscipline.get(d) ?? 0;
+    const resolved = resolvedByDiscipline.get(d) ?? { total: 0, correct: 0 };
+    return {
+      discipline: d,
+      total,
+      resolved: resolved.total,
+      correct: resolved.correct,
+    };
+  });
+
+  // Treemap: top tópicos por disciplina (a partir de TODAS as questões disponíveis,
+  // não apenas as resolvidas pelo usuário — mostra o que a banca cobra mais).
+  const treemapData: DisciplineTreeNode[] = DISCIPLINES.map((d) => {
+    const list = subtopicsByDiscipline.get(d) ?? [];
+    const topics = list
+      .map((s) => ({ topic: s.subtopic_short || s.subtopic, count: s.total }))
+      .sort((a, b) => b.count - a.count);
+    const count = topics.reduce((acc, t) => acc + t.count, 0);
+    return { discipline: d, count, topics };
+  })
+    .filter((node) => node.count > 0)
+    .sort((a, b) => b.count - a.count);
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-4xl items-start justify-between gap-4 px-4 py-6">
@@ -360,40 +410,42 @@ export default async function EstatisticasPage() {
           </div>
         ) : null}
 
-        {/* Gráfico semanal */}
+        {/* Gráfico semanal — XP ao longo do tempo */}
         <section aria-labelledby="weekly-chart" className="flex flex-col gap-3">
           <div className="flex items-end justify-between">
             <h2 id="weekly-chart" className="text-lg font-semibold text-foreground">
               Evolução semanal
             </h2>
-            <span className="text-xs text-muted-foreground">últimas 12 semanas</span>
+            <span className="text-xs text-muted-foreground">XP nas últimas 12 semanas</span>
           </div>
           <Card className="p-4">
-            <div className="grid grid-cols-12 items-end gap-2" style={{ minHeight: '180px' }}>
-              {weekStarts.map((ws) => {
-                const bucket = weekBuckets.get(ws) ?? { total: 0, correct: 0 };
-                const heightPct = bucket.total === 0 ? 4 : (bucket.total / maxWeekTotal) * 100;
-                const accuracy = bucket.total === 0 ? null : Math.round((bucket.correct / bucket.total) * 100);
-                return (
-                  <div key={ws} className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] tabular-nums text-muted-foreground">
-                      {accuracy === null ? '—' : `${accuracy}%`}
-                    </span>
-                    <div
-                      role="img"
-                      aria-label={`${formatWeekLabel(ws)}: ${bucket.total} questões${
-                        accuracy !== null ? `, ${accuracy}% de acerto` : ''
-                      }`}
-                      className="w-full rounded-sm bg-primary/70"
-                      style={{ height: `${heightPct}%`, minHeight: '4px' }}
-                    />
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatWeekLabel(ws)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            <WeeklyXpChart points={weeklyXpPoints} />
+          </Card>
+        </section>
+
+        {/* Acerto por disciplina — barras coloridas */}
+        <section aria-labelledby="discipline-chart" className="flex flex-col gap-3">
+          <div className="flex items-end justify-between">
+            <h2 id="discipline-chart" className="text-lg font-semibold text-foreground">
+              Acerto por disciplina
+            </h2>
+            <span className="text-xs text-muted-foreground">% de acerto sobre resolvidas</span>
+          </div>
+          <Card className="p-4">
+            <DisciplineBarChart rows={disciplineChartRows} />
+          </Card>
+        </section>
+
+        {/* Treemap de tópicos mais cobrados */}
+        <section aria-labelledby="topic-treemap" className="flex flex-col gap-3">
+          <div className="flex items-end justify-between">
+            <h2 id="topic-treemap" className="text-lg font-semibold text-foreground">
+              Tópicos mais cobrados
+            </h2>
+            <span className="text-xs text-muted-foreground">clique numa disciplina pra expandir</span>
+          </div>
+          <Card className="p-4">
+            <TopicTreemap data={treemapData} topicsPerDiscipline={8} />
           </Card>
         </section>
 

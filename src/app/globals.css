@@ -42,17 +42,19 @@
   }
 
   .dark {
-    /* Tema (dark) — primária e semânticas mantêm; neutros invertem */
-    --page-bg: #0c0a09;
-    --card-bg: #1c1917;
-    --border: #292524;
+    /* Tema (dark) — primária e semânticas mantêm; neutros invertem.
+       Hierarquia visual: page-bg (off-black ~#0a0a0a) < card-bg (~#1a1a1a)
+       com border mais visível para separar superfícies. */
+    --page-bg: #0a0a0a;
+    --card-bg: #1a1a1a;
+    --border: #333333;
     --text-primary: #fafaf9;
-    --text-secondary: #a8a29e;
+    --text-secondary: #b3b3b3;
 
-    --neutral-50: #0c0a09;
-    --neutral-100: #1c1917;
-    --neutral-200: #292524;
-    --neutral-500: #a8a29e;
+    --neutral-50: #0a0a0a;
+    --neutral-100: #1a1a1a;
+    --neutral-200: #333333;
+    --neutral-500: #b3b3b3;
     --neutral-900: #fafaf9;
 
     --primary-light: #2a1812;
@@ -65,16 +67,16 @@
      a menos que o ThemeProvider tenha forçado uma escolha manual via .light/.dark */
   @media (prefers-color-scheme: dark) {
     :root:not(.light) {
-      --page-bg: #0c0a09;
-      --card-bg: #1c1917;
-      --border: #292524;
+      --page-bg: #0a0a0a;
+      --card-bg: #1a1a1a;
+      --border: #333333;
       --text-primary: #fafaf9;
-      --text-secondary: #a8a29e;
+      --text-secondary: #b3b3b3;
 
-      --neutral-50: #0c0a09;
-      --neutral-100: #1c1917;
-      --neutral-200: #292524;
-      --neutral-500: #a8a29e;
+      --neutral-50: #0a0a0a;
+      --neutral-100: #1a1a1a;
+      --neutral-200: #333333;
+      --neutral-500: #b3b3b3;
       --neutral-900: #fafaf9;
 
       --primary-light: #2a1812;
