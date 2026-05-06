@@ -14,9 +14,32 @@ import {
   checkQuestionsCapAction,
   type QuizFilters,
 } from '@/app/quiz/actions';
-import type { Discipline } from '@/lib/supabase/types';
+import type { Discipline, HumanasSubject, Language } from '@/lib/supabase/types';
 import { PaywallModal } from '@/components/paywall-modal';
 import { isStripeEnabledClient } from '@/lib/billing/stripe-client';
+
+const LANGUAGE_OPTIONS: Array<{ value: Language | 'tudo'; label: string }> = [
+  { value: 'tudo', label: 'Tudo' },
+  { value: 'portugues', label: 'Português + Literatura' },
+  { value: 'ingles', label: 'Inglês' },
+  { value: 'espanhol', label: 'Espanhol' },
+];
+
+const SUBJECT_OPTIONS: Array<{ value: HumanasSubject | 'tudo'; label: string }> = [
+  { value: 'tudo', label: 'Tudo' },
+  { value: 'historia', label: 'História' },
+  { value: 'geografia', label: 'Geografia' },
+  { value: 'filosofia', label: 'Filosofia' },
+  { value: 'sociologia', label: 'Sociologia' },
+];
+
+const LANGUAGE_VALUES: Language[] = ['portugues', 'ingles', 'espanhol'];
+const SUBJECT_VALUES: HumanasSubject[] = [
+  'historia',
+  'geografia',
+  'filosofia',
+  'sociologia',
+];
 
 const DISCIPLINE_OPTIONS: Array<{ value: Discipline | ''; label: string }> = [
   { value: '', label: 'Todas' },
@@ -50,6 +73,8 @@ type FormState = {
   year: string;
   status: 'todas' | 'correct' | 'wrong' | 'toreview';
   hide_annulled: boolean;
+  language: Language | 'tudo';
+  subject: HumanasSubject | 'tudo';
 };
 
 function toFilters(s: FormState): QuizFilters {
@@ -59,6 +84,10 @@ function toFilters(s: FormState): QuizFilters {
     year: s.year === '' ? null : Number(s.year),
     status: s.status,
     hide_annulled: s.hide_annulled,
+    language:
+      s.discipline === 'linguagens' && s.language !== 'tudo' ? s.language : null,
+    subject:
+      s.discipline === 'humanas' && s.subject !== 'tudo' ? s.subject : null,
   };
 }
 
@@ -68,19 +97,33 @@ export function QuizSetupForm({ years }: { years: number[] }) {
   const yearId = useId();
   const statusId = useId();
   const hideId = useId();
+  const languageGroupId = useId();
+  const subjectGroupId = useId();
 
   const searchParams = useSearchParams();
   const previewFreeMode = searchParams?.get('preview') === 'free';
 
-  // Hidrata state inicial a partir de query params (?discipline=X&subtopic=Y)
+  // Hidrata state inicial a partir de query params (?discipline=X&subtopic=Y&language=Z&subject=W)
   // Usado pelos chips do <TopicMapMatrix mode='quiz'> e drill-down.
   const initialDisciplineParam = searchParams?.get('discipline') ?? '';
   const initialSubtopicParam = searchParams?.get('subtopic') ?? '';
+  const initialLanguageParam = searchParams?.get('language') ?? '';
+  const initialSubjectParam = searchParams?.get('subject') ?? '';
   const initialDiscipline: Discipline | '' = (DISCIPLINE_VALUES as string[]).includes(
     initialDisciplineParam,
   )
     ? (initialDisciplineParam as Discipline)
     : '';
+  const initialLanguage: Language | 'tudo' = (LANGUAGE_VALUES as string[]).includes(
+    initialLanguageParam,
+  )
+    ? (initialLanguageParam as Language)
+    : 'tudo';
+  const initialSubject: HumanasSubject | 'tudo' = (SUBJECT_VALUES as string[]).includes(
+    initialSubjectParam,
+  )
+    ? (initialSubjectParam as HumanasSubject)
+    : 'tudo';
 
   const [state, setState] = useState<FormState>({
     discipline: initialDiscipline,
@@ -88,6 +131,8 @@ export function QuizSetupForm({ years }: { years: number[] }) {
     year: '',
     status: 'todas',
     hide_annulled: true,
+    language: initialLanguage,
+    subject: initialSubject,
   });
 
   const [subtopics, setSubtopics] = useState<string[]>([]);
@@ -147,9 +192,11 @@ export function QuizSetupForm({ years }: { years: number[] }) {
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setState((prev) => {
       const next = { ...prev, [key]: value };
-      // Se trocou disciplina, zera subtopic
+      // Se trocou disciplina, zera subtopic e reseta sub-filtros pra 'tudo'.
       if (key === 'discipline' && prev.discipline !== value) {
         next.subtopic = '';
+        next.language = 'tudo';
+        next.subject = 'tudo';
       }
       return next;
     });
@@ -205,6 +252,90 @@ export function QuizSetupForm({ years }: { years: number[] }) {
             ))}
           </select>
         </div>
+
+        {state.discipline === 'linguagens' ? (
+          <fieldset
+            className="flex flex-col gap-2 rounded border border-border bg-muted/30 p-3"
+            aria-labelledby={languageGroupId}
+          >
+            <legend
+              id={languageGroupId}
+              className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Foco
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {LANGUAGE_OPTIONS.map((opt) => {
+                const checked = state.language === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3 py-2 text-sm transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-primary"
+                    style={{
+                      borderColor: checked ? 'hsl(var(--primary))' : undefined,
+                      backgroundColor: checked
+                        ? 'hsl(var(--primary) / 0.08)'
+                        : undefined,
+                      color: checked ? 'hsl(var(--primary))' : undefined,
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="quiz-language"
+                      value={opt.value}
+                      checked={checked}
+                      onChange={() => update('language', opt.value)}
+                      className="h-4 w-4"
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : null}
+
+        {state.discipline === 'humanas' ? (
+          <fieldset
+            className="flex flex-col gap-2 rounded border border-border bg-muted/30 p-3"
+            aria-labelledby={subjectGroupId}
+          >
+            <legend
+              id={subjectGroupId}
+              className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Foco
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {SUBJECT_OPTIONS.map((opt) => {
+                const checked = state.subject === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3 py-2 text-sm transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-primary"
+                    style={{
+                      borderColor: checked ? 'hsl(var(--primary))' : undefined,
+                      backgroundColor: checked
+                        ? 'hsl(var(--primary) / 0.08)'
+                        : undefined,
+                      color: checked ? 'hsl(var(--primary))' : undefined,
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="quiz-subject"
+                      value={opt.value}
+                      checked={checked}
+                      onChange={() => update('subject', opt.value)}
+                      className="h-4 w-4"
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor={subtopicId}>Subtópico</Label>

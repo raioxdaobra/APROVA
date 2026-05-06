@@ -18,6 +18,10 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type AttemptContext = 'quiz' | 'revisao' | 'simulado' | 'review' | 'diagnostic';
 export type StudySessionType = 'quiz' | 'revisao' | 'simulado' | 'diagnostic';
 export type Discipline = 'matematica' | 'fisica' | 'quimica' | 'biologia' | 'humanas' | 'linguagens';
+/** Sub-filtro de Linguagens — cobre as 3 línguas presentes em provas Unifor. */
+export type Language = 'portugues' | 'ingles' | 'espanhol';
+/** Sub-filtro de Humanas — split por matéria escolar. */
+export type HumanasSubject = 'historia' | 'geografia' | 'filosofia' | 'sociologia';
 export type AnswerLetter = 'A' | 'B' | 'C' | 'D' | 'E';
 export type UserQuestionStatus = 'correct' | 'wrong' | 'toreview';
 export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
