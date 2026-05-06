@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Loader2, Lock, Mail, User } from 'lucide-react';
+import { AuthInput } from '@/components/auth/auth-input';
+import { AuthCtaButton } from '@/components/auth/auth-cta-button';
 import { track } from '@/lib/analytics';
 import { signUpWithEmail, type SignUpState } from './actions';
 
@@ -14,90 +14,54 @@ export function SignUpForm() {
   const [state, formAction] = useFormState(signUpWithEmail, initialState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
-      <Field
+    <form action={formAction} className="flex flex-col gap-5" noValidate>
+      <AuthInput
         id="display_name"
         name="display_name"
         type="text"
         label="Como devemos te chamar?"
         autoComplete="name"
+        placeholder="Seu primeiro nome"
         maxLength={60}
         required
+        icon={<User className="h-4 w-4" />}
         error={state.fieldErrors?.display_name}
       />
-      <Field
+      <AuthInput
         id="email"
         name="email"
         type="email"
         label="Email"
         autoComplete="email"
+        placeholder="seu@email.com"
         required
+        icon={<Mail className="h-4 w-4" />}
         error={state.fieldErrors?.email}
       />
-      <Field
+      <AuthInput
         id="password"
         name="password"
         type="password"
         label="Senha (mínimo 8 caracteres)"
         autoComplete="new-password"
+        placeholder="Mínimo 8 caracteres"
         minLength={8}
         required
+        icon={<Lock className="h-4 w-4" />}
         error={state.fieldErrors?.password}
       />
 
       {state.error && (
-        <p role="alert" className="rounded border border-error bg-error-bg p-3 text-sm text-error-foreground">
+        <p
+          role="alert"
+          className="rounded border border-error bg-error-bg p-3 text-sm text-error-foreground"
+        >
           {state.error}
         </p>
       )}
 
       <SubmitButton />
     </form>
-  );
-}
-
-function Field({
-  id,
-  name,
-  type,
-  label,
-  error,
-  autoComplete,
-  required,
-  minLength,
-  maxLength,
-}: {
-  id: string;
-  name: string;
-  type: 'text' | 'email' | 'password';
-  label: string;
-  error?: string;
-  autoComplete?: string;
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-}) {
-  const errorId = `${id}-error`;
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        name={name}
-        type={type}
-        autoComplete={autoComplete}
-        required={required}
-        minLength={minLength}
-        maxLength={maxLength}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-      />
-      {error && (
-        <span id={errorId} className="text-xs text-error">
-          {error}
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -109,8 +73,12 @@ function SubmitButton() {
   }, [pending]);
 
   return (
-    <Button type="submit" size="lg" disabled={pending} className="mt-2 w-full">
-      {pending ? 'Criando conta...' : 'Criar conta'}
-    </Button>
+    <AuthCtaButton
+      type="submit"
+      disabled={pending}
+      rightIcon={pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+    >
+      {pending ? 'Criando conta...' : 'Criar minha conta'}
+    </AuthCtaButton>
   );
 }
