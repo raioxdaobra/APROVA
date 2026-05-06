@@ -18,11 +18,14 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { Card } from '@/components/ui/card';
+import { WeakPointsView } from '@/components/stats/weak-points-view';
 import { createClient } from '@/lib/supabase/server';
 import { slugify } from '@/lib/slug';
+import { fetchWeakPoints } from '@/lib/stats/weak-points';
 import type { Discipline } from '@/lib/supabase/types';
 import { DeleteAllDialog } from './_components/delete-all-dialog';
 import { ExportButton } from './_components/export-button';
+import { StatsTabs } from './_components/stats-tabs';
 
 export const metadata = {
   title: 'Estatísticas — APROVA',
@@ -125,7 +128,15 @@ function formatWeekLabel(iso: string): string {
   return `S${week}`;
 }
 
-export default async function EstatisticasPage() {
+interface PageProps {
+  searchParams?: Record<string, string | string[] | undefined>;
+}
+
+export default async function EstatisticasPage({ searchParams }: PageProps) {
+  const tabParamRaw = searchParams?.tab;
+  const tabParam = Array.isArray(tabParamRaw) ? tabParamRaw[0] : tabParamRaw;
+  const initialTab: 'visao' | 'fracos' = tabParam === 'fracos' ? 'fracos' : 'visao';
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -186,6 +197,10 @@ export default async function EstatisticasPage() {
       .order('position', { ascending: true })
       .limit(500),
   ]);
+
+  // Pontos fracos pessoais (gap-finder) — usado tanto pra aba "Meus pontos
+  // fracos" quanto pro badge na aba.
+  const weakPointsResult = await fetchWeakPoints(supabase, user.id);
 
   const username = profile?.username ?? null;
   const displayName = profile?.display_name ?? username ?? 'estudante';
@@ -418,6 +433,17 @@ export default async function EstatisticasPage() {
           </div>
         ) : null}
 
+        <StatsTabs
+          initialTab={initialTab}
+          weakBadgeCount={weakPointsResult.weak.length}
+          fracosSlot={
+            <WeakPointsView
+              weak={weakPointsResult.weak}
+              undiagnosed={weakPointsResult.undiagnosed}
+              totalAttemptsConsidered={weakPointsResult.totalAttemptsConsidered}
+            />
+          }
+          visaoSlot={<>
         {/* Gráfico semanal — XP ao longo do tempo */}
         <section aria-labelledby="weekly-chart" className="flex flex-col gap-3">
           <div className="flex items-end justify-between">
@@ -608,6 +634,8 @@ export default async function EstatisticasPage() {
             )}
           </div>
         </section>
+          </>}
+        />
 
         {/* Ações */}
         <section aria-labelledby="actions" className="mt-2 flex flex-col gap-3 border-t border-border pt-6">
