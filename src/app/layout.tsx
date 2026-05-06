@@ -7,6 +7,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { ThemeProvider } from '@/components/theme-provider';
+import { TrialBanner } from '@/components/trial-banner';
 import { Toaster } from '@/components/ui/sonner';
 import { inter, jetbrainsMono } from '@/lib/fonts';
 import { createClient } from '@/lib/supabase/server';
@@ -72,13 +73,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   } = await supabase.auth.getSession();
 
   let isAdmin = false;
+  let trialEndsAt: string | null = null;
+  let isProOrAdmin = false;
   if (session?.user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('is_admin')
+      .select('is_admin, plan, plan_expires_at, trial_ends_at')
       .eq('id', session.user.id)
       .maybeSingle();
     isAdmin = profile?.is_admin === true;
+    trialEndsAt =
+      ((profile as { trial_ends_at?: string | null } | null)?.trial_ends_at as string | null | undefined) ??
+      null;
+    const plan = profile?.plan ?? 'free';
+    const exp = profile?.plan_expires_at ? Date.parse(profile.plan_expires_at) : null;
+    const proActive = plan === 'pro' && (!exp || Number.isNaN(exp) || exp > Date.now());
+    isProOrAdmin = isAdmin || proActive;
   }
 
   return (
@@ -94,6 +104,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeProvider>
           <AuthProvider initialSession={session}>
             <AdminBanner isAdmin={isAdmin} />
+            <TrialBanner trialEndsAt={trialEndsAt} isProOrAdmin={isProOrAdmin} />
             <AppShell isAdmin={isAdmin}>{children}</AppShell>
             <MobileBottomNav />
             <Toaster />

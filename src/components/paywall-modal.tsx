@@ -77,7 +77,7 @@ export function PaywallModal({
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch('/api/stripe/checkout', {
+        const res = await fetch('/api/mercadopago/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ plan: selected }),
@@ -88,7 +88,7 @@ export function PaywallModal({
         };
         if (!res.ok || !json.url) {
           setError(
-            json.error === 'stripe_not_configured'
+            json.error === 'mp_not_configured' || json.error === 'stripe_not_configured'
               ? 'Pagamentos em breve. Entre em contato.'
               : 'Falha ao iniciar checkout. Tente novamente.',
           );

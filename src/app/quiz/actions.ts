@@ -457,8 +457,8 @@ export async function startTopicsQuizAndRedirect(
 }
 
 export type QuizCapResult =
-  | { allowed: true; used: number; limit: number; plan: 'free' | 'pro' | 'admin' }
-  | { allowed: false; used: number; limit: number; plan: 'free' | 'pro' | 'admin' };
+  | { allowed: true; used: number; limit: number; plan: 'free' | 'pro' | 'admin' | 'trial' }
+  | { allowed: false; used: number; limit: number; plan: 'free' | 'pro' | 'admin' | 'trial' };
 
 export async function checkQuestionsCapAction(
   options: { previewFreeMode?: boolean } = {},

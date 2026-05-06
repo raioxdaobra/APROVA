@@ -172,7 +172,7 @@ export type SimuladoCapResult = {
   allowed: boolean;
   used: number;
   limit: number;
-  plan: 'free' | 'pro' | 'admin';
+  plan: 'free' | 'pro' | 'admin' | 'trial';
 };
 
 const MULTI_TOPIC_DISCIPLINE = z.enum([
