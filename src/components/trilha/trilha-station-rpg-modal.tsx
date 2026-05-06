@@ -19,6 +19,8 @@ import type { TrilhaStationRPG } from '@/lib/trilha/stations';
 export interface TrilhaStationRPGModalProps {
   open: boolean;
   station: TrilhaStationRPG | null;
+  /** Multiplier de XP atual do user (PR 27). 1.0/1.25/1.5. */
+  streakMultiplier?: number;
   onClose: () => void;
 }
 
@@ -48,6 +50,7 @@ function formatDate(iso: string | null): string {
 export function TrilhaStationRPGModal({
   open,
   station,
+  streakMultiplier,
   onClose,
 }: TrilhaStationRPGModalProps) {
   const ref = useRef<HTMLDialogElement | null>(null);
@@ -139,8 +142,28 @@ export function TrilhaStationRPGModal({
         <div className="grid grid-cols-3 gap-2 text-center">
           <Stat label="Questões" value={String(station.question_count)} />
           <Stat label="Aprovação" value={`${station.passing_pct}%`} />
-          <Stat label="XP" value={`+${station.xp_reward}`} />
+          <Stat
+            label={
+              streakMultiplier && streakMultiplier > 1
+                ? `XP (${streakMultiplier}x)`
+                : 'XP'
+            }
+            value={
+              streakMultiplier && streakMultiplier > 1
+                ? `+${Math.round(station.xp_reward * streakMultiplier)}`
+                : `+${station.xp_reward}`
+            }
+          />
         </div>
+
+        {streakMultiplier && streakMultiplier > 1 && (
+          <div className="flex items-center gap-2 rounded-lg bg-orange-100 px-3 py-2 text-xs text-orange-800 dark:bg-orange-950/50 dark:text-orange-200">
+            <span className="text-base" aria-hidden="true">🔥</span>
+            <span>
+              Bônus de streak: <strong>{streakMultiplier}x</strong> de XP nesta tentativa.
+            </span>
+          </div>
+        )}
 
         {/* Histórico */}
         {station.attempts_count > 0 && (

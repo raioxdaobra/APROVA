@@ -52,6 +52,8 @@ import {
   type TrilhaStationRPG,
 } from '@/lib/trilha/stations';
 import { TrilhaStationRPGModal } from './trilha-station-rpg-modal';
+import { TrilhaPeersOverlay } from './trilha-peers';
+import type { TrilhaPeer } from '@/lib/trilha/peers';
 import type { Discipline } from '@/lib/supabase/types';
 
 const RANK_ICONS: Record<TrilhaRankTheme['iconName'], LucideIcon> = {
@@ -76,40 +78,78 @@ const DISCIPLINE_ICONS: Record<Discipline, LucideIcon> = {
 
 export interface TrilhaMapRPGProps {
   stations: TrilhaStationRPG[];
+  /**
+   * Ordem customizada (PR 27). Se fornecida, usa o `displayRank` em
+   * vez de `rank` para ordenar a apresentação. Cada item do array é uma
+   * tupla `[rankOriginal, displayRank]` ou um Map equivalente. Aqui
+   * passamos um Map já calculado.
+   */
+  rankOrderMap?: Map<number, number>;
+  /** Peers (PR 27) — overlay opcional. */
+  peers?: TrilhaPeer[];
+  /** Streak (PR 27) — só pra exibir o multiplier no modal. */
+  streakMultiplier?: number;
 }
 
-export function TrilhaMapRPG({ stations }: TrilhaMapRPGProps) {
+export function TrilhaMapRPG({
+  stations,
+  rankOrderMap,
+  peers,
+  streakMultiplier,
+}: TrilhaMapRPGProps) {
   const [selected, setSelected] = useState<TrilhaStationRPG | null>(null);
 
   const groups = useMemo(() => groupByRank(stations), [stations]);
   const nextId = useMemo(() => findNextStationId(stations), [stations]);
 
-  // Renderiza ranks em ordem 1..8.
-  const sortedRanks = useMemo(
-    () =>
-      [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([rank, list]) => ({
+  // Renderiza ranks em ordem do displayRank (se houver) ou 1..8.
+  const sortedRanks = useMemo(() => {
+    const entries = [...groups.entries()].map(([rank, list]) => {
+      const displayRank = rankOrderMap?.get(rank) ?? rank;
+      return {
         rank,
+        displayRank,
         theme: getRankTheme(rank),
         stations: list,
-      })),
-    [groups],
-  );
+      };
+    });
+    entries.sort((a, b) => a.displayRank - b.displayRank);
+    return entries;
+  }, [groups, rankOrderMap]);
+
+  // Mapeia stationId -> {x, y} no canvas global pra overlay de peers.
+  // Calculado depois que o DOM é renderizado via ref + medição. Pra simplificar
+  // e manter SSR-friendly, oferecemos a função que consulta posições por
+  // estação dentro do mapa via dataset (cada node terá data-station-id).
+  const stationCenters = useMemo(() => {
+    // Construímos um Map<stationId, {sectionRank, indexInRank}> pra que o
+    // overlay possa achar coordenadas via DOM lookup. Cá, retornamos null —
+    // o componente <TrilhaPeersOverlay> renderiza por seção (StationStrip)
+    // recebendo apenas peers daquela seção.
+    return null;
+  }, []);
+  void stationCenters; // placeholder pra manter clareza
 
   return (
     <>
       <div className="flex flex-col gap-12 pb-12">
-        {sortedRanks.map(({ rank, theme, stations: rankStations }) => {
+        {sortedRanks.map(({ rank, theme, stations: rankStations, displayRank }) => {
           const completedInRank = rankStations.filter((s) => s.is_passed).length;
+          const rankPeers = (peers ?? []).filter(
+            (p) => p.currentRank === rank,
+          );
           return (
             <RankSection
               key={rank}
               theme={theme}
+              displayRank={displayRank}
               completed={completedInRank}
               total={rankStations.length}
             >
               <StationStrip
                 stations={rankStations}
                 nextId={nextId}
+                peers={rankPeers}
                 onSelect={(s) => setSelected(s)}
               />
             </RankSection>
@@ -120,6 +160,7 @@ export function TrilhaMapRPG({ stations }: TrilhaMapRPGProps) {
       <TrilhaStationRPGModal
         open={selected !== null}
         station={selected}
+        streakMultiplier={streakMultiplier}
         onClose={() => setSelected(null)}
       />
     </>
@@ -128,13 +169,22 @@ export function TrilhaMapRPG({ stations }: TrilhaMapRPGProps) {
 
 interface RankSectionProps {
   theme: TrilhaRankTheme;
+  /** Posição do rank na ordem exibida (1..8); pode diferir de `theme.rank`. */
+  displayRank?: number;
   completed: number;
   total: number;
   children: React.ReactNode;
 }
 
-function RankSection({ theme, completed, total, children }: RankSectionProps) {
+function RankSection({
+  theme,
+  displayRank,
+  completed,
+  total,
+  children,
+}: RankSectionProps) {
   const Icon = RANK_ICONS[theme.iconName];
+  const reordered = displayRank !== undefined && displayRank !== theme.rank;
   return (
     <section
       aria-labelledby={`rpg-rank-${theme.rank}`}
@@ -156,6 +206,11 @@ function RankSection({ theme, completed, total, children }: RankSectionProps) {
         <div className="flex flex-col">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Rank {theme.rank}
+            {reordered && (
+              <span className="ml-1 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] font-mono">
+                #{displayRank}
+              </span>
+            )}
           </span>
           <h2
             id={`rpg-rank-${theme.rank}`}
@@ -179,6 +234,7 @@ function RankSection({ theme, completed, total, children }: RankSectionProps) {
 interface StationStripProps {
   stations: TrilhaStationRPG[];
   nextId: string | null;
+  peers?: TrilhaPeer[];
   onSelect: (s: TrilhaStationRPG) => void;
 }
 
@@ -204,8 +260,21 @@ function xForPos(pos: number): number {
   }
 }
 
-function StationStrip({ stations, nextId, onSelect }: StationStripProps) {
+function StationStrip({ stations, nextId, peers, onSelect }: StationStripProps) {
   const height = ROW_HEIGHT * stations.length + 40;
+
+  // Mapeia stationId -> {x, y} (centro do node) pra que <TrilhaPeersOverlay>
+  // possa posicionar avatares em cima.
+  const stationCenters: Record<string, { x: number; y: number }> = {};
+  stations.forEach((station, i) => {
+    const cx = xForPos(station.position_in_rank);
+    const cy = ROW_HEIGHT * i + ROW_HEIGHT / 2;
+    stationCenters[station.id] = { x: cx, y: cy };
+  });
+
+  function getStationCenter(stationId: string): { x: number; y: number } | null {
+    return stationCenters[stationId] ?? null;
+  }
 
   return (
     <div className="relative mx-auto" style={{ width: VIEW_WIDTH, height }}>
@@ -267,6 +336,11 @@ function StationStrip({ stations, nextId, onSelect }: StationStripProps) {
           />
         );
       })}
+
+      {/* Overlay peers */}
+      {peers && peers.length > 0 && (
+        <TrilhaPeersOverlay peers={peers} getStationCenter={getStationCenter} />
+      )}
     </div>
   );
 }
