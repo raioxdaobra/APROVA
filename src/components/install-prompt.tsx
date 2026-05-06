@@ -10,21 +10,25 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const DISMISS_KEY = 'aprova-install-dismissed-at';
-const FIRST_QUESTION_KEY = 'aprova-first-question-completed';
 const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-const ENGAGEMENT_DELAY_MS = 60 * 1000; // 60 seconds of navigation
+const SHOW_DELAY_MS = 800; // deixa a página pintar antes
+
+type Platform = 'ios' | 'android-chrome' | 'desktop' | 'other';
 
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
-  // iOS Safari uses navigator.standalone
   const nav = window.navigator as Navigator & { standalone?: boolean };
   return nav.standalone === true;
 }
 
-function isIos(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+  if (/Android/.test(ua)) return 'android-chrome';
+  if (/Chrome|Chromium|Edg/.test(ua) && !/Mobile/.test(ua)) return 'desktop';
+  return 'other';
 }
 
 function readDismissedAt(): number | null {
@@ -44,25 +48,17 @@ function isDismissedRecently(): boolean {
   return Date.now() - ts < DISMISS_TTL_MS;
 }
 
-function hasCompletedFirstQuestion(): boolean {
-  try {
-    return window.localStorage.getItem(FIRST_QUESTION_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
 export function InstallPrompt(): JSX.Element | null {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIos, setShowIos] = useState(false);
-  const [eligible, setEligible] = useState(false);
+  const [platform, setPlatform] = useState<Platform>('other');
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isStandalone() || isDismissedRecently()) return;
 
-    if (isStandalone() || isDismissedRecently()) {
-      return;
-    }
+    const detected = detectPlatform();
+    setPlatform(detected);
 
     const onBeforeInstall = (e: Event): void => {
       e.preventDefault();
@@ -72,55 +68,16 @@ export function InstallPrompt(): JSX.Element | null {
 
     const onInstalled = (): void => {
       setDeferred(null);
-      setShowIos(false);
-      setEligible(false);
+      setVisible(false);
     };
     window.addEventListener('appinstalled', onInstalled);
 
-    if (isIos()) {
-      setShowIos(true);
-    }
-
-    // Engagement gates: 60s timer OR first-question signal (whichever first).
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const markEligible = (): void => {
-      setEligible(true);
-      if (timer !== null) {
-        clearTimeout(timer);
-        timer = null;
-      }
-    };
-
-    if (hasCompletedFirstQuestion()) {
-      markEligible();
-    } else {
-      timer = setTimeout(markEligible, ENGAGEMENT_DELAY_MS);
-    }
-
-    const onFirstQuestion = (): void => {
-      try {
-        window.localStorage.setItem(FIRST_QUESTION_KEY, '1');
-      } catch {
-        // no-op
-      }
-      markEligible();
-    };
-    window.addEventListener('aprova:question-completed', onFirstQuestion);
-
-    const onStorage = (e: StorageEvent): void => {
-      if (e.key === FIRST_QUESTION_KEY && e.newValue === '1') {
-        markEligible();
-      }
-    };
-    window.addEventListener('storage', onStorage);
+    const timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
-      window.removeEventListener('aprova:question-completed', onFirstQuestion);
-      window.removeEventListener('storage', onStorage);
-      if (timer !== null) clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -131,11 +88,10 @@ export function InstallPrompt(): JSX.Element | null {
       // no-op
     }
     setDeferred(null);
-    setShowIos(false);
-    setEligible(false);
+    setVisible(false);
   };
 
-  const handleInstall = async (): Promise<void> => {
+  const handleNativeInstall = async (): Promise<void> => {
     if (!deferred) return;
     try {
       await deferred.prompt();
@@ -147,41 +103,133 @@ export function InstallPrompt(): JSX.Element | null {
     handleDismiss();
   };
 
-  if (!eligible) return null;
-  if (!deferred && !showIos) return null;
+  if (!visible) return null;
+  if (platform === 'other' && !deferred) return null;
 
-  const message = deferred
-    ? 'Instale o APROVA na sua tela inicial'
-    : "Toque no botão Compartilhar e escolha 'Adicionar à Tela de Início'";
+  const canNativeInstall = deferred !== null;
+  const isIos = platform === 'ios';
 
   return (
     <div
       role="dialog"
-      aria-label="Instalar APROVA"
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto flex w-full max-w-sm items-center gap-3 border-t border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur"
+      aria-modal="true"
+      aria-labelledby="install-title"
+      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-3 sm:px-4 sm:pb-4 motion-safe:animate-[install-slide_320ms_ease-out]"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
     >
-      <p className="flex-1 text-sm text-foreground">{message}</p>
-      {deferred ? (
-        <Button type="button" size="sm" variant="primary" onClick={handleInstall}>
-          Instalar
-        </Button>
-      ) : null}
-      <button
-        type="button"
-        onClick={handleDismiss}
-        aria-label="Fechar"
-        className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M3 3l10 10M13 3L3 13"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-12px_rgba(0,0,0,0.4)]">
+        <div className="flex items-start gap-3 p-4 sm:p-5">
+          <div
+            aria-hidden="true"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md"
+          >
+            <span className="text-lg font-bold tracking-tight">A</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 id="install-title" className="text-base font-semibold text-foreground">
+              Instale o APROVA
+            </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Adicione à tela inicial e estude offline em 1 toque.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            aria-label="Fechar"
+            className="-mr-1 -mt-1 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M3 3l10 10M13 3L3 13"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {canNativeInstall ? (
+          <div className="border-t border-border bg-background/50 px-4 py-3 sm:px-5 sm:py-4">
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              onClick={handleNativeInstall}
+              className="w-full"
+            >
+              Adicionar à tela inicial
+            </Button>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              Sem pesar no celular · Funciona offline
+            </p>
+          </div>
+        ) : isIos ? (
+          <div className="border-t border-border bg-background/50 px-4 py-4 sm:px-5">
+            <ol className="flex flex-col gap-2 text-sm text-foreground">
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                  1
+                </span>
+                <span>
+                  Toque no botão{' '}
+                  <span className="inline-flex items-center gap-1 align-middle font-medium text-foreground">
+                    Compartilhar
+                    <ShareIosIcon />
+                  </span>{' '}
+                  no Safari
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                  2
+                </span>
+                <span>
+                  Role e escolha{' '}
+                  <span className="font-medium text-foreground">
+                    Adicionar à Tela de Início
+                  </span>
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                  3
+                </span>
+                <span>
+                  Toque em{' '}
+                  <span className="font-medium text-foreground">Adicionar</span> — pronto, abre como app.
+                </span>
+              </li>
+            </ol>
+          </div>
+        ) : (
+          <div className="border-t border-border bg-background/50 px-4 py-3 text-sm text-muted-foreground sm:px-5">
+            Use Chrome no celular ou desktop para instalar com 1 toque.
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+function ShareIosIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="inline-block text-primary"
+    >
+      <path d="M12 16V4" />
+      <path d="M7 9l5-5 5 5" />
+      <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+    </svg>
   );
 }
