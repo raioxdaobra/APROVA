@@ -309,6 +309,13 @@ export default async function DashboardPage() {
               </Button>
             </Card>
             <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
+              <CardTitle className="text-base">Trilha</CardTitle>
+              <CardDescription>40 estações, 8 ranks. Avance no seu ritmo.</CardDescription>
+              <Button asChild variant="secondary" size="sm" className="mt-2">
+                <Link href="/trilha">Continuar</Link>
+              </Button>
+            </Card>
+            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
               <CardTitle className="text-base">Simulado completo</CardTitle>
               <CardDescription>Cronômetro, formato real, bônus por tempo.</CardDescription>
               <Button asChild variant="secondary" size="sm" className="mt-2">

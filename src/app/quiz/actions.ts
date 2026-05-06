@@ -119,27 +119,37 @@ export async function getYears(): Promise<number[]> {
   return [...set].sort((a, b) => b - a);
 }
 
-export interface DisciplineFrequency {
+export interface TopicFrequencyNode {
   discipline: string;
   count: number;
+  topics: Array<{ topic: string; count: number }>;
 }
 
-export async function getDisciplineFrequency(): Promise<DisciplineFrequency[]> {
+export async function getTopicFrequency(): Promise<TopicFrequencyNode[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('questions')
-    .select('discipline, annulled')
+    .select('discipline, subtopic, annulled')
     .eq('exam', EXAM);
   if (error || !data) return [];
-  const counts = new Map<string, number>();
+  const byDiscipline = new Map<string, Map<string, number>>();
   for (const row of data) {
     if (row.annulled) continue;
-    const d = row.discipline as string | null;
+    const d = (row.discipline as string | null) ?? null;
     if (!d) continue;
-    counts.set(d, (counts.get(d) ?? 0) + 1);
+    const t = ((row.subtopic as string | null) ?? '').trim() || 'Sem tópico';
+    if (!byDiscipline.has(d)) byDiscipline.set(d, new Map());
+    const inner = byDiscipline.get(d) ?? new Map<string, number>();
+    inner.set(t, (inner.get(t) ?? 0) + 1);
   }
-  return [...counts.entries()]
-    .map(([discipline, count]) => ({ discipline, count }))
+  return [...byDiscipline.entries()]
+    .map(([discipline, topicsMap]) => {
+      const topics = [...topicsMap.entries()]
+        .map(([topic, count]) => ({ topic, count }))
+        .sort((a, b) => b.count - a.count);
+      const count = topics.reduce((acc, t) => acc + t.count, 0);
+      return { discipline, count, topics };
+    })
     .sort((a, b) => b.count - a.count);
 }
 

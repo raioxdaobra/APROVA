@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { AdminBanner } from '@/components/admin-banner';
 import { AnalyticsProvider } from '@/components/analytics-provider';
 import { AuthProvider } from '@/components/auth-provider';
+import { AppShell } from '@/components/layout/app-shell';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -88,7 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeProvider>
           <AuthProvider initialSession={session}>
             <AdminBanner isAdmin={isAdmin} />
-            {children}
+            <AppShell isAdmin={isAdmin}>{children}</AppShell>
             <MobileBottomNav />
             <Toaster />
           </AuthProvider>
