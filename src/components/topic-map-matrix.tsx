@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flame, ChevronRight, BookOpen } from 'lucide-react';
+import { Flame, ChevronRight, BookOpen, Check } from 'lucide-react';
 import {
   type DisciplineTopicNode,
   type DisciplineProgress,
@@ -43,11 +43,32 @@ export interface TopicMapMatrixProps {
   data: DisciplineTopicNode[];
   /** Progresso pessoal por disciplina (resolved/correct). Pode estar ausente em mode='quiz'. */
   progress?: Record<string, DisciplineProgress>;
-  /** explore = expande accordion in-place; quiz = navega pra /quiz?discipline=X&subtopic=Y */
-  mode: 'explore' | 'quiz';
+  /**
+   * explore = expande accordion in-place;
+   * quiz = navega pra /quiz?discipline=X&subtopic=Y;
+   * simulado = toggle de seleção (precisa selectedTopics+onToggleTopic).
+   */
+  mode: 'explore' | 'quiz' | 'simulado';
+  /** Set de IDs `discipline:subtopic` selecionados. Obrigatório em mode='simulado'. */
+  selectedTopics?: Set<string>;
+  /** Callback de toggle. Obrigatório em mode='simulado'. */
+  onToggleTopic?: (topicId: string) => void;
 }
 
-export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
+/**
+ * Constrói o ID canônico de um tópico (estável p/ Sets, deep-link, etc).
+ */
+export function topicIdOf(discipline: string, subtopic: string): string {
+  return `${discipline}:${subtopic}`;
+}
+
+export function TopicMapMatrix({
+  data,
+  progress,
+  mode,
+  selectedTopics,
+  onToggleTopic,
+}: TopicMapMatrixProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [submitting, startTransition] = useTransition();
@@ -75,10 +96,17 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
     );
   });
 
+  const isSimulado = mode === 'simulado';
+  const selected = selectedTopics ?? new Set<string>();
+
   const handleChipClick = (discipline: string, subtopic: string) => {
     if (mode === 'quiz') {
       const url = `/quiz?discipline=${encodeURIComponent(discipline)}&subtopic=${encodeURIComponent(subtopic)}`;
       router.push(url);
+      return;
+    }
+    if (isSimulado) {
+      onToggleTopic?.(topicIdOf(discipline, subtopic));
       return;
     }
     // explore: alterna accordion
@@ -92,6 +120,20 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
     if (mode === 'explore') {
       // Em /estatisticas redirecionamos pra /quiz com a flag — usuário confirma lá
       router.push('/quiz?source=mais-cai');
+      return;
+    }
+
+    if (isSimulado) {
+      // Em simulado, "MAIS CAI" pré-seleciona top-3 de cada disciplina.
+      if (!onToggleTopic) return;
+      const ids = new Set<string>();
+      for (const [discipline, topics] of top3ByDiscipline) {
+        for (const t of topics) ids.add(topicIdOf(discipline, t.topic));
+      }
+      // Aplica diff: adiciona quem falta.
+      for (const id of ids) {
+        if (!selected.has(id)) onToggleTopic(id);
+      }
       return;
     }
 
@@ -117,6 +159,14 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
     });
   };
 
+  // Header CTA varia por modo
+  const ctaLabel = isSimulado
+    ? '⚡ Simulado focado nos que mais caem'
+    : 'Estudar o que MAIS CAI (top-3 por disciplina)';
+  const ctaSubtitle = isSimulado
+    ? 'Selecione tópicos manualmente ou clique abaixo'
+    : 'Cards equivalentes · top-3 com selo MAIS CAI';
+
   return (
     <div className="flex flex-col gap-4">
       {/* CTA superior */}
@@ -125,19 +175,17 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
           <h2 className="text-base font-semibold text-foreground">
             Mapa de tópicos
           </h2>
-          <p className="text-xs text-muted-foreground">
-            Cards equivalentes · top-3 com selo MAIS CAI
-          </p>
+          <p className="text-xs text-muted-foreground">{ctaSubtitle}</p>
         </div>
         <button
           type="button"
           onClick={handleStudyTop3}
           disabled={submitting}
           className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label="Estudar o que mais cai"
+          aria-label={ctaLabel}
         >
-          <BookOpen className="h-4 w-4" aria-hidden="true" />
-          {submitting ? 'Carregando…' : 'Estudar o que MAIS CAI (top-3 por disciplina)'}
+          {!isSimulado ? <BookOpen className="h-4 w-4" aria-hidden="true" /> : null}
+          {submitting ? 'Carregando…' : ctaLabel}
         </button>
       </div>
 
@@ -155,13 +203,30 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
           const top3 = top3ByDiscipline.get(d.discipline) ?? [];
           const top3Set = new Set(top3.map((t) => t.topic));
           const prog = progress?.[d.discipline];
-          const isExpanded = expanded === d.discipline && mode === 'explore';
+          // explore E simulado podem expandir accordion
+          const isExpanded =
+            expanded === d.discipline && (mode === 'explore' || isSimulado);
+
+          // Conta tópicos selecionados nesta disciplina (só simulado)
+          const selectedCountInDiscipline = isSimulado
+            ? d.topics.filter((t) =>
+                selected.has(topicIdOf(d.discipline, t.topic)),
+              ).length
+            : 0;
+          const totalTopicsInDiscipline = d.topics.length;
+          const isAnySelected = selectedCountInDiscipline > 0;
 
           return (
             <article
               key={d.discipline}
-              className="flex min-h-[180px] flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors"
-              style={{ borderTopWidth: '3px', borderTopColor: `hsl(var(${accent}))` }}
+              className="flex min-h-[180px] flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors"
+              style={{
+                borderTopWidth: '3px',
+                borderTopColor: `hsl(var(${accent}))`,
+                borderColor: isSimulado && isAnySelected
+                  ? `hsl(var(${accent}) / 0.6)`
+                  : undefined,
+              }}
             >
               {/* Header */}
               <header className="flex items-baseline justify-between gap-2">
@@ -171,9 +236,32 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
                 >
                   {label}
                 </h3>
-                <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {d.count}
-                </span>
+                {isSimulado ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium tabular-nums"
+                    style={{
+                      backgroundColor: isAnySelected
+                        ? `hsl(var(${accent}) / 0.15)`
+                        : 'transparent',
+                      color: isAnySelected
+                        ? `hsl(var(${accent}))`
+                        : 'hsl(var(--muted-foreground))',
+                      borderColor: isAnySelected
+                        ? `hsl(var(${accent}) / 0.4)`
+                        : undefined,
+                    }}
+                    aria-label={`${selectedCountInDiscipline} de ${totalTopicsInDiscipline} tópicos selecionados em ${label}`}
+                  >
+                    {isAnySelected ? (
+                      <Check className="h-3 w-3" aria-hidden="true" />
+                    ) : null}
+                    {selectedCountInDiscipline}/{totalTopicsInDiscipline}
+                  </span>
+                ) : (
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {d.count}
+                  </span>
+                )}
               </header>
 
               {/* Mini barra de progresso */}
@@ -224,31 +312,37 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
                 <ul className="flex flex-wrap gap-1.5">
                   {top3.map((t) => {
                     const isHot = top3Set.has(t.topic);
+                    const tid = topicIdOf(d.discipline, t.topic);
+                    const isSelected = isSimulado && selected.has(tid);
                     return (
                       <li key={t.topic}>
                         <button
                           type="button"
                           onClick={() => handleChipClick(d.discipline, t.topic)}
-                          className="group inline-flex min-h-[28px] items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2"
+                          aria-pressed={isSimulado ? isSelected : undefined}
+                          className="group inline-flex min-h-[28px] items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2"
                           style={{
-                            backgroundColor: isHot
-                              ? `hsl(var(${accent}) / 0.22)`
-                              : `hsl(var(${accent}) / 0.08)`,
-                            borderColor: isHot
-                              ? `hsl(var(${accent}) / 0.5)`
-                              : undefined,
-                            color: isHot
+                            backgroundColor: isSelected
+                              ? `hsl(var(${accent}) / 0.32)`
+                              : isHot
+                                ? `hsl(var(${accent}) / 0.22)`
+                                : `hsl(var(${accent}) / 0.08)`,
+                            borderColor: isSelected
+                              ? `hsl(var(${accent}))`
+                              : isHot
+                                ? `hsl(var(${accent}) / 0.5)`
+                                : 'hsl(var(--border))',
+                            color: isHot || isSelected
                               ? `hsl(var(${accent}))`
                               : 'hsl(var(--foreground))',
                           }}
                           title={`${t.topic} (${t.count} questões)`}
-                          aria-label={`${t.topic}, ${t.count} questões${isHot ? ', top 3' : ''}`}
+                          aria-label={`${t.topic}, ${t.count} questões${isHot ? ', top 3' : ''}${isSelected ? ', selecionado' : ''}`}
                         >
-                          {isHot ? (
-                            <Flame
-                              className="h-3 w-3 shrink-0"
-                              aria-hidden="true"
-                            />
+                          {isSelected ? (
+                            <Check className="h-3 w-3 shrink-0" aria-hidden="true" />
+                          ) : isHot ? (
+                            <Flame className="h-3 w-3 shrink-0" aria-hidden="true" />
                           ) : null}
                           <span className="line-clamp-1 max-w-[140px]">
                             {t.topic}
@@ -267,11 +361,15 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
                 </p>
               )}
 
-              {/* Explore: botão "Ver todos" abaixo */}
-              {mode === 'explore' && d.topics.length > 3 ? (
+              {/* Explore/Simulado: botão "Ver todos" abaixo */}
+              {(mode === 'explore' || isSimulado) && d.topics.length > 3 ? (
                 <button
                   type="button"
-                  onClick={() => setExpanded((prev) => (prev === d.discipline ? null : d.discipline))}
+                  onClick={() =>
+                    setExpanded((prev) =>
+                      prev === d.discipline ? null : d.discipline,
+                    )
+                  }
                   className="mt-auto inline-flex items-center justify-between gap-1 rounded border border-transparent px-1 py-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2"
                   aria-expanded={isExpanded}
                   aria-controls={`topics-all-${d.discipline}`}
@@ -298,11 +396,20 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
                     return d.topics.map((t) => {
                       const pct = (t.count / max) * 100;
                       const isHot = top3Set.has(t.topic);
-                      return (
-                        <div key={t.topic} className="flex flex-col gap-0.5">
+                      const tid = topicIdOf(d.discipline, t.topic);
+                      const isSelected = isSimulado && selected.has(tid);
+
+                      const row = (
+                        <>
                           <div className="flex items-baseline justify-between gap-2 text-xs">
                             <span className="line-clamp-1 inline-flex items-center gap-1 text-foreground">
-                              {isHot ? (
+                              {isSelected ? (
+                                <Check
+                                  className="h-3 w-3 shrink-0"
+                                  style={{ color: `hsl(var(${accent}))` }}
+                                  aria-hidden="true"
+                                />
+                              ) : isHot ? (
                                 <Flame
                                   className="h-3 w-3 shrink-0"
                                   style={{ color: `hsl(var(${accent}))` }}
@@ -324,6 +431,35 @@ export function TopicMapMatrix({ data, progress, mode }: TopicMapMatrixProps) {
                               }}
                             />
                           </div>
+                        </>
+                      );
+
+                      // Em simulado, cada tópico é toggleável (botão com tap-target ≥44px)
+                      if (isSimulado) {
+                        return (
+                          <button
+                            key={t.topic}
+                            type="button"
+                            onClick={() => onToggleTopic?.(tid)}
+                            aria-pressed={isSelected}
+                            className="flex min-h-[44px] flex-col gap-1 rounded border border-transparent px-1 py-1 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2"
+                            style={{
+                              backgroundColor: isSelected
+                                ? `hsl(var(${accent}) / 0.12)`
+                                : undefined,
+                              borderColor: isSelected
+                                ? `hsl(var(${accent}) / 0.4)`
+                                : undefined,
+                            }}
+                          >
+                            {row}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <div key={t.topic} className="flex flex-col gap-0.5">
+                          {row}
                         </div>
                       );
                     });

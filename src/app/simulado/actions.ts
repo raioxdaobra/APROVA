@@ -174,6 +174,124 @@ export type SimuladoCapResult = {
   plan: 'free' | 'pro' | 'admin';
 };
 
+const MULTI_TOPIC_DISCIPLINE = z.enum([
+  'matematica',
+  'fisica',
+  'quimica',
+  'biologia',
+  'humanas',
+  'linguagens',
+]);
+
+const multiTopicSchema = z.object({
+  topics: z
+    .array(
+      z.object({
+        discipline: MULTI_TOPIC_DISCIPLINE,
+        subtopic: z.string().min(1),
+      }),
+    )
+    .min(1)
+    .max(120),
+  /** Tempo total opcional em minutos. Default = ~2.5 min/q (ajustado pra MIN/MAX). */
+  time_limit_min: z.number().int().min(15).max(360).optional(),
+});
+
+export type StartMultiTopicSimuladoInput = z.infer<typeof multiTopicSchema>;
+
+const SIMULADO_MAX = 90;
+const SIMULADO_MIN = 5;
+
+/**
+ * Cria um simulado a partir de um conjunto arbitrário de pares (discipline, subtopic).
+ * Sample aleatório (sem proporcionalidade), limita ao SIMULADO_MAX, valida cap.
+ * Em sucesso, faz redirect pra `/simulado/sessao/[id]`.
+ */
+export async function startMultiTopicSimuladoAndRedirect(
+  input: StartMultiTopicSimuladoInput,
+): Promise<void> {
+  const parsed = multiTopicSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error('Tópicos inválidos.');
+  }
+  const { topics, time_limit_min } = parsed.data;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/');
+  }
+
+  const cap = await checkSimuladoCap(supabase, user.id);
+  if (!cap.allowed) {
+    throw new Error('Limite de simulados grátis atingido. Assine o Pro.');
+  }
+
+  // Agrupa subtópicos por disciplina (1 round-trip por disciplina)
+  const byDiscipline = new Map<string, string[]>();
+  for (const p of topics) {
+    const list = byDiscipline.get(p.discipline) ?? [];
+    list.push(p.subtopic);
+    byDiscipline.set(p.discipline, list);
+  }
+
+  const pool: SamplePool[] = [];
+  for (const [discipline, subs] of byDiscipline) {
+    const { data: rows, error } = await supabase
+      .from('questions')
+      .select('id, discipline, subtopic, annulled')
+      .eq('exam', 'unifor-medicina')
+      .eq('discipline', discipline)
+      .in('subtopic', subs)
+      .or('annulled.is.null,annulled.eq.false');
+    if (error || !rows) continue;
+    for (const r of rows) {
+      pool.push({ id: r.id, discipline: r.discipline as string });
+    }
+  }
+
+  if (pool.length < SIMULADO_MIN) {
+    throw new Error(
+      `Tópicos selecionados têm menos de ${SIMULADO_MIN} questões.`,
+    );
+  }
+
+  const questionIds = shuffle(pool).slice(0, SIMULADO_MAX).map((q) => q.id);
+  const total = questionIds.length;
+
+  // Default: ~2.5 min/q arredondado para 15+ min, capado em 360
+  const computedTime =
+    time_limit_min ?? Math.min(360, Math.max(15, Math.round(total * 2.5)));
+
+  const filters: Json = {
+    total,
+    time_limit_sec: computedTime * 60,
+    question_ids: questionIds,
+    discipline_filter: 'todas',
+    multi_topic: true,
+    topics,
+  };
+
+  const { data: created, error: insertErr } = await supabase
+    .from('study_sessions')
+    .insert({
+      user_id: user.id,
+      type: 'simulado',
+      filters,
+    })
+    .select('id')
+    .single();
+  if (insertErr || !created) {
+    throw new Error('Falha ao iniciar simulado.');
+  }
+
+  await incrementUsageCounter(supabase, user.id, 'simulados_used_count');
+
+  redirect(`/simulado/sessao/${created.id}`);
+}
+
 export async function checkSimuladoCapAction(
   options: { previewFreeMode?: boolean } = {},
 ): Promise<SimuladoCapResult> {
