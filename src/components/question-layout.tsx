@@ -34,6 +34,11 @@ interface Props {
   enableFullscreen?: boolean;
   /** Habilita o lightbox via clique na imagem. Default `true`. */
   enableLightbox?: boolean;
+  /**
+   * Slot opcional renderizado ao lado da imagem ampliada no lightbox.
+   * Default: reusa `body` (alternativas + nav) — permite responder sem fechar zoom.
+   */
+  lightboxSidebar?: ReactNode;
   /** Wrapper class adicional (mobile-first). */
   className?: string;
 }
@@ -45,6 +50,7 @@ export function QuestionLayout({
   imageAlt,
   enableFullscreen = true,
   enableLightbox = true,
+  lightboxSidebar,
   className,
 }: Props) {
   const [fullscreen, setFullscreen] = useState(false);
@@ -156,6 +162,7 @@ export function QuestionLayout({
           src={imageUrl}
           alt={imageAlt}
           onClose={() => setLightboxOpen(false)}
+          sidebar={lightboxSidebar ?? body}
         />
       ) : null}
     </div>

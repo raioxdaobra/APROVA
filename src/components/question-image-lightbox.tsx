@@ -14,6 +14,11 @@ interface Props {
   src: string;
   alt: string;
   onClose: () => void;
+  /**
+   * Slot opcional renderizado ao lado da imagem ampliada (desktop) ou
+   * abaixo (mobile). Permite responder sem fechar o zoom.
+   */
+  sidebar?: import('react').ReactNode;
 }
 
 const MIN_SCALE = 0.5;
@@ -26,7 +31,7 @@ interface PointerData {
   y: number;
 }
 
-export function QuestionImageLightbox({ open, src, alt, onClose }: Props) {
+export function QuestionImageLightbox({ open, src, alt, onClose, sidebar }: Props) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const [scale, setScale] = useState(1);
@@ -231,26 +236,47 @@ export function QuestionImageLightbox({ open, src, alt, onClose }: Props) {
         </div>
       </div>
 
-      {/* Canvas */}
-      <div
-        className={cn(
-          'relative flex flex-1 select-none items-center justify-center overflow-hidden',
-          'touch-none',
-        )}
-        onWheel={handleWheel}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={alt}
-          draggable={false}
-          className="max-h-full max-w-full"
-          style={transformStyle}
-        />
+      {/* Body: imagem + sidebar com respostas (se presente) */}
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+        {/* Canvas da imagem */}
+        <div
+          className={cn(
+            'relative flex flex-1 select-none items-center justify-center overflow-hidden',
+            'touch-none',
+          )}
+          onWheel={handleWheel}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={alt}
+            draggable={false}
+            className="max-h-full max-w-full"
+            style={transformStyle}
+          />
+        </div>
+
+        {/* Sidebar com alternativas e nav (não roda zoom — eventos isolados) */}
+        {sidebar ? (
+          <aside
+            className={cn(
+              'flex-shrink-0 overflow-y-auto bg-card text-foreground',
+              'border-t border-border lg:border-l lg:border-t-0',
+              'p-3 lg:w-[360px] lg:p-4',
+              'max-h-[40vh] lg:max-h-none',
+            )}
+            // Bloqueia bubbling de eventos pra zoom não capturar interação na lista
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+          >
+            {sidebar}
+          </aside>
+        ) : null}
       </div>
     </div>
   );

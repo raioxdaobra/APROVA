@@ -325,13 +325,16 @@ function StationStrip({ stations, nextId, peers, onSelect }: StationStripProps) 
             key={station.id}
             station={station}
             state={state}
+            // Wrapper centralizado horizontalmente em cx, com largura grande pra
+            // o label embaixo poder respirar (até 160px). Button interno mantém
+            // dimensão real do node (size).
             style={{
               position: 'absolute',
-              left: cx - size / 2,
+              left: cx - 80, // 160 / 2
               top: cy - size / 2,
-              width: size,
-              height: size,
+              width: 160,
             }}
+            buttonSize={size}
             onSelect={() => onSelect(station)}
           />
         );
@@ -352,6 +355,8 @@ interface TrilhaStationNodeProps {
   station: TrilhaStationRPG;
   state: StationVisualState;
   style: React.CSSProperties;
+  /** Tamanho do botão circular (px). Default 64. Boss = 80. */
+  buttonSize?: number;
   onSelect: () => void;
 }
 
@@ -359,6 +364,7 @@ function TrilhaStationNode({
   station,
   state,
   style,
+  buttonSize = 64,
   onSelect,
 }: TrilhaStationNodeProps) {
   const DiscIcon = DISCIPLINE_ICONS[station.discipline] ?? Calculator;
@@ -402,7 +408,7 @@ function TrilhaStationNode({
         type="button"
         onClick={onSelect}
         aria-label={ariaLabel}
-        style={{ width: '100%', height: '100%', ...bgStyle }}
+        style={{ width: buttonSize, height: buttonSize, ...bgStyle }}
         className={cn(
           'group relative flex items-center justify-center rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2',
           borderClass,
