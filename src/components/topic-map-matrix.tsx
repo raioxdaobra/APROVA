@@ -70,6 +70,13 @@ export interface TopicMapMatrixProps {
   onToggleTopic?: (topicId: string) => void;
   /** Esconde o header CTA + descrição (parent renderiza seus próprios CTAs). */
   hideHeader?: boolean;
+  /**
+   * Quando true, mostra apenas cards com pelo menos 1 item selecionado e,
+   * dentro deles, apenas os chips selecionados. Útil pra "modo foco" após
+   * o user já ter escolhido o que quer estudar. Ignorado quando não é
+   * controlado (sem selectedTopics + onToggleTopic).
+   */
+  focusOnSelected?: boolean;
 }
 
 /**
@@ -86,6 +93,7 @@ export function TopicMapMatrix({
   selectedTopics,
   onToggleTopic,
   hideHeader = false,
+  focusOnSelected = false,
 }: TopicMapMatrixProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -233,6 +241,13 @@ export function TopicMapMatrix({
       {/* Grid de cards equivalentes */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {orderedDisciplines.map((d) => {
+          // Modo foco: pula cards sem nada selecionado nesta disciplina
+          if (focusOnSelected && isToggleable) {
+            const allId = `${d.discipline}:*`;
+            const hasAny = selected.has(allId)
+              || d.topics.some((t) => selected.has(topicIdOf(d.discipline, t.topic)));
+            if (!hasAny) return null;
+          }
           const accent = ACCENT_VARS[d.discipline] ?? '--accent-quiz';
           const label = DISCIPLINE_LABELS[d.discipline] ?? d.discipline;
           const isLinguagens = d.discipline === 'linguagens';
@@ -510,10 +525,16 @@ export function TopicMapMatrix({
                 )}
               </div>
 
-              {/* Chips top-3 */}
-              {top3.length > 0 ? (
+              {/* Chips: top-3 normalmente; só selecionados em modo foco */}
+              {(() => {
+                const chipsToRender = focusOnSelected && isToggleable
+                  ? (allSelected
+                    ? filteredTopics.slice(0, 12) // ao selecionar disc:*, mostra até 12 dos topics
+                    : filteredTopics.filter((t) => selected.has(topicIdOf(d.discipline, t.topic))))
+                  : top3;
+                return chipsToRender.length > 0 ? (
                 <ul className="flex flex-wrap gap-1.5">
-                  {top3.map((t) => {
+                  {chipsToRender.map((t) => {
                     const isHot = top3Set.has(t.topic);
                     const tid = topicIdOf(d.discipline, t.topic);
                     const isSelected =
@@ -561,9 +582,10 @@ export function TopicMapMatrix({
                 </ul>
               ) : (
                 <p className="text-xs italic text-muted-foreground">
-                  Sem tópicos cadastrados.
+                  {focusOnSelected ? 'Nada selecionado nesta disciplina.' : 'Sem tópicos cadastrados.'}
                 </p>
-              )}
+              );
+              })()}
 
               {/* Explore/Simulado/Quiz controlado: botão "Ver todos" abaixo */}
               {(mode === 'explore' || isToggleable) && filteredTopics.length > 3 ? (

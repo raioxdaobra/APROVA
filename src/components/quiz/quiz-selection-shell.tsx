@@ -182,6 +182,8 @@ export function QuizSelectionShell({ data, years }: QuizSelectionShellProps) {
 
   const isPending = isPendingMaisCai || isPendingSelected;
   const canStartSelected = totalSelectedItems > 0 && !isPending;
+  const [showAllInMap, setShowAllInMap] = useState(false);
+  const focusOnSelected = totalSelectedItems > 0 && !showAllInMap;
 
   return (
     <div className="flex flex-col gap-6">
@@ -189,15 +191,27 @@ export function QuizSelectionShell({ data, years }: QuizSelectionShellProps) {
         aria-labelledby="topic-map-quiz"
         className="rounded-lg border border-border bg-card p-4"
       >
-        <h2 id="topic-map-quiz" className="mb-3 text-base font-semibold text-foreground">
-          Mapa de tópicos
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="topic-map-quiz" className="text-base font-semibold text-foreground">
+            Mapa de tópicos
+          </h2>
+          {totalSelectedItems > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowAllInMap((p) => !p)}
+              className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {showAllInMap ? 'Ver só selecionados' : '+ Adicionar mais tópicos'}
+            </button>
+          ) : null}
+        </div>
         <TopicMapMatrix
           data={data}
           mode="quiz"
           selectedTopics={selected}
           onToggleTopic={handleToggle}
           hideHeader
+          focusOnSelected={focusOnSelected}
         />
 
         {/* Indicador */}
