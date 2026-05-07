@@ -115,7 +115,7 @@ async function buildIco(): Promise<void> {
   let offset = 6 + sizes.length * 16;
 
   sizes.forEach((s, i) => {
-    const png = pngs[i];
+    const png = pngs[i]!;
     const entry = Buffer.alloc(16);
     entry.writeUInt8(s === 256 ? 0 : s, 0); // width (0 means 256)
     entry.writeUInt8(s === 256 ? 0 : s, 1); // height
