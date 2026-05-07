@@ -241,13 +241,8 @@ export function TopicMapMatrix({
       {/* Grid de cards equivalentes */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {orderedDisciplines.map((d) => {
-          // Modo foco: pula cards sem nada selecionado nesta disciplina
-          if (focusOnSelected && isToggleable) {
-            const allId = `${d.discipline}:*`;
-            const hasAny = selected.has(allId)
-              || d.topics.some((t) => selected.has(topicIdOf(d.discipline, t.topic)));
-            if (!hasAny) return null;
-          }
+          // Cards sempre visíveis. Em focus mode, chips ficam vazios até user
+          // selecionar via gráfico abaixo ou clicar "+ Adicionar mais tópicos".
           const accent = ACCENT_VARS[d.discipline] ?? '--accent-quiz';
           const label = DISCIPLINE_LABELS[d.discipline] ?? d.discipline;
           const isLinguagens = d.discipline === 'linguagens';
@@ -582,7 +577,9 @@ export function TopicMapMatrix({
                 </ul>
               ) : (
                 <p className="text-xs italic text-muted-foreground">
-                  {focusOnSelected ? 'Nada selecionado nesta disciplina.' : 'Sem tópicos cadastrados.'}
+                  {focusOnSelected
+                    ? 'Toque no gráfico abaixo pra selecionar tópicos.'
+                    : 'Sem tópicos cadastrados.'}
                 </p>
               );
               })()}

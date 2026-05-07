@@ -182,8 +182,10 @@ export function QuizSelectionShell({ data, years }: QuizSelectionShellProps) {
 
   const isPending = isPendingMaisCai || isPendingSelected;
   const canStartSelected = totalSelectedItems > 0 && !isPending;
+  // Default: cards começam vazios (focus mode). User preenche clicando no
+  // gráfico de barras abaixo ou acionando "+ Adicionar mais tópicos".
   const [showAllInMap, setShowAllInMap] = useState(false);
-  const focusOnSelected = totalSelectedItems > 0 && !showAllInMap;
+  const focusOnSelected = !showAllInMap;
 
   return (
     <div className="flex flex-col gap-6">
@@ -195,15 +197,19 @@ export function QuizSelectionShell({ data, years }: QuizSelectionShellProps) {
           <h2 id="topic-map-quiz" className="text-base font-semibold text-foreground">
             Mapa de tópicos
           </h2>
-          {totalSelectedItems > 0 ? (
-            <button
-              type="button"
-              onClick={() => setShowAllInMap((p) => !p)}
-              className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-            >
-              {showAllInMap ? 'Ver só selecionados' : '+ Adicionar mais tópicos'}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => setShowAllInMap((p) => !p)}
+            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {showAllInMap
+              ? totalSelectedItems > 0
+                ? 'Ver só selecionados'
+                : 'Ocultar recomendados'
+              : totalSelectedItems > 0
+                ? '+ Adicionar mais tópicos'
+                : 'Ver tópicos recomendados'}
+          </button>
         </div>
         <TopicMapMatrix
           data={data}
