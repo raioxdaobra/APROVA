@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { createClient } from '@/lib/supabase/server';
 import { DisplayNameForm } from './forms/display-name-form';
@@ -112,21 +111,10 @@ export default async function ConfiguracoesPage() {
 
         <Card className="flex flex-col gap-5">
           <div>
-            <CardTitle>Dados e ações destrutivas</CardTitle>
+            <CardTitle>Zona de perigo</CardTitle>
             <CardDescription>
-              Exporte suas informações ou apague tudo definitivamente.
+              Apague sua conta e todos os dados associados. Essa ação é definitiva.
             </CardDescription>
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-foreground">Exportar meus dados</span>
-            <p className="text-xs text-muted-foreground">
-              Inclui perfil, tentativas, sessões, XP semanal, sequências e revisões em JSON.
-            </p>
-            <Button asChild variant="secondary" size="sm" className="self-start">
-              <a href="/api/export" download>
-                Baixar JSON
-              </a>
-            </Button>
           </div>
           <DeleteAccountSection username={username} />
         </Card>
