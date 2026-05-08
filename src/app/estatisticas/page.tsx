@@ -186,7 +186,8 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
     supabase
       .from('questions')
       .select('id, discipline, subtopic, subtopic_short, annulled, exam')
-      .eq('exam', 'unifor-medicina'),
+      .eq('exam', 'unifor-medicina')
+      .range(0, 9999),
     supabase
       .from('subtopic_mastery')
       .select('discipline, subtopic')

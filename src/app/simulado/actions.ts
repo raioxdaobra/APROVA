@@ -106,7 +106,8 @@ export async function startSimulado(input: StartSimuladoInput): Promise<void> {
   let poolQuery = supabase
     .from('questions')
     .select('id, discipline')
-    .or('annulled.is.null,annulled.eq.false');
+    .or('annulled.is.null,annulled.eq.false')
+    .range(0, 9999);
   if (discipline !== 'todas') {
     poolQuery = poolQuery.eq('discipline', discipline);
   }
@@ -255,7 +256,8 @@ export async function startMultiTopicSimuladoAndRedirect(
       .eq('exam', 'unifor-medicina')
       .eq('discipline', discipline)
       .in('subtopic', subs)
-      .or('annulled.is.null,annulled.eq.false');
+      .or('annulled.is.null,annulled.eq.false')
+      .range(0, 9999);
     if (error || !rows) continue;
     for (const r of rows) {
       // Sub-filtro: só aplica na disciplina pertinente.

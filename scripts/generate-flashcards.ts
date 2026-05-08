@@ -209,14 +209,18 @@ async function main() {
       console.log(`OK [${provider}]`);
       ok++;
     } catch (err) {
-      console.log(`FAIL (${(err as Error).message.slice(0, 80)})`);
+      const msg = (err as Error).message;
+      console.log(`FAIL (${msg.slice(0, 80)})`);
       failed++;
+      // Se TODOS providers falharam (breakers abertos), espera 90s pra eles fecharem.
+      if (msg.includes('Nenhum provedor')) {
+        console.log('  → todos providers down, esperando 90s pro breaker reabrir...');
+        await new Promise((r) => setTimeout(r, 90000));
+      }
     }
 
-    // throttle leve pra não estourar rate limits
-    if (i % 10 === 9) {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
+    // Throttle: 6s entre requests pra ficar dentro de Gemini (15/min) e Groq (30/min) com folga.
+    await new Promise((r) => setTimeout(r, 6000));
   }
 
   await client.end();

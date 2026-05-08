@@ -97,7 +97,8 @@ async function loadCandidateQuestionIds(
     .eq('exam', EXAM)
     // Anuladas são sempre escondidas (PR 33). Mantemos a coluna do filtro
     // por compat, mas ignoramos `f.hide_annulled` pra evitar regressão.
-    .eq('annulled', false);
+    .eq('annulled', false)
+    .range(0, 9999); // Supabase default 1000; banco tem 1015+ não-anuladas.
 
   if (f.discipline) query = query.eq('discipline', f.discipline);
   if (f.subtopic) query = query.eq('subtopic', f.subtopic);
@@ -131,7 +132,8 @@ export async function getSubtopics(discipline: string | null): Promise<string[]>
     .from('questions')
     .select('subtopic')
     .eq('exam', EXAM)
-    .eq('annulled', false);
+    .eq('annulled', false)
+    .range(0, 9999);
   if (discipline) {
     const parsed = disciplineSchema.safeParse(discipline);
     if (!parsed.success) return [];
@@ -152,7 +154,8 @@ export async function getYears(): Promise<number[]> {
     .from('questions')
     .select('year')
     .eq('exam', EXAM)
-    .eq('annulled', false);
+    .eq('annulled', false)
+    .range(0, 9999);
   if (error || !data) return [];
   const set = new Set<number>();
   for (const row of data) {
@@ -169,10 +172,12 @@ export interface TopicFrequencyNode {
 
 export async function getTopicFrequency(): Promise<TopicFrequencyNode[]> {
   const supabase = await createClient();
+  // Supabase default limita 1000 rows. Banco tem 1025 → setamos range explícito.
   const { data, error } = await supabase
     .from('questions')
     .select('discipline, subtopic, annulled')
-    .eq('exam', EXAM);
+    .eq('exam', EXAM)
+    .range(0, 9999);
   if (error || !data) return [];
   const byDiscipline = new Map<string, Map<string, number>>();
   for (const row of data) {
@@ -241,7 +246,8 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
     .from('questions')
     .select('id, year, semester, question_num, discipline, subtopic, annulled')
     .eq('exam', EXAM)
-    .eq('annulled', false);
+    .eq('annulled', false)
+    .range(0, 9999);
   if (f.discipline) metaQuery = metaQuery.eq('discipline', f.discipline);
   if (f.subtopic) metaQuery = metaQuery.eq('subtopic', f.subtopic);
   if (f.year !== null) metaQuery = metaQuery.eq('year', f.year);
@@ -388,7 +394,8 @@ export async function startTopicsQuizAndRedirect(
       .eq('exam', EXAM)
       .eq('discipline', discipline)
       .in('subtopic', subs)
-      .eq('annulled', false);
+      .eq('annulled', false)
+      .range(0, 9999);
     if (error || !rows) continue;
     // Aplica sub-filtro só na disciplina relevante.
     const filtered = filterBySubFilter(rows, {
