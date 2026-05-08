@@ -58,9 +58,22 @@ function isPublicRoute(pathname: string): boolean {
   return false;
 }
 
+/**
+ * Rotas "imersivas" — sessões ativas onde a barra atrapalha (cobre teclado
+ * virtual no Wordle, esconde Alternativa E e botão Próxima no quiz, etc).
+ * O `/jogos` (lobby) continua mostrando; só `/jogos/<gameId>/...` esconde.
+ */
+function isImmersiveRoute(pathname: string): boolean {
+  if (pathname.startsWith('/quiz/sessao/')) return true;
+  if (pathname.startsWith('/simulado/sessao/')) return true;
+  if (pathname.startsWith('/jogos/') && pathname !== '/jogos') return true;
+  return false;
+}
+
 export function MobileBottomNav(): JSX.Element | null {
   const pathname = usePathname() ?? '/';
   if (isPublicRoute(pathname)) return null;
+  if (isImmersiveRoute(pathname)) return null;
 
   return (
     <nav
