@@ -21,41 +21,46 @@ function getSystemPreference(): ResolvedTheme {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('system');
+  const [theme, setThemeState] = useState<Theme>('light');
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light');
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
-      const initial = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+      // Migra valores antigos 'system' pra preferência do sistema concreta.
+      let initial: Theme;
+      if (stored === 'light' || stored === 'dark') {
+        initial = stored;
+      } else if (stored === 'system') {
+        initial = getSystemPreference();
+        try {
+          window.localStorage.setItem(STORAGE_KEY, initial);
+        } catch {
+          /* ignore */
+        }
+      } else {
+        initial = getSystemPreference();
+      }
       applyTheme(initial);
       setThemeState(initial);
-      setResolvedTheme(initial === 'system' ? getSystemPreference() : initial);
+      setResolvedTheme(initial);
     } catch {
-      /* localStorage indisponível — segue com 'system' */
+      /* localStorage indisponível */
       setResolvedTheme(getSystemPreference());
     }
-
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => {
-      setThemeState((current) => {
-        if (current === 'system') setResolvedTheme(mql.matches ? 'dark' : 'light');
-        return current;
-      });
-    };
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
   }, []);
 
   const setTheme = (next: Theme) => {
+    // Coage 'system' pra resolução concreta — só persistimos light|dark.
+    const resolved: ResolvedTheme = next === 'system' ? getSystemPreference() : next;
     try {
-      window.localStorage.setItem(STORAGE_KEY, next);
+      window.localStorage.setItem(STORAGE_KEY, resolved);
     } catch {
       /* localStorage indisponível */
     }
-    applyTheme(next);
-    setThemeState(next);
-    setResolvedTheme(next === 'system' ? getSystemPreference() : next);
+    applyTheme(resolved);
+    setThemeState(resolved);
+    setResolvedTheme(resolved);
   };
 
   return (
@@ -66,10 +71,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
   root.classList.remove('light', 'dark');
+  // Sempre aplica light|dark concreto. 'system' já foi resolvido antes.
   if (theme === 'light' || theme === 'dark') {
     root.classList.add(theme);
+  } else {
+    root.classList.add(getSystemPreference());
   }
-  // 'system' = remove ambas, deixa @media prefers-color-scheme decidir
 }
 
 export function useTheme() {

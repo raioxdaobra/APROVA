@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Gamepad2, Home, Map as MapIcon, User } from 'lucide-react';
+import { Brain, Gamepad2, Home, Map as MapIcon, User } from 'lucide-react';
 
 interface NavItem {
   href: string;
@@ -10,6 +10,7 @@ interface NavItem {
   Icon: typeof Home;
   /** Match prefix to highlight nested routes too. */
   match: (pathname: string) => boolean;
+  accentVar: string;
 }
 
 const ITEMS: NavItem[] = [
@@ -18,24 +19,35 @@ const ITEMS: NavItem[] = [
     label: 'Início',
     Icon: Home,
     match: (p) => p === '/dashboard' || p.startsWith('/dashboard/'),
+    accentVar: '--primary',
   },
   {
     href: '/trilha',
     label: 'Trilha',
     Icon: MapIcon,
     match: (p) => p === '/trilha' || p.startsWith('/trilha/'),
+    accentVar: '--accent-trilha',
+  },
+  {
+    href: '/revisao',
+    label: 'Revisão',
+    Icon: Brain,
+    match: (p) => p === '/revisao' || p.startsWith('/revisao/'),
+    accentVar: '--accent-chat',
   },
   {
     href: '/jogos',
     label: 'Jogos',
     Icon: Gamepad2,
     match: (p) => p === '/jogos' || p.startsWith('/jogos/'),
+    accentVar: '--accent-jogos',
   },
   {
     href: '/configuracoes',
     label: 'Perfil',
     Icon: User,
     match: (p) => p === '/configuracoes' || p.startsWith('/configuracoes/'),
+    accentVar: '--neutral-500',
   },
 ];
 
@@ -82,8 +94,8 @@ export function MobileBottomNav(): JSX.Element | null {
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto grid max-w-screen-sm grid-cols-4">
-        {ITEMS.map(({ href, label, Icon, match }) => {
+      <ul className="mx-auto grid max-w-screen-sm grid-cols-5">
+        {ITEMS.map(({ href, label, Icon, match, accentVar }) => {
           const active = match(pathname);
           return (
             <li key={href}>
@@ -91,16 +103,25 @@ export function MobileBottomNav(): JSX.Element | null {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors',
-                  active
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground',
+                  'flex h-14 flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium transition-colors',
+                  active ? 'text-foreground' : 'text-foreground/65 hover:text-foreground',
                 ].join(' ')}
               >
-                <Icon
+                <span
                   aria-hidden="true"
-                  className={['h-5 w-5', active ? 'stroke-[2.25]' : 'stroke-[1.75]'].join(' ')}
-                />
+                  className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                  style={{
+                    backgroundColor: active
+                      ? `hsl(var(${accentVar}) / 0.16)`
+                      : 'transparent',
+                    color: `hsl(var(${accentVar}))`,
+                  }}
+                >
+                  <Icon
+                    className={active ? 'h-[18px] w-[18px] stroke-[2.25]' : 'h-[18px] w-[18px] stroke-[1.75]'}
+                    aria-hidden="true"
+                  />
+                </span>
                 <span>{label}</span>
               </Link>
             </li>

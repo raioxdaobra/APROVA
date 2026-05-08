@@ -201,25 +201,31 @@ export function AppSidebar({
                     'group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                     active
                       ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                      : 'text-foreground/70 hover:bg-muted/50 hover:text-foreground',
                     collapsed && variant === 'desktop' && 'justify-center',
                   )}
                   title={collapsed && variant === 'desktop' ? it.label : undefined}
+                  style={
+                    active
+                      ? {
+                          ['--sidebar-active-accent' as string]: `hsl(var(${it.accentVar}))`,
+                          boxShadow: `inset 3px 0 0 hsl(var(${it.accentVar}))`,
+                        }
+                      : undefined
+                  }
                 >
-                  <it.Icon
-                    className="h-[18px] w-[18px] shrink-0"
+                  <span
                     aria-hidden="true"
-                    style={active ? { color: `hsl(var(${it.accentVar}))` } : undefined}
-                  />
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors group-hover:bg-background"
+                    style={{
+                      backgroundColor: `hsl(var(${it.accentVar}) / 0.12)`,
+                      color: `hsl(var(${it.accentVar}))`,
+                    }}
+                  >
+                    <it.Icon className="h-[16px] w-[16px]" aria-hidden="true" />
+                  </span>
                   {!(collapsed && variant === 'desktop') && (
                     <span className="flex-1 truncate">{it.label}</span>
-                  )}
-                  {active && !(collapsed && variant === 'desktop') && (
-                    <span
-                      aria-hidden="true"
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: `hsl(var(${it.accentVar}))` }}
-                    />
                   )}
                 </Link>
               </li>

@@ -8,7 +8,6 @@ import { UserMenu } from '@/components/user-menu';
 import { RankBadge } from '@/components/rank-badge';
 import { DailyMissionsCard } from '@/components/daily-missions-card';
 import { PomodoroRestModal } from '@/components/pomodoro-rest-modal';
-import { VestibularCountdown } from '@/components/vestibular-countdown';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -197,40 +196,6 @@ export default async function DashboardPage() {
   const buckets = buildDailyBuckets(today, attempts7d);
   const maxBarValue = Math.max(dailyGoal, ...buckets.map((b) => b.count), 1);
 
-  // Data alvo do vestibular (configurada em app_settings via worktree A).
-  // Tolera ausência da tabela. Tipagem da DB ainda não conhece a tabela,
-  // então castamos via unknown pra silenciar o checker.
-  let vestibularTargetDate: string | null = null;
-  try {
-    type AppSettingsQuery = {
-      from: (table: 'app_settings') => {
-        select: (cols: string) => {
-          eq: (col: string, val: string) => {
-            maybeSingle: () => Promise<{ data: { value: unknown } | null }>;
-          };
-        };
-      };
-    };
-    const sb = supabase as unknown as AppSettingsQuery;
-    const { data: settingRow } = await sb
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'vestibular_target_date')
-      .maybeSingle();
-    const raw = settingRow?.value;
-    if (typeof raw === 'string') {
-      vestibularTargetDate = raw;
-    } else if (
-      raw &&
-      typeof raw === 'object' &&
-      'value' in (raw as Record<string, unknown>)
-    ) {
-      const inner = (raw as Record<string, unknown>).value;
-      if (typeof inner === 'string') vestibularTargetDate = inner;
-    }
-  } catch {
-    // Tabela ainda pode não existir — ignora.
-  }
 
   // CTA principal — sessao recente nas ultimas 24h.
   const lastAttempt = lastAttemptRes.data;
@@ -265,7 +230,6 @@ export default async function DashboardPage() {
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-2xl items-start justify-between gap-4 px-4 py-6">
         <div className="flex flex-col gap-2">
-          <VestibularCountdown targetDate={vestibularTargetDate} />
           <h1 className="text-2xl font-semibold text-foreground">Olá, {displayName}</h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {currentStreak > 0 ? (
