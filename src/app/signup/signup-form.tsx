@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
+import Link from 'next/link';
 import { Loader2, Lock, Mail, User } from 'lucide-react';
 import { AuthInput } from '@/components/auth/auth-input';
 import { AuthCtaButton } from '@/components/auth/auth-cta-button';
@@ -59,6 +60,32 @@ export function SignUpForm() {
           {state.error}
         </p>
       )}
+
+      <label className="flex items-start gap-2 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          name="accept_terms"
+          required
+          className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
+        />
+        <span>
+          Li e concordo com os{' '}
+          <Link
+            href="/termos"
+            className="font-semibold text-primary underline-offset-4 hover:underline"
+          >
+            Termos de Uso
+          </Link>{' '}
+          e{' '}
+          <Link
+            href="/privacidade"
+            className="font-semibold text-primary underline-offset-4 hover:underline"
+          >
+            Política de Privacidade
+          </Link>
+          .
+        </span>
+      </label>
 
       <SubmitButton />
     </form>

@@ -20,6 +20,14 @@ export async function signUpWithEmail(
   _prev: SignUpState,
   formData: FormData,
 ): Promise<SignUpState> {
+  const acceptTerms = formData.get('accept_terms');
+  if (acceptTerms !== 'on' && acceptTerms !== 'true') {
+    return {
+      error:
+        'Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar conta.',
+    };
+  }
+
   const parsed = schema.safeParse({
     display_name: formData.get('display_name'),
     email: formData.get('email'),
