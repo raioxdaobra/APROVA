@@ -1,16 +1,10 @@
 'use client';
 
 /**
- * PR 29 — Wrapper que dá ao /quiz uma seleção compartilhada entre o
- * TopicMapMatrix (chips), o QuizSetupForm (dropdowns) e o
- * DisciplineBarChart na home (clicks). Renderiza:
- *
- *   - TopicMapMatrix (mode='quiz', controlado, sem header próprio)
- *   - 2 CTAs:
- *       🟠 "Estudar o que mais cai"  (top-3 fixo, ação direta)
- *       🔵 "Estudar itens selecionados" (usa o set atual)
- *   - Indicador "X selecionados · Y questões disponíveis"
- *   - QuizSetupForm tradicional (controlado) como fallback dentro de <details>
+ * PR 33 — Wrapper que dá ao /quiz uma seleção compartilhada usando o
+ * <DisciplineExplorer> (cards à esquerda + tópicos à direita) + 2 CTAs
+ * embaixo. Substitui o antigo `<TopicMapMatrix>` (6 cards 2x3) que ficava
+ * empilhado em cima do drilldown.
  *
  * Persiste seleção via URL `?selected=mat:funcoes,bio:*,quim:reacoes`.
  */
@@ -25,8 +19,7 @@ import {
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Play } from 'lucide-react';
-import { TopicMapMatrix } from '@/components/topic-map-matrix';
-import { QuizSetupForm } from '@/components/quiz-setup-form';
+import { DisciplineExplorer } from '@/components/quiz/discipline-explorer';
 import {
   type DisciplineTopicNode,
   getTopTopicsByDiscipline,
@@ -67,10 +60,11 @@ function isKnownDiscipline(d: string): d is Discipline {
 
 export interface QuizSelectionShellProps {
   data: DisciplineTopicNode[];
-  years: number[];
+  /** Mantido pra compat — não é mais usado já que o `<details>` foi removido. */
+  years?: number[];
 }
 
-export function QuizSelectionShell({ data, years }: QuizSelectionShellProps) {
+export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const previewFreeMode = searchParams?.get('preview') === 'free';
@@ -127,6 +121,11 @@ export function QuizSelectionShell({ data, years }: QuizSelectionShellProps) {
 
   const totalSelectedItems = selected.size;
 
+  const totalAvailable = useMemo(
+    () => data.reduce((acc, d) => acc + d.count, 0),
+    [data],
+  );
+
   const startQuizFromPairs = useCallback(
     (
       pairs: Array<{ discipline: string; subtopic: string }>,
@@ -182,124 +181,82 @@ export function QuizSelectionShell({ data, years }: QuizSelectionShellProps) {
 
   const isPending = isPendingMaisCai || isPendingSelected;
   const canStartSelected = totalSelectedItems > 0 && !isPending;
-  // Default: cards começam vazios (focus mode). User preenche clicando no
-  // gráfico de barras abaixo ou acionando "+ Adicionar mais tópicos".
-  const [showAllInMap, setShowAllInMap] = useState(false);
-  const focusOnSelected = !showAllInMap;
 
   return (
-    <div className="flex flex-col gap-6">
-      <section
-        aria-labelledby="topic-map-quiz"
-        className="rounded-lg border border-border bg-card p-4"
-      >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 id="topic-map-quiz" className="text-base font-semibold text-foreground">
-            Mapa de tópicos
-          </h2>
+    <div className="flex flex-col gap-4">
+      <DisciplineExplorer
+        data={data}
+        selected={selected}
+        onToggle={handleToggle}
+        title={`${totalAvailable} questões oficiais`}
+        subtitle="Clique numa disciplina pra ver os tópicos · clique nos tópicos pra montar seu quiz"
+      />
+
+      {/* Indicador de seleção */}
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <p
+          className="text-sm text-muted-foreground tabular-nums"
+          aria-live="polite"
+        >
+          {totalSelectedItems === 0 ? (
+            'Nenhum item selecionado.'
+          ) : (
+            <>
+              <span className="font-semibold text-foreground">
+                {totalSelectedItems}
+              </span>{' '}
+              {totalSelectedItems === 1 ? 'selecionado' : 'selecionados'} ·{' '}
+              <span className="font-semibold text-foreground">
+                {totalQuestions}
+              </span>{' '}
+              {totalQuestions === 1 ? 'questão disponível' : 'questões disponíveis'}
+            </>
+          )}
+        </p>
+        {totalSelectedItems > 0 ? (
           <button
             type="button"
-            onClick={() => setShowAllInMap((p) => !p)}
-            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+            onClick={handleClear}
+            className="text-xs font-medium text-muted-foreground hover:underline"
           >
-            {showAllInMap
-              ? totalSelectedItems > 0
-                ? 'Ver só selecionados'
-                : 'Ocultar recomendados'
-              : totalSelectedItems > 0
-                ? '+ Adicionar mais tópicos'
-                : 'Ver tópicos recomendados'}
+            Limpar seleção
           </button>
-        </div>
-        <TopicMapMatrix
-          data={data}
-          mode="quiz"
-          selectedTopics={selected}
-          onToggleTopic={handleToggle}
-          hideHeader
-          focusOnSelected={focusOnSelected}
-        />
-
-        {/* Indicador */}
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p
-            className="text-sm text-muted-foreground tabular-nums"
-            aria-live="polite"
-          >
-            {totalSelectedItems === 0 ? (
-              'Nenhum item selecionado.'
-            ) : (
-              <>
-                <span className="font-semibold text-foreground">
-                  {totalSelectedItems}
-                </span>{' '}
-                {totalSelectedItems === 1 ? 'selecionado' : 'selecionados'} ·{' '}
-                <span className="font-semibold text-foreground">
-                  {totalQuestions}
-                </span>{' '}
-                {totalQuestions === 1 ? 'questão disponível' : 'questões disponíveis'}
-              </>
-            )}
-          </p>
-          {totalSelectedItems > 0 ? (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="text-xs font-medium text-muted-foreground hover:underline"
-            >
-              Limpar seleção
-            </button>
-          ) : null}
-        </div>
-
-        {errorMsg ? (
-          <p className="mt-2 text-sm text-destructive" role="alert">
-            {errorMsg}
-          </p>
         ) : null}
+      </div>
 
-        {/* CTAs */}
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={handleStudyMaisCai}
-            disabled={isPending}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Estudar o que mais cai (top-3 por disciplina)"
-          >
-            <BookOpen className="h-4 w-4" aria-hidden="true" />
-            {isPendingMaisCai ? 'Carregando…' : 'Estudar o que mais cai'}
-          </button>
-          <button
-            type="button"
-            onClick={handleStudySelected}
-            disabled={!canStartSelected}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Estudar itens selecionados"
-          >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            {isPendingSelected
-              ? 'Carregando…'
-              : totalSelectedItems === 0
-                ? 'Estudar itens selecionados'
-                : `Estudar itens selecionados (${totalQuestions}q)`}
-          </button>
-        </div>
-      </section>
+      {errorMsg ? (
+        <p className="text-sm text-destructive" role="alert">
+          {errorMsg}
+        </p>
+      ) : null}
 
-      {/* Form tradicional (fallback / power user com filtros de ano e status) */}
-      <details className="rounded-lg border border-border bg-card">
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-foreground">
-          Mais filtros (ano, status, anuladas)
-        </summary>
-        <div className="border-t border-border p-4">
-          <QuizSetupForm
-            years={years}
-            controlledSelection={selected}
-            onSelectionChange={setSelected}
-          />
-        </div>
-      </details>
+      {/* CTAs */}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={handleStudyMaisCai}
+          disabled={isPending}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="Estudar o que mais cai (top-3 por disciplina)"
+        >
+          <BookOpen className="h-4 w-4" aria-hidden="true" />
+          {isPendingMaisCai ? 'Carregando…' : 'Estudar o que mais cai'}
+        </button>
+        <button
+          type="button"
+          onClick={handleStudySelected}
+          disabled={!canStartSelected}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Estudar itens selecionados"
+        >
+          <Play className="h-4 w-4" aria-hidden="true" />
+          {isPendingSelected
+            ? 'Carregando…'
+            : totalSelectedItems === 0
+              ? 'Estudar itens selecionados'
+              : `Estudar itens selecionados (${totalQuestions}q)`}
+        </button>
+      </div>
 
       <PaywallModal
         open={paywallOpen}

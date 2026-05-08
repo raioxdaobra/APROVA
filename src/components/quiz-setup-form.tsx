@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics';
 import {
   countQuestions,
@@ -116,7 +115,6 @@ export function QuizSetupForm({
   const subtopicId = useId();
   const yearId = useId();
   const statusId = useId();
-  const hideId = useId();
   const languageGroupId = useId();
   const subjectGroupId = useId();
 
@@ -442,16 +440,7 @@ export function QuizSetupForm({
           </select>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor={hideId} className="cursor-pointer">
-            Esconder anuladas
-          </Label>
-          <Switch
-            id={hideId}
-            checked={state.hide_annulled}
-            onCheckedChange={(v) => update('hide_annulled', v)}
-          />
-        </div>
+        {/* PR 33: anuladas sempre escondidas — sem toggle visível. */}
       </div>
 
       <div className="rounded-lg border border-border bg-muted/40 p-3 text-center">

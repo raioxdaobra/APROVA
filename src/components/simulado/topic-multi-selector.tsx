@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, ChevronUp, Save, Scale, Zap, Play } from 'lucide-react';
-import { TopicMapMatrix } from '@/components/topic-map-matrix';
+import { DisciplineExplorer } from '@/components/quiz/discipline-explorer';
 import type { DisciplineTopicNode } from '@/lib/stats/topic-frequency';
 import {
   balanceSelection,
@@ -66,7 +66,13 @@ function parseTopicId(
   id: string,
 ):
   | {
-      discipline: 'matematica' | 'fisica' | 'quimica' | 'biologia' | 'humanas' | 'linguagens';
+      discipline:
+        | 'matematica'
+        | 'fisica'
+        | 'quimica'
+        | 'biologia'
+        | 'humanas'
+        | 'linguagens';
       subtopic: string;
     }
   | null {
@@ -74,7 +80,8 @@ function parseTopicId(
   if (idx <= 0) return null;
   const discipline = id.slice(0, idx);
   const subtopic = id.slice(idx + 1);
-  if (!KNOWN_DISCIPLINES.has(discipline) || !subtopic) return null;
+  if (!KNOWN_DISCIPLINES.has(discipline) || !subtopic || subtopic === '*')
+    return null;
   return {
     discipline: discipline as
       | 'matematica'
@@ -125,7 +132,6 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
   const [templates, setTemplates] = useState<SimuladoTemplate[]>([]);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
 
-  // Carrega templates do localStorage no mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -149,8 +155,7 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
     setTemplatesLoaded(true);
   }, []);
 
-  // Sincroniza URL ?topics=... com a seleção (deep link)
-  // Skip a primeira sincronização pra evitar loop.
+  // Sincroniza URL ?topics=... com a seleção (deep link).
   const isFirstSyncRef = useRef(true);
   useEffect(() => {
     if (isFirstSyncRef.current) {
@@ -184,6 +189,11 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
   const totalQuestions = summary.totalAvailableQuestions;
   const totalTopics = summary.totalSelectedTopics;
   const minutes = estimatedMinutes(totalQuestions);
+
+  const totalAvailable = useMemo(
+    () => data.reduce((acc, d) => acc + d.count, 0),
+    [data],
+  );
 
   const canStart = totalQuestions >= MIN_QUESTIONS_TO_START;
 
@@ -221,7 +231,6 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
       const tpl = templates[idx];
       if (!tpl) return;
       setSelected(new Set(tpl.topics));
-      // reseta o select pra deixar o usuário trocar de template depois
       e.target.value = '';
     },
     [templates],
@@ -257,13 +266,14 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
 
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_320px] lg:items-start lg:gap-8">
-      {/* Coluna principal: matriz */}
+      {/* Coluna principal: explorer */}
       <div className="flex flex-col gap-4 order-2 lg:order-1">
-        <TopicMapMatrix
+        <DisciplineExplorer
           data={data}
-          mode="simulado"
-          selectedTopics={selected}
-          onToggleTopic={toggleTopic}
+          selected={selected}
+          onToggle={toggleTopic}
+          title={`${totalAvailable} questões oficiais`}
+          subtitle="Clique numa disciplina pra ver os tópicos · clique nos tópicos pra montar seu simulado"
         />
 
         {selected.size > 0 ? (
@@ -284,7 +294,6 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
         aria-label="Resumo da seleção"
         className="order-1 lg:order-2 lg:sticky lg:top-4 flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-sm"
       >
-        {/* Header colapsável (mobile) */}
         <button
           type="button"
           className="flex items-center justify-between gap-2 text-left lg:cursor-default"
@@ -312,7 +321,6 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
 
         {(statusOpen || typeof window === 'undefined') ? (
           <div className="flex flex-col gap-3">
-            {/* Distribuição por disciplina */}
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-foreground">
                 Distribuição
@@ -371,7 +379,6 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
               </p>
             </div>
 
-            {/* Botões */}
             <div className="flex flex-col gap-2">
               <button
                 type="button"
@@ -417,7 +424,6 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
               </p>
             ) : null}
 
-            {/* CTA primário (desktop) */}
             <button
               type="button"
               onClick={handleStart}
@@ -457,7 +463,6 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
           {isPending ? 'Iniciando…' : 'Iniciar'}
         </button>
       </div>
-      {/* Spacer pra evitar que o CTA fixo cubra conteúdo no fim do scroll */}
       <div className="h-20 lg:hidden" aria-hidden="true" />
 
       <PaywallModal

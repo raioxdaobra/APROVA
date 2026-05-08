@@ -94,12 +94,14 @@ async function loadCandidateQuestionIds(
   let query = supabase
     .from('questions')
     .select('id, discipline, subtopic')
-    .eq('exam', EXAM);
+    .eq('exam', EXAM)
+    // Anuladas são sempre escondidas (PR 33). Mantemos a coluna do filtro
+    // por compat, mas ignoramos `f.hide_annulled` pra evitar regressão.
+    .eq('annulled', false);
 
   if (f.discipline) query = query.eq('discipline', f.discipline);
   if (f.subtopic) query = query.eq('subtopic', f.subtopic);
   if (f.year !== null) query = query.eq('year', f.year);
-  if (f.hide_annulled) query = query.eq('annulled', false);
 
   const { data: questionRows, error } = await query;
   if (error || !questionRows) return [];
@@ -128,7 +130,8 @@ export async function getSubtopics(discipline: string | null): Promise<string[]>
   let query = supabase
     .from('questions')
     .select('subtopic')
-    .eq('exam', EXAM);
+    .eq('exam', EXAM)
+    .eq('annulled', false);
   if (discipline) {
     const parsed = disciplineSchema.safeParse(discipline);
     if (!parsed.success) return [];
@@ -148,7 +151,8 @@ export async function getYears(): Promise<number[]> {
   const { data, error } = await supabase
     .from('questions')
     .select('year')
-    .eq('exam', EXAM);
+    .eq('exam', EXAM)
+    .eq('annulled', false);
   if (error || !data) return [];
   const set = new Set<number>();
   for (const row of data) {
@@ -232,14 +236,15 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
   const mode = parsed.data.mode;
 
   // Carrega ids elegíveis com metadados para ordenar quando 'sequencial'.
+  // PR 33: anuladas sempre escondidas (independente do filtro).
   let metaQuery = supabase
     .from('questions')
     .select('id, year, semester, question_num, discipline, subtopic, annulled')
-    .eq('exam', EXAM);
+    .eq('exam', EXAM)
+    .eq('annulled', false);
   if (f.discipline) metaQuery = metaQuery.eq('discipline', f.discipline);
   if (f.subtopic) metaQuery = metaQuery.eq('subtopic', f.subtopic);
   if (f.year !== null) metaQuery = metaQuery.eq('year', f.year);
-  if (f.hide_annulled) metaQuery = metaQuery.eq('annulled', false);
 
   const { data: rows, error: qErr } = await metaQuery;
   if (qErr || !rows) {

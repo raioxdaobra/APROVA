@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { QuizSelectionShell } from '@/components/quiz/quiz-selection-shell';
-import { QuizTopicDrilldown } from '@/components/quiz-topic-drilldown';
-import { getTopicFrequency, getYears, startQuizSession } from './actions';
+import { getTopicFrequency, startQuizSession } from './actions';
 
 export const metadata = {
   title: 'Quiz — APROVA',
@@ -34,12 +33,11 @@ export default async function QuizPage({ searchParams }: QuizPageProps) {
     }
   }
 
-  const [years, topicFreq] = await Promise.all([getYears(), getTopicFrequency()]);
+  const topicFreq = await getTopicFrequency();
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 py-6">
-      <QuizSelectionShell data={topicFreq} years={years} />
-      <QuizTopicDrilldown data={topicFreq} />
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-4 py-6">
+      <QuizSelectionShell data={topicFreq} />
     </main>
   );
 }
