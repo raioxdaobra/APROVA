@@ -20,6 +20,7 @@ import { UserMenu } from '@/components/user-menu';
 import { Card } from '@/components/ui/card';
 import { WeakPointsView } from '@/components/stats/weak-points-view';
 import { createClient } from '@/lib/supabase/server';
+import { fetchAll } from '@/lib/supabase/fetch-all';
 import { slugify } from '@/lib/slug';
 import { fetchWeakPoints } from '@/lib/stats/weak-points';
 import type { Discipline } from '@/lib/supabase/types';
@@ -182,11 +183,15 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
       .eq('user_id', user.id)
       .neq('context', 'diagnostic')
       .gt('created_at', twelveWeeksAgoIso),
-    supabase
-      .from('questions')
-      .select('id, discipline, subtopic, subtopic_short, annulled, exam')
-      .eq('exam', 'unifor-medicina')
-      .range(0, 9999),
+    // Pagina pra contornar cap 1000 do PostgREST (1015+ rows elegíveis).
+    fetchAll<{ id: string; discipline: string; subtopic: string; subtopic_short: string; annulled: boolean | null; exam: string }>(
+      ({ from, to }) =>
+        supabase
+          .from('questions')
+          .select('id, discipline, subtopic, subtopic_short, annulled, exam')
+          .eq('exam', 'unifor-medicina')
+          .range(from, to),
+    ).then((data) => ({ data, error: null })),
     supabase
       .from('subtopic_mastery')
       .select('discipline, subtopic')

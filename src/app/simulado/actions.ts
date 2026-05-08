@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { fetchAll } from '@/lib/supabase/fetch-all';
 import type { AnswerLetter, Discipline, Json } from '@/lib/supabase/types';
 import { SIMULADO_DISCIPLINE_OPTIONS } from './config';
 import {
@@ -102,17 +103,18 @@ export async function startSimulado(input: StartSimuladoInput): Promise<void> {
     throw new Error('Limite de simulados grátis atingido. Assine o Pro.');
   }
 
-  // Carrega pool de questões não anuladas (apenas id + discipline).
-  let poolQuery = supabase
-    .from('questions')
-    .select('id, discipline')
-    .or('annulled.is.null,annulled.eq.false')
-    .range(0, 9999);
-  if (discipline !== 'todas') {
-    poolQuery = poolQuery.eq('discipline', discipline);
-  }
-  const { data: pool, error: poolErr } = await poolQuery;
-  if (poolErr || !pool || pool.length === 0) {
+  // Carrega pool de questões não anuladas (apenas id + discipline). Pagina pra cap 1000.
+  const pool = await fetchAll<{ id: string; discipline: string }>(({ from, to }) => {
+    let q = supabase
+      .from('questions')
+      .select('id, discipline')
+      .or('annulled.is.null,annulled.eq.false');
+    if (discipline !== 'todas') {
+      q = q.eq('discipline', discipline);
+    }
+    return q.range(from, to);
+  });
+  if (pool.length === 0) {
     throw new Error('Não foi possível montar o simulado: banco vazio.');
   }
 
@@ -250,15 +252,18 @@ export async function startMultiTopicSimuladoAndRedirect(
 
   const pool: SamplePool[] = [];
   for (const [discipline, subs] of byDiscipline) {
-    const { data: rows, error } = await supabase
-      .from('questions')
-      .select('id, discipline, subtopic, annulled')
-      .eq('exam', 'unifor-medicina')
-      .eq('discipline', discipline)
-      .in('subtopic', subs)
-      .or('annulled.is.null,annulled.eq.false')
-      .range(0, 9999);
-    if (error || !rows) continue;
+    const rows = await fetchAll<{ id: string; discipline: string; subtopic: string; annulled: boolean | null }>(
+      ({ from, to }) =>
+        supabase
+          .from('questions')
+          .select('id, discipline, subtopic, annulled')
+          .eq('exam', 'unifor-medicina')
+          .eq('discipline', discipline)
+          .in('subtopic', subs)
+          .or('annulled.is.null,annulled.eq.false')
+          .range(from, to),
+    );
+    if (rows.length === 0) continue;
     for (const r of rows) {
       // Sub-filtro: só aplica na disciplina pertinente.
       if (

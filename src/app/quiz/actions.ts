@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { fetchAll } from '@/lib/supabase/fetch-all';
 import type { AnswerLetter, Json } from '@/lib/supabase/types';
 import {
   checkQuestionsCap,
@@ -91,21 +92,21 @@ async function loadCandidateQuestionIds(
   userId: string,
   f: NormalizedFilters,
 ): Promise<string[]> {
-  let query = supabase
-    .from('questions')
-    .select('id, discipline, subtopic')
-    .eq('exam', EXAM)
-    // Anuladas são sempre escondidas (PR 33). Mantemos a coluna do filtro
-    // por compat, mas ignoramos `f.hide_annulled` pra evitar regressão.
-    .eq('annulled', false)
-    .range(0, 9999); // Supabase default 1000; banco tem 1015+ não-anuladas.
-
-  if (f.discipline) query = query.eq('discipline', f.discipline);
-  if (f.subtopic) query = query.eq('subtopic', f.subtopic);
-  if (f.year !== null) query = query.eq('year', f.year);
-
-  const { data: questionRows, error } = await query;
-  if (error || !questionRows) return [];
+  // Pagina pra contornar cap de 1000 do PostgREST.
+  const questionRows = await fetchAll<{ id: string; discipline: string; subtopic: string }>(
+    ({ from, to }) => {
+      let q = supabase
+        .from('questions')
+        .select('id, discipline, subtopic')
+        .eq('exam', EXAM)
+        .eq('annulled', false);
+      if (f.discipline) q = q.eq('discipline', f.discipline);
+      if (f.subtopic) q = q.eq('subtopic', f.subtopic);
+      if (f.year !== null) q = q.eq('year', f.year);
+      return q.range(from, to);
+    },
+  );
+  if (questionRows.length === 0) return [];
 
   // Sub-filtro de Linguagens (PT/ING/ESP) ou Humanas (Hist/Geo/Filo/Soc).
   const filteredRows = filterBySubFilter(questionRows, f);
@@ -128,19 +129,22 @@ async function loadCandidateQuestionIds(
 
 export async function getSubtopics(discipline: string | null): Promise<string[]> {
   const supabase = await createClient();
-  let query = supabase
-    .from('questions')
-    .select('subtopic')
-    .eq('exam', EXAM)
-    .eq('annulled', false)
-    .range(0, 9999);
+  let parsedDiscipline: string | null = null;
   if (discipline) {
     const parsed = disciplineSchema.safeParse(discipline);
     if (!parsed.success) return [];
-    query = query.eq('discipline', parsed.data);
+    parsedDiscipline = parsed.data;
   }
-  const { data, error } = await query;
-  if (error || !data) return [];
+  const data = await fetchAll<{ subtopic: string | null }>(({ from, to }) => {
+    let q = supabase
+      .from('questions')
+      .select('subtopic')
+      .eq('exam', EXAM)
+      .eq('annulled', false);
+    if (parsedDiscipline) q = q.eq('discipline', parsedDiscipline);
+    return q.range(from, to);
+  });
+  if (data.length === 0) return [];
   const set = new Set<string>();
   for (const row of data) {
     if (row.subtopic) set.add(row.subtopic);
@@ -150,13 +154,15 @@ export async function getSubtopics(discipline: string | null): Promise<string[]>
 
 export async function getYears(): Promise<number[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('questions')
-    .select('year')
-    .eq('exam', EXAM)
-    .eq('annulled', false)
-    .range(0, 9999);
-  if (error || !data) return [];
+  const data = await fetchAll<{ year: number | null }>(({ from, to }) =>
+    supabase
+      .from('questions')
+      .select('year')
+      .eq('exam', EXAM)
+      .eq('annulled', false)
+      .range(from, to),
+  );
+  if (data.length === 0) return [];
   const set = new Set<number>();
   for (const row of data) {
     if (typeof row.year === 'number') set.add(row.year);
@@ -172,13 +178,16 @@ export interface TopicFrequencyNode {
 
 export async function getTopicFrequency(): Promise<TopicFrequencyNode[]> {
   const supabase = await createClient();
-  // Supabase default limita 1000 rows. Banco tem 1025 → setamos range explícito.
-  const { data, error } = await supabase
-    .from('questions')
-    .select('discipline, subtopic, annulled')
-    .eq('exam', EXAM)
-    .range(0, 9999);
-  if (error || !data) return [];
+  // Supabase enforça hard cap de 1000 rows (db-max-rows). Pagina via fetchAll.
+  const data = await fetchAll<{ discipline: string | null; subtopic: string | null; annulled: boolean | null }>(
+    ({ from, to }) =>
+      supabase
+        .from('questions')
+        .select('discipline, subtopic, annulled')
+        .eq('exam', EXAM)
+        .range(from, to),
+  );
+  if (data.length === 0) return [];
   const byDiscipline = new Map<string, Map<string, number>>();
   for (const row of data) {
     if (row.annulled) continue;
@@ -242,18 +251,27 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
 
   // Carrega ids elegíveis com metadados para ordenar quando 'sequencial'.
   // PR 33: anuladas sempre escondidas (independente do filtro).
-  let metaQuery = supabase
-    .from('questions')
-    .select('id, year, semester, question_num, discipline, subtopic, annulled')
-    .eq('exam', EXAM)
-    .eq('annulled', false)
-    .range(0, 9999);
-  if (f.discipline) metaQuery = metaQuery.eq('discipline', f.discipline);
-  if (f.subtopic) metaQuery = metaQuery.eq('subtopic', f.subtopic);
-  if (f.year !== null) metaQuery = metaQuery.eq('year', f.year);
-
-  const { data: rows, error: qErr } = await metaQuery;
-  if (qErr || !rows) {
+  // Pagina pra contornar cap de 1000 do PostgREST.
+  const rows = await fetchAll<{
+    id: string;
+    year: number;
+    semester: number;
+    question_num: number;
+    discipline: string;
+    subtopic: string;
+    annulled: boolean | null;
+  }>(({ from, to }) => {
+    let q = supabase
+      .from('questions')
+      .select('id, year, semester, question_num, discipline, subtopic, annulled')
+      .eq('exam', EXAM)
+      .eq('annulled', false);
+    if (f.discipline) q = q.eq('discipline', f.discipline);
+    if (f.subtopic) q = q.eq('subtopic', f.subtopic);
+    if (f.year !== null) q = q.eq('year', f.year);
+    return q.range(from, to);
+  });
+  if (rows.length === 0) {
     return { ok: false, error: 'Falha ao carregar questões.' };
   }
 
@@ -292,6 +310,12 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
         pool[i] = b;
         pool[j] = a;
       }
+    }
+    // Trial weighting: durante trial, prioriza questões fáceis (correct_pct >= 60).
+    // Mantém proporção 70% easy / 30% mix pra deixar novos users felizes.
+    const isTrial = await isUserInTrial(supabase, user.id);
+    if (isTrial && pool.length > 5) {
+      pool = await applyTrialEasyBias(supabase, pool);
     }
   }
 
@@ -388,15 +412,26 @@ export async function startTopicsQuizAndRedirect(
 
   const idChunks: Array<{ id: string; year: number; semester: number; question_num: number }> = [];
   for (const [discipline, subs] of byDiscipline) {
-    const { data: rows, error } = await supabase
-      .from('questions')
-      .select('id, year, semester, question_num, discipline, subtopic, annulled')
-      .eq('exam', EXAM)
-      .eq('discipline', discipline)
-      .in('subtopic', subs)
-      .eq('annulled', false)
-      .range(0, 9999);
-    if (error || !rows) continue;
+    // Pagina (caso uma disciplina passe de 1000 — defesa).
+    const rows = await fetchAll<{
+      id: string;
+      year: number;
+      semester: number;
+      question_num: number;
+      discipline: string;
+      subtopic: string;
+      annulled: boolean | null;
+    }>(({ from, to }) =>
+      supabase
+        .from('questions')
+        .select('id, year, semester, question_num, discipline, subtopic, annulled')
+        .eq('exam', EXAM)
+        .eq('discipline', discipline)
+        .in('subtopic', subs)
+        .eq('annulled', false)
+        .range(from, to),
+    );
+    if (rows.length === 0) continue;
     // Aplica sub-filtro só na disciplina relevante.
     const filtered = filterBySubFilter(rows, {
       discipline,
@@ -695,4 +730,76 @@ export async function finishQuizSession(sessionId: string): Promise<FinishQuizRe
   if (updateErr) return { ok: false, error: 'Falha ao encerrar sessão.' };
 
   return { ok: true };
+}
+
+// -----------------------------------------------------------------------------
+// Trial weighted-easy: durante o trial (7 dias) o user vê majoritariamente
+// questões fáceis (correct_pct >= 60% baseado em ≥3 tentativas no banco).
+// Objetivo: maximizar a sensação de progresso pro novo user. Quando trial
+// expira (ou plan vira pro), volta ao random uniforme.
+// -----------------------------------------------------------------------------
+
+const TRIAL_EASY_PCT = 70;
+const TRIAL_EASY_THRESHOLD = 60;
+const TRIAL_EASY_MIN_ATTEMPTS = 3;
+
+async function isUserInTrial(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('plan, trial_ends_at')
+    .eq('id', userId)
+    .maybeSingle();
+  if (!data) return false;
+  const plan = (data as { plan?: string | null }).plan ?? 'free';
+  if (plan !== 'free') return false;
+  const trialRaw = (data as { trial_ends_at?: string | null }).trial_ends_at;
+  if (!trialRaw) return false;
+  const trialEnds = new Date(trialRaw);
+  if (Number.isNaN(trialEnds.getTime())) return false;
+  return trialEnds.getTime() > Date.now();
+}
+
+interface PoolItem {
+  id: string;
+  year: number;
+  semester: number;
+  question_num: number;
+  discipline: string;
+  subtopic: string;
+}
+
+async function applyTrialEasyBias<T extends PoolItem>(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  pool: T[],
+): Promise<T[]> {
+  const ids = pool.map((p) => p.id);
+  const { data: stats } = await supabase
+    .from('question_stats')
+    .select('question_id, correct_pct, total_attempts')
+    .in('question_id', ids);
+
+  const easySet = new Set(
+    (stats ?? [])
+      .filter(
+        (s) =>
+          (s.total_attempts ?? 0) >= TRIAL_EASY_MIN_ATTEMPTS &&
+          (s.correct_pct ?? 0) >= TRIAL_EASY_THRESHOLD,
+      )
+      .map((s) => s.question_id as string),
+  );
+
+  if (easySet.size < 5) return pool; // não tem dados suficientes pra bias
+
+  const easy = pool.filter((p) => easySet.has(p.id));
+  const rest = pool.filter((p) => !easySet.has(p.id));
+
+  // Reordena: 70% das primeiras posições vai pro easy.
+  const total = pool.length;
+  const easyCount = Math.min(easy.length, Math.round((total * TRIAL_EASY_PCT) / 100));
+  const restCount = total - easyCount;
+
+  return [...easy.slice(0, easyCount), ...rest.slice(0, restCount)];
 }
