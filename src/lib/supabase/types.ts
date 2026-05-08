@@ -972,11 +972,10 @@ export interface Database {
           question_id: string;
           discipline: string;
           subtopic: string;
-          description: string | null;
-          image_url: string;
-          correct_answer: 'A' | 'B' | 'C' | 'D' | 'E' | null;
           year: number;
           semester: number;
+          front_text: string;
+          back_text: string;
         };
         Relationships: [];
       };

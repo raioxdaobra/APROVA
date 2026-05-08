@@ -11,7 +11,6 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { nextReview } from '@/lib/srs/sm2';
 import type {
-  AnswerLetter,
   FlashcardCardData,
   FlashcardCounts,
   Quality,
@@ -91,9 +90,7 @@ export async function getDueQueue(limit = DEFAULT_LIMIT): Promise<FlashcardCardD
   // 3. Carrega dados completos da view
   const { data: cards } = await supabase
     .from('flashcards_available')
-    .select(
-      'question_id, discipline, subtopic, description, image_url, correct_answer, year',
-    )
+    .select('question_id, discipline, subtopic, year, front_text, back_text')
     .in('question_id', ids);
 
   if (!cards) return [];
@@ -108,10 +105,9 @@ export async function getDueQueue(limit = DEFAULT_LIMIT): Promise<FlashcardCardD
         questionId: c.question_id,
         discipline: c.discipline ?? '',
         subtopic: c.subtopic ?? '',
-        description: c.description ?? null,
-        imageUrl: c.image_url ?? '',
-        correctAnswer: ((c.correct_answer ?? 'A') as AnswerLetter),
         year: c.year ?? 0,
+        frontText: c.front_text ?? '',
+        backText: c.back_text ?? '',
         isNew: !dueSet.has(id),
       } satisfies FlashcardCardData;
     })

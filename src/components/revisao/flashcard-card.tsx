@@ -1,9 +1,5 @@
 'use client';
 
-import Image from 'next/image';
-import { useState } from 'react';
-import { ZoomIn } from 'lucide-react';
-import { QuestionImageLightbox } from '@/components/question-image-lightbox';
 import type { FlashcardCardData } from '@/lib/srs/types';
 
 interface Props {
@@ -22,48 +18,34 @@ const DISCIPLINE_LABEL: Record<string, string> = {
 };
 
 export function FlashcardCard({ card, flipped, onFlip }: Props) {
-  const [zoomOpen, setZoomOpen] = useState(false);
   const disciplineLabel = DISCIPLINE_LABEL[card.discipline] ?? card.discipline;
 
   return (
-    <article className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+    <article className="flex min-h-[20rem] flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
           {disciplineLabel}
         </span>
-        <span className="truncate">{card.subtopic}</span>
+        <span className="truncate text-right">{card.subtopic}</span>
         <span className="shrink-0 tabular-nums">{card.year}</span>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setZoomOpen(true)}
-        className="group relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-border bg-muted"
-        aria-label="Ampliar imagem da questão"
-      >
-        {card.imageUrl ? (
-          <Image
-            src={card.imageUrl}
-            alt={`Questão de ${disciplineLabel}`}
-            fill
-            sizes="(max-width: 768px) 100vw, 700px"
-            className="object-contain"
-            priority
-            unoptimized
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Imagem indisponível
-          </div>
-        )}
-        <span className="absolute right-2 top-2 inline-flex items-center justify-center rounded-md bg-background/80 p-1.5 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
-          <ZoomIn className="h-4 w-4" aria-hidden="true" />
-        </span>
-      </button>
+      <div className="flex flex-1 flex-col justify-center gap-3">
+        <p className="text-base leading-relaxed text-foreground sm:text-lg">
+          {card.frontText}
+        </p>
 
-      {card.description ? (
-        <p className="text-sm leading-relaxed text-foreground">{card.description}</p>
-      ) : null}
+        {flipped ? (
+          <div className="rounded-lg border-l-4 border-primary bg-primary/5 px-4 py-3 sm:px-5 sm:py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Resposta
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-foreground sm:text-base">
+              {card.backText}
+            </p>
+          </div>
+        ) : null}
+      </div>
 
       {!flipped ? (
         <button
@@ -76,21 +58,7 @@ export function FlashcardCard({ card, flipped, onFlip }: Props) {
             Espaço
           </span>
         </button>
-      ) : (
-        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 text-center">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Resposta correta
-          </p>
-          <p className="mt-1 text-4xl font-bold text-primary">{card.correctAnswer}</p>
-        </div>
-      )}
-
-      <QuestionImageLightbox
-        open={zoomOpen}
-        src={card.imageUrl}
-        alt={`Questão de ${disciplineLabel}`}
-        onClose={() => setZoomOpen(false)}
-      />
+      ) : null}
     </article>
   );
 }

@@ -16,16 +16,13 @@ export interface ReviewState {
   due_at: Date;
 }
 
-export type AnswerLetter = 'A' | 'B' | 'C' | 'D' | 'E';
-
 export interface FlashcardCardData {
   questionId: string;
   discipline: string;
   subtopic: string;
-  description: string | null;
-  imageUrl: string;
-  correctAnswer: AnswerLetter;
   year: number;
+  frontText: string;
+  backText: string;
   isNew: boolean;
 }
 
