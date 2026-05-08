@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   BarChart3,
   Brain,
   ChevronLeft,
   ChevronRight,
+  Download,
   Gamepad2,
   Home,
   Map as MapIcon,
@@ -102,6 +104,13 @@ const ITEMS: NavItem[] = [
   },
 ];
 
+function isStandaloneMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return nav.standalone === true;
+}
+
 interface AppSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -119,6 +128,11 @@ export function AppSidebar({
   variant = 'desktop',
 }: AppSidebarProps) {
   const pathname = usePathname() ?? '/';
+  const [showInstall, setShowInstall] = useState(false);
+
+  useEffect(() => {
+    setShowInstall(!isStandaloneMode());
+  }, []);
 
   return (
     <aside
@@ -211,6 +225,24 @@ export function AppSidebar({
               </li>
             );
           })}
+          {showInstall ? (
+            <li className="mt-1">
+              <Link
+                href="/instalar"
+                onClick={onNavigate}
+                className={cn(
+                  'group flex items-center gap-2.5 rounded-md border border-dashed border-primary/40 px-2.5 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10',
+                  collapsed && variant === 'desktop' && 'justify-center',
+                )}
+                title={collapsed && variant === 'desktop' ? 'Instalar app' : undefined}
+              >
+                <Download className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                {!(collapsed && variant === 'desktop') && (
+                  <span className="flex-1 truncate">Instalar app</span>
+                )}
+              </Link>
+            </li>
+          ) : null}
         </ul>
       </nav>
 

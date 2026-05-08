@@ -4,6 +4,7 @@ import { AdminBanner } from '@/components/admin-banner';
 import { AnalyticsProvider } from '@/components/analytics-provider';
 import { AuthProvider } from '@/components/auth-provider';
 import { AppShell } from '@/components/layout/app-shell';
+import { InstallPrompt } from '@/components/install-prompt';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -135,6 +136,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <TrialBanner trialEndsAt={trialEndsAt} isProOrAdmin={isProOrAdmin} />
             <AppShell isAdmin={isAdmin}>{children}</AppShell>
             <MobileBottomNav />
+            <InstallPrompt />
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

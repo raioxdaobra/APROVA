@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { InstallPrompt } from '@/components/install-prompt';
 import { HeroSection } from '@/components/landing/hero-section';
 import { ShowcaseSection } from '@/components/landing/showcase-section';
 import { FeatureCards } from '@/components/landing/feature-cards';
@@ -76,14 +75,15 @@ export default function HomePage() {
             <Link href="/termos" className="hover:text-foreground hover:underline">
               Termos
             </Link>
+            <Link href="/instalar" className="hover:text-foreground hover:underline">
+              Instalar app
+            </Link>
             <Link href="/login" className="hover:text-foreground hover:underline">
               Entrar
             </Link>
           </nav>
         </div>
       </footer>
-
-      <InstallPrompt />
     </main>
   );
 }

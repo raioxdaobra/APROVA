@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = new Set([
   '/privacidade',
   '/termos',
   '/design',
+  '/instalar',
 ]);
 const ONBOARDING_PREFIX = '/onboarding';
 const DIAGNOSTIC_ROUTE = '/diagnostico';

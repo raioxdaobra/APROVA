@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -49,6 +51,7 @@ function isDismissedRecently(): boolean {
 }
 
 export function InstallPrompt(): JSX.Element | null {
+  const pathname = usePathname() ?? '/';
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [platform, setPlatform] = useState<Platform>('other');
   const [visible, setVisible] = useState(false);
@@ -56,6 +59,8 @@ export function InstallPrompt(): JSX.Element | null {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (isStandalone() || isDismissedRecently()) return;
+    // Não mostra na página dedicada de instalação
+    if (pathname === '/instalar') return;
 
     const detected = detectPlatform();
     setPlatform(detected);
@@ -79,7 +84,8 @@ export function InstallPrompt(): JSX.Element | null {
       window.removeEventListener('appinstalled', onInstalled);
       clearTimeout(timer);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const handleDismiss = (): void => {
     try {
@@ -104,7 +110,6 @@ export function InstallPrompt(): JSX.Element | null {
   };
 
   if (!visible) return null;
-  if (platform === 'other' && !deferred) return null;
 
   const canNativeInstall = deferred !== null;
   const isIos = platform === 'ios';
@@ -204,8 +209,13 @@ export function InstallPrompt(): JSX.Element | null {
             </ol>
           </div>
         ) : (
-          <div className="border-t border-border bg-background/50 px-4 py-3 text-sm text-muted-foreground sm:px-5">
-            Use Chrome no celular ou desktop para instalar com 1 toque.
+          <div className="border-t border-border bg-background/50 px-4 py-3 sm:px-5">
+            <Link
+              href="/instalar"
+              className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Ver instruções de instalação
+            </Link>
           </div>
         )}
       </div>

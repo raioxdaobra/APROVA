@@ -46,6 +46,7 @@ const PUBLIC_ROUTES = new Set<string>([
   '/sobre',
   '/privacidade',
   '/termos',
+  '/instalar',
 ]);
 
 function isPublicRoute(pathname: string): boolean {
