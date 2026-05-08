@@ -5,8 +5,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'APROVA — Vestibular Unifor Medicina',
     short_name: 'APROVA',
     description:
-      'Resolva mais de 1.000 questões. 20 anos de vestibular Unifor Medicina, organizadas por matéria.',
+      'Resolva mais de 1.000 questões reais do vestibular Unifor Medicina, organizadas por matéria. Estude com IA, simulados e trilha personalizada.',
     start_url: '/',
+    scope: '/',
+    id: '/',
     display: 'standalone',
     background_color: '#C4633B',
     theme_color: '#C4633B',

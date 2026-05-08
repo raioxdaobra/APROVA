@@ -14,10 +14,38 @@ import { createClient } from '@/lib/supabase/server';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://aprova-five.vercel.app'),
   title: 'APROVA — Vestibular Unifor Medicina',
   description:
     'Resolva mais de 1.000 questões. 20 anos de vestibular Unifor Medicina, organizadas por matéria.',
   applicationName: 'APROVA',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'APROVA — Vestibular Unifor Medicina',
+    description:
+      'Mais de 1.000 questões reais do vestibular Unifor Medicina, organizadas por matéria. Estude com IA, simulados e trilha personalizada.',
+    url: '/',
+    siteName: 'APROVA',
+    images: [
+      {
+        url: '/icons/icon-512.png',
+        width: 512,
+        height: 512,
+        alt: 'APROVA logo',
+      },
+    ],
+    locale: 'pt_BR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'APROVA — Vestibular Unifor Medicina',
+    description:
+      'Mais de 1.000 questões reais do vestibular Unifor Medicina, organizadas por matéria. Estude com IA, simulados e trilha personalizada.',
+    images: ['/icons/icon-512.png'],
+  },
   appleWebApp: {
     capable: true,
     title: 'APROVA',
