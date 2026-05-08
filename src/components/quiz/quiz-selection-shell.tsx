@@ -230,23 +230,13 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
         </p>
       ) : null}
 
-      {/* CTAs */}
+      {/* CTAs — Estudar selecionados (primary) à esquerda; Mais cai (secondary) à direita */}
       <div className="flex flex-col gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={handleStudyMaisCai}
-          disabled={isPending}
-          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label="Estudar o que mais cai (top-3 por disciplina)"
-        >
-          <BookOpen className="h-4 w-4" aria-hidden="true" />
-          {isPendingMaisCai ? 'Carregando…' : 'Estudar o que mais cai'}
-        </button>
         <button
           type="button"
           onClick={handleStudySelected}
           disabled={!canStartSelected}
-          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Estudar itens selecionados"
         >
           <Play className="h-4 w-4" aria-hidden="true" />
@@ -255,6 +245,16 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
             : totalSelectedItems === 0
               ? 'Estudar itens selecionados'
               : `Estudar itens selecionados (${totalQuestions}q)`}
+        </button>
+        <button
+          type="button"
+          onClick={handleStudyMaisCai}
+          disabled={isPending}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="Estudar o que mais cai (top-3 por disciplina)"
+        >
+          <BookOpen className="h-4 w-4" aria-hidden="true" />
+          {isPendingMaisCai ? 'Carregando…' : 'Estudar o que mais cai'}
         </button>
       </div>
 

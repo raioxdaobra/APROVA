@@ -28,7 +28,7 @@ export function PrivacyForm() {
       <div className="flex items-start gap-4 rounded-lg border border-border bg-card p-4">
         <div className="flex flex-1 flex-col gap-1">
           <Label htmlFor="leaderboard" className="text-base">
-            Aparecer no ranking semanal de Fortaleza?
+            Aparecer no ranking de desempenho semanal?
           </Label>
           <p className="text-xs text-muted-foreground">
             Sempre como seu_username, nunca seu nome real. Pode mudar depois nas configurações.

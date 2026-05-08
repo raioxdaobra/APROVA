@@ -21,7 +21,10 @@ export function DeleteAllDialog({ username }: { username: string }) {
     setConfirmedFirstStep(false);
   };
 
-  const matches = confirmation.trim() === username;
+  // Confirmação simplificada: usuário digita "Confirmo" pra liberar.
+  // (username ainda chega como prop pra retro-compat, mas não é usado).
+  void username;
+  const matches = confirmation.trim().toLowerCase() === 'confirmo';
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,7 +50,7 @@ export function DeleteAllDialog({ username }: { username: string }) {
         size="md"
         onClick={() => setOpen(true)}
       >
-        Apagar tudo
+        Zerar estatísticas
       </Button>
 
       {open && (
@@ -71,7 +74,7 @@ export function DeleteAllDialog({ username }: { username: string }) {
             className="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg"
           >
             <h2 id="delete-all-title" className="text-lg font-semibold text-foreground">
-              Apagar todo o progresso?
+              Zerar estatísticas?
             </h2>
 
             {!confirmedFirstStep ? (
@@ -100,17 +103,20 @@ export function DeleteAllDialog({ username }: { username: string }) {
             ) : (
               <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                  Para confirmar, digite seu username{' '}
-                  <span className="font-mono font-semibold text-foreground">{username}</span>.
+                  Para confirmar, digite{' '}
+                  <span className="font-mono font-semibold text-foreground">Confirmo</span>{' '}
+                  no campo abaixo.
                 </p>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="confirmation">Username</Label>
+                  <Label htmlFor="confirmation">Confirmação</Label>
                   <Input
                     id="confirmation"
                     name="confirmation"
                     value={confirmation}
                     onChange={(event) => setConfirmation(event.target.value)}
+                    placeholder="Confirmo"
                     autoComplete="off"
+                    autoFocus
                     disabled={pending}
                   />
                 </div>
@@ -128,7 +134,7 @@ export function DeleteAllDialog({ username }: { username: string }) {
                     variant="destructive"
                     disabled={!matches || pending}
                   >
-                    {pending ? 'Apagando…' : 'Apagar permanentemente'}
+                    {pending ? 'Zerando…' : 'Zerar permanentemente'}
                   </Button>
                 </div>
               </form>

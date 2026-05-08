@@ -299,7 +299,11 @@ export function QuizRunner({
           const newRankId = rankFromXp(g.weeklyXp).id;
           if (newRankId !== lastRankIdRef.current) {
             lastRankIdRef.current = newRankId;
-            setRankUpOpen(true);
+            // Só celebra com confete/modal se a resposta foi CERTA.
+            // Errar e ganhar XP base não merece comemoração.
+            if (res.is_correct) {
+              setRankUpOpen(true);
+            }
           }
         }
       });

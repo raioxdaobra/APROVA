@@ -24,7 +24,6 @@ import { slugify } from '@/lib/slug';
 import { fetchWeakPoints } from '@/lib/stats/weak-points';
 import type { Discipline } from '@/lib/supabase/types';
 import { DeleteAllDialog } from './_components/delete-all-dialog';
-import { ExportButton } from './_components/export-button';
 import { StatsTabs } from './_components/stats-tabs';
 
 export const metadata = {
@@ -638,21 +637,18 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
           </>}
         />
 
-        {/* Ações */}
+        {/* Zona de perigo — zerar estatísticas */}
         <section aria-labelledby="actions" className="mt-2 flex flex-col gap-3 border-t border-border pt-6">
           <h2 id="actions" className="text-lg font-semibold text-foreground">
-            Ações
+            Zona de perigo
           </h2>
-          <div className="flex flex-wrap gap-3">
-            <ExportButton />
-            {username ? (
-              <DeleteAllDialog username={username} />
-            ) : null}
-          </div>
           <p className="text-xs text-muted-foreground">
-            Exportar baixa um JSON com todo o seu progresso. Apagar remove
-            tentativas, sessões, XP, sequência e domínio — sua conta permanece.
+            Zerar estatísticas remove tentativas, sessões, XP, sequência e domínio de
+            subtópicos. Sua conta permanece intacta.
           </p>
+          <div className="flex flex-wrap gap-3">
+            {username ? <DeleteAllDialog username={username} /> : null}
+          </div>
         </section>
       </main>
     </div>

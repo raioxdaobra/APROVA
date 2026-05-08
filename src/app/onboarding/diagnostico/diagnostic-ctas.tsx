@@ -13,7 +13,7 @@ export function DiagnosticCTAs() {
         onSubmit={() => track('onboarding_finished', { did_diagnostic: true })}
       >
         <Button type="submit" size="lg" className="w-full">
-          Fazer diagnóstico (5 questões)
+          Faça suas 5 primeiras questões
         </Button>
       </form>
 

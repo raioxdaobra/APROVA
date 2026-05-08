@@ -34,6 +34,7 @@ export function QuestionChat({ questionId, maxMessages = MAX_DEFAULT }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState<string>(''); // assistant em construção
   const listRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Carrega histórico ao montar
   useEffect(() => {
@@ -195,15 +196,31 @@ export function QuestionChat({ questionId, maxMessages = MAX_DEFAULT }: Props) {
     <div className="flex flex-col gap-3">
       <div
         ref={listRef}
-        className="max-h-96 min-h-[8rem] overflow-y-auto rounded-md border border-border bg-card p-3"
+        className="max-h-96 min-h-[8rem] cursor-text overflow-y-auto rounded-md border border-border bg-card p-3 transition-colors hover:border-primary/40"
         aria-live="polite"
+        onClick={(e) => {
+          // Clicar em qualquer lugar do painel foca o textarea direto.
+          // Não interfere com seleção de texto em mensagens.
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'A' || target.tagName === 'BUTTON') return;
+          if (window.getSelection()?.toString()) return;
+          textareaRef.current?.focus();
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            textareaRef.current?.focus();
+          }
+        }}
       >
         {loading ? (
           <p className="text-sm text-muted-foreground">Carregando histórico…</p>
         ) : messages.length === 0 && !streaming ? (
           <p className="text-sm text-muted-foreground">
             Tire sua dúvida sobre essa questão. Ex.: &quot;Por que não pode ser
-            a alternativa B?&quot;
+            a alternativa B?&quot; <span className="text-primary">Clique aqui pra digitar.</span>
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -247,6 +264,7 @@ export function QuestionChat({ questionId, maxMessages = MAX_DEFAULT }: Props) {
       ) : (
         <div className="flex items-end gap-2">
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
