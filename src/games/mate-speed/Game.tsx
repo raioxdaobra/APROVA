@@ -127,6 +127,19 @@ export default function MateSpeedGame() {
       subtitle="10 contas. 60 segundos. Sem misericórdia."
       icon="🧮"
       onRestart={handleRestart}
+      instructions={{
+        gameId: 'mate_speed',
+        title: 'Mate-Speed',
+        subtitle: 'Contas rápidas no cronômetro',
+        icon: '🧮',
+        rules: [
+          'Você tem 60 segundos pra resolver até 10 contas (soma, subtração, multiplicação, divisão).',
+          'Digite o resultado e aperte Enter (ou OK) pra confirmar.',
+          'Cada acerto vale 10 pontos. Erros não tiram pontos, mas comem tempo.',
+          'A dificuldade sobe conforme você acerta — números maiores aparecem.',
+          'Sua melhor pontuação entra no ranking automaticamente.',
+        ],
+      }}
       hud={
         <div className="flex items-center gap-2 text-xs">
           <span className="rounded-full bg-primary/15 px-2 py-1 font-bold text-primary tabular-nums">

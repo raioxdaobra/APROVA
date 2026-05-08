@@ -189,6 +189,19 @@ export default function WordleGame() {
       subtitle="Adivinhe a palavra de 5 letras"
       icon="🔤"
       onRestart={restart}
+      instructions={{
+        gameId: 'wordle',
+        title: 'Termo Médico',
+        subtitle: 'Wordle de termos vestibulares (5 letras)',
+        icon: '🔤',
+        rules: [
+          'Você tem 6 tentativas pra adivinhar uma palavra de 5 letras (geralmente termo médico/biológico).',
+          'Verde: letra certa no lugar certo. Amarelo: letra existe mas em outra posição. Cinza: letra não existe na palavra.',
+          'Use as setas do teclado físico ou o teclado on-screen no celular.',
+          'Quanto menos tentativas você usar e mais rápido for, maior a pontuação.',
+          'Acertos contam pro ranking. Erros zeram a tentativa atual.',
+        ],
+      }}
       hud={
         <span className="rounded-full bg-primary/15 px-2 py-1 text-xs font-bold text-primary tabular-nums">
           {rows.length}/{MAX_GUESSES}

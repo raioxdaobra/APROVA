@@ -119,6 +119,19 @@ export default function MemoryPeriodicGame() {
       subtitle="Encontre os 8 pares: símbolo ↔ nome"
       icon="⚛️"
       onRestart={restart}
+      instructions={{
+        gameId: 'memory_periodic',
+        title: 'Memória Periódica',
+        subtitle: 'Pares de elementos da tabela periódica',
+        icon: '⚛️',
+        rules: [
+          'O grid 4×4 tem 16 cartas viradas — 8 pares de símbolo + nome do elemento.',
+          'Toque (ou clique) em duas cartas pra virá-las. Se baterem, ficam reveladas.',
+          'Se errar, as cartas voltam pra posição inicial. Memorize antes de tentar de novo.',
+          'Pontuação = 1000 − (tentativas × 50) − (segundos × 2). Quanto mais rápido, melhor.',
+          'Termina quando todos os 8 pares forem formados.',
+        ],
+      }}
       hud={
         <div className="flex items-center gap-2 text-xs">
           <span className="rounded-full bg-primary/15 px-2 py-1 font-bold text-primary tabular-nums">

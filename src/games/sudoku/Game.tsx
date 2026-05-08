@@ -129,6 +129,19 @@ export default function SudokuGame() {
       subtitle="Preencha o grid 9x9"
       onRestart={restart}
       finalScore={finalScore}
+      instructions={{
+        gameId: 'sudoku',
+        title: 'Sudoku',
+        subtitle: 'Lógica clássica em grid 9×9',
+        icon: '🔢',
+        rules: [
+          'Preencha o grid 9×9 com números de 1 a 9.',
+          'Cada linha, coluna e bloco 3×3 deve ter os 9 dígitos sem repetição.',
+          'Toque numa célula vazia e digite (ou use os botões) o número desejado.',
+          'Use a borracha pra apagar e a lâmpada pra ver dicas (penaliza a pontuação).',
+          'Três níveis: Fácil, Médio, Difícil. Cada nível tem ranking próprio.',
+        ],
+      }}
       hud={
         <div className="flex items-center gap-2 text-xs">
           {DIFFS.map((d) => (

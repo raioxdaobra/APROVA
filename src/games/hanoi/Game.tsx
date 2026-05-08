@@ -68,6 +68,19 @@ export default function HanoiGame() {
       subtitle="Mova todos os discos para a torre da direita"
       onRestart={() => restart()}
       finalScore={finalScore}
+      instructions={{
+        gameId: 'hanoi',
+        title: 'Torre de Hanói',
+        subtitle: 'Mova todos os discos no menor número de jogadas',
+        icon: '🗼',
+        rules: [
+          'Você tem 3 hastes e vários discos empilhados na haste da esquerda (do maior pro menor).',
+          'Mova todos os discos pra haste da direita, mantendo a ordem (maior embaixo).',
+          'Só pode mover um disco por vez, e nunca colocar um maior em cima de um menor.',
+          'Toque em uma haste pra "pegar" o disco do topo, depois toque na haste de destino.',
+          'Quanto menos movimentos usar (mais perto do ótimo 2ⁿ−1), maior a pontuação.',
+        ],
+      }}
       hud={
         <span className="rounded-full bg-card px-2 py-1 text-xs">
           <MoveHorizontal className="mr-1 inline h-3 w-3" />

@@ -14,10 +14,14 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RotateCcw, Trophy } from 'lucide-react';
+import { ArrowLeft, BookOpen, RotateCcw, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { LeaderboardRow } from '@/lib/games/score-action';
+import {
+  HowToPlayModal,
+  type HowToPlayInstructions,
+} from '@/components/jogos/how-to-play-modal';
 
 export interface GameShellProps {
   title: string;
@@ -36,6 +40,11 @@ export interface GameShellProps {
   accentClassName?: string;
   /** Classes extras pra área principal (main). */
   className?: string;
+  /**
+   * Instruções "Como jogar". Quando fornecido, exibe modal automaticamente na
+   * primeira partida e renderiza botão "Ver regras" no header.
+   */
+  instructions?: HowToPlayInstructions;
   children: ReactNode;
 }
 
@@ -49,10 +58,12 @@ export function GameShell({
   finalScore,
   accentClassName,
   className,
+  instructions,
   children,
 }: GameShellProps) {
   // Mark client mount so we can render dynamic widgets lazily without hydration noise.
   const [mounted, setMounted] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState<boolean | undefined>(undefined);
   useEffect(() => setMounted(true), []);
 
   return (
@@ -91,6 +102,18 @@ export function GameShell({
         </div>
         <div className="flex items-center gap-2">
           {mounted && hud ? <div className="text-sm">{hud}</div> : null}
+          {instructions ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setRulesOpen(true)}
+              aria-label="Ver regras"
+              title="Ver regras"
+            >
+              <BookOpen className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Regras</span>
+            </Button>
+          ) : null}
           {onRestart ? (
             <Button size="sm" variant="secondary" onClick={onRestart}>
               <RotateCcw className="mr-1 h-4 w-4" />
@@ -99,6 +122,14 @@ export function GameShell({
           ) : null}
         </div>
       </header>
+
+      {instructions ? (
+        <HowToPlayModal
+          instructions={instructions}
+          open={rulesOpen}
+          onClose={() => setRulesOpen(false)}
+        />
+      ) : null}
 
       {finalScore !== null && finalScore !== undefined ? (
         <div className="border-b border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-primary/10 to-amber-500/10 px-4 py-2 text-center text-sm font-semibold">

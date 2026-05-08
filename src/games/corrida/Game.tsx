@@ -223,6 +223,19 @@ export default function CorridaGame({
       subtitle="Acerte os quizzes pra acelerar"
       onRestart={restart}
       finalScore={finalScore}
+      instructions={{
+        gameId: 'corrida',
+        title: 'Corrida do Saber',
+        subtitle: 'Acerte questões pra acelerar até a chegada',
+        icon: '🏁',
+        rules: [
+          'Você é um carro na pista. Cada questão respondida corretamente avança vários metros.',
+          'Erros não te empurram pra trás, mas custam tempo precioso.',
+          'A pista tem comprimento fixo — chegue na linha de chegada antes do tempo acabar.',
+          'A pontuação final combina tempo + acertos.',
+          'O recorde pessoal entra no ranking público dos jogos.',
+        ],
+      }}
       hud={
         <div className="flex items-center gap-3 text-xs">
           <span className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-1">

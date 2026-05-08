@@ -192,6 +192,19 @@ export default function SnakeAnatomyGame() {
       subtitle="Coma órgãos pra crescer. Não bata na parede!"
       icon="🐍"
       onRestart={restart}
+      instructions={{
+        gameId: 'snake_anatomy',
+        title: 'Snake Anatomia',
+        subtitle: 'Snake clássico com órgãos do corpo humano',
+        icon: '🐍',
+        rules: [
+          'Controle a cobra com setas/WASD (desktop) ou D-pad/swipe (mobile).',
+          'Coma os órgãos que aparecem pra crescer e somar pontos.',
+          'A cobra não pode bater nela mesma nem nas paredes — game over imediato.',
+          'A velocidade aumenta gradualmente: quanto mais comer, mais rápido fica.',
+          'O comprimento final vai pro ranking.',
+        ],
+      }}
       hud={
         <span className="rounded-full bg-primary/15 px-2 py-1 text-xs font-bold text-primary tabular-nums">
           {state.score}

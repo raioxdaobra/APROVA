@@ -165,6 +165,19 @@ export default function Game2048() {
       subtitle="Combine pra chegar no 2048"
       icon="🧩"
       onRestart={restart}
+      instructions={{
+        gameId: '2048',
+        title: '2048 Médico',
+        subtitle: 'Junte conceitos crescentes',
+        icon: '🧩',
+        rules: [
+          'Use setas (desktop) ou swipe (mobile) pra mover todas as peças do tabuleiro 4×4.',
+          'Quando duas peças iguais se encostam, elas fundem e dobram de valor.',
+          'Objetivo: chegar na peça 2048. Ganha pontos pelo maior valor alcançado.',
+          'A cada movimento, uma nova peça (2 ou 4) aparece no tabuleiro.',
+          'Game over quando o tabuleiro lota e nenhum movimento é possível.',
+        ],
+      }}
       hud={
         <div className="flex items-center gap-2 text-xs">
           <span className="rounded-full bg-primary/15 px-2 py-1 font-bold text-primary tabular-nums">

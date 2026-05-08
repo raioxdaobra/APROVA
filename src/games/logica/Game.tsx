@@ -84,6 +84,19 @@ export default function LogicaGame() {
       subtitle="Use as dicas pra preencher cada casa"
       onRestart={restart}
       finalScore={finalScore}
+      instructions={{
+        gameId: 'logica',
+        title: 'Charadas Lógicas',
+        subtitle: 'Enigmas curtos pra esquentar o raciocínio',
+        icon: '🧩',
+        rules: [
+          'Você recebe uma tabela com pessoas/itens/categorias e várias dicas verbais.',
+          'Cada dica elimina ou confirma combinações possíveis.',
+          'Marque os cruzamentos certos baseado nas dicas até a tabela ficar consistente.',
+          'Quanto mais rápido resolver e menos dicas usar, maior a pontuação.',
+          'Não há erro fatal — você pode reanalizar e ajustar antes de confirmar.',
+        ],
+      }}
       hud={
         <span className="rounded-full bg-card px-2 py-1 text-xs">
           <Brain className="mr-1 inline h-3 w-3" />

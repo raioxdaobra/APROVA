@@ -103,6 +103,19 @@ export default function TrunfoGame({ initialDifficulty = 'easy' }: TrunfoGamePro
       subtitle="Escolha o atributo mais forte da sua carta"
       onRestart={restart}
       finalScore={finalScore}
+      instructions={{
+        gameId: 'trunfo',
+        title: 'Super Trunfo',
+        subtitle: 'Cartas de cientistas com atributos',
+        icon: '🃏',
+        rules: [
+          'Cada carta mostra um cientista com 4 atributos (publicações, citações, prêmios, impacto).',
+          'Na sua vez, escolha o atributo que você acha que é o mais forte da sua carta.',
+          'A CPU revela a carta dela e quem tem o valor maior leva a rodada.',
+          'Empate: a carta volta pro fim do baralho.',
+          'Vence quem zerar o adversário ou tiver mais cartas ao fim do tempo.',
+        ],
+      }}
       hud={
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-xs font-bold text-primary">
