@@ -518,16 +518,16 @@ export function QuizRunner({
       {showFeedback && correctLetter ? (
         <div
           className={cn(
-            'rounded-lg p-3 text-sm',
+            'rounded-lg border p-3 text-sm font-medium',
             currentAnswer.is_correct
-              ? 'bg-success-bg text-success'
-              : 'bg-error-bg text-error',
+              ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300'
+              : 'border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300',
           )}
           role="status"
         >
           {currentAnswer.is_correct
-            ? `Correto! Gabarito: ${correctLetter}`
-            : `Resposta certa: ${correctLetter}. Você marcou ${currentAnswer.selected}.`}
+            ? `🎉 Parabéns! Resposta correta.`
+            : `❌ Resposta certa: ${correctLetter}. Você marcou ${currentAnswer.selected}.`}
         </div>
       ) : null}
 

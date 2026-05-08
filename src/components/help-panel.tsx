@@ -1,24 +1,21 @@
 'use client';
 /**
- * Wrapper com 3 abas: Resolução, Teoria, Tira-dúvidas.
+ * Wrapper com 2 abas: Resolução e Teoria.
  * Usado em quiz pós-resposta, simulado-resultado, modo revisão.
  *
  * Faz fetch lazy das APIs:
  *  - GET /api/question/[id]/solution
  *  - GET /api/question/[id]/theory?discipline=&subtopic=
- *
- * O chat tem componente próprio (`QuestionChat`) que carrega histórico.
  */
 import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { QuestionChat } from '@/components/question-chat';
 import { MarkdownKatex } from '@/components/markdown-katex';
 
 interface Props {
   questionId: string;
   discipline: string;
   subtopic: string;
-  defaultTab?: 'resolucao' | 'teoria' | 'chat';
+  defaultTab?: 'resolucao' | 'teoria';
 }
 
 interface SolutionData {
@@ -104,9 +101,6 @@ export function HelpPanel({
           <TabsTrigger value="teoria" className="flex-1">
             Teoria
           </TabsTrigger>
-          <TabsTrigger value="chat" className="flex-1">
-            Tira-dúvidas
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resolucao">
@@ -168,10 +162,6 @@ export function HelpPanel({
               ) : null}
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="chat">
-          <QuestionChat questionId={questionId} />
         </TabsContent>
       </Tabs>
     </div>
