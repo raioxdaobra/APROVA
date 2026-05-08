@@ -16,12 +16,12 @@ export default function LoginPage() {
       <LoginForm />
 
       <div className="mt-6 flex flex-col items-center gap-3 text-sm">
-        <a
-          href="mailto:eng.arocha@gmail.com?subject=Recuperar%20senha%20APROVA"
+        <Link
+          href="/forgot-password"
           className="font-medium text-primary underline-offset-4 hover:underline"
         >
           Esqueci a senha
-        </a>
+        </Link>
         <p className="text-muted-foreground">
           Não tem conta?{' '}
           <Link

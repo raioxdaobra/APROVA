@@ -7,6 +7,8 @@ const PUBLIC_ROUTES = new Set([
   '/login',
   '/signup',
   '/auth/callback',
+  '/auth/reset',
+  '/forgot-password',
   '/sobre',
   '/privacidade',
   '/termos',
