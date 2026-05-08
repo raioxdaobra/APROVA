@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  Brain,
   ChevronLeft,
   ChevronRight,
   Gamepad2,
@@ -54,6 +55,13 @@ const ITEMS: NavItem[] = [
     label: 'Trilha',
     Icon: MapIcon,
     match: (p) => p === '/trilha' || p.startsWith('/trilha/'),
+    accentVar: '--accent-trilha',
+  },
+  {
+    href: '/revisao',
+    label: 'Revisão',
+    Icon: Brain,
+    match: (p) => p === '/revisao' || p.startsWith('/revisao/'),
     accentVar: '--accent-trilha',
   },
   {

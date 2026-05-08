@@ -316,6 +316,15 @@ export default async function DashboardPage() {
               </Button>
             </Card>
             <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
+              <CardTitle className="text-base">Revisão (SRS)</CardTitle>
+              <CardDescription>
+                Repetição espaçada com as questões oficiais. Anki para vestibular.
+              </CardDescription>
+              <Button asChild variant="secondary" size="sm" className="mt-2">
+                <Link href="/revisao">Revisar agora</Link>
+              </Button>
+            </Card>
+            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
               <CardTitle className="text-base">Simulado completo</CardTitle>
               <CardDescription>Cronômetro, formato real, bônus por tempo.</CardDescription>
               <Button asChild variant="secondary" size="sm" className="mt-2">

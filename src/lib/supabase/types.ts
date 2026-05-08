@@ -864,6 +864,58 @@ export interface Database {
           },
         ];
       };
+      flashcard_reviews: {
+        Row: {
+          user_id: string;
+          question_id: string;
+          ease_factor: number;
+          interval_days: number;
+          repetitions: number;
+          due_at: string;
+          last_quality: number | null;
+          total_reviews: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          question_id: string;
+          ease_factor?: number;
+          interval_days?: number;
+          repetitions?: number;
+          due_at?: string;
+          last_quality?: number | null;
+          total_reviews?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          question_id?: string;
+          ease_factor?: number;
+          interval_days?: number;
+          repetitions?: number;
+          due_at?: string;
+          last_quality?: number | null;
+          total_reviews?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'flashcard_reviews_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'flashcard_reviews_question_id_fkey';
+            columns: ['question_id'];
+            referencedRelation: 'questions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {
       weekly_leaderboard: {
@@ -912,6 +964,19 @@ export interface Database {
           user_progress: number;
           user_completed: boolean;
           completed_at: string | null;
+        };
+        Relationships: [];
+      };
+      flashcards_available: {
+        Row: {
+          question_id: string;
+          discipline: string;
+          subtopic: string;
+          description: string | null;
+          image_url: string;
+          correct_answer: 'A' | 'B' | 'C' | 'D' | 'E' | null;
+          year: number;
+          semester: number;
         };
         Relationships: [];
       };
