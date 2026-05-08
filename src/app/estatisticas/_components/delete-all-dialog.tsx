@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,15 @@ export function DeleteAllDialog({ username }: { username: string }) {
   const [confirmedFirstStep, setConfirmedFirstStep] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const confirmInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Foca o campo de confirmação quando o passo 2 abre. Usar useEffect+ref
+  // em vez de autoFocus pra atender o lint jsx-a11y/no-autofocus.
+  useEffect(() => {
+    if (open && confirmedFirstStep) {
+      confirmInputRef.current?.focus();
+    }
+  }, [open, confirmedFirstStep]);
 
   const reset = () => {
     setOpen(false);
@@ -110,13 +119,13 @@ export function DeleteAllDialog({ username }: { username: string }) {
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="confirmation">Confirmação</Label>
                   <Input
+                    ref={confirmInputRef}
                     id="confirmation"
                     name="confirmation"
                     value={confirmation}
                     onChange={(event) => setConfirmation(event.target.value)}
                     placeholder="Confirmo"
                     autoComplete="off"
-                    autoFocus
                     disabled={pending}
                   />
                 </div>
