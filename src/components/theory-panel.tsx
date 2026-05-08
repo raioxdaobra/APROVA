@@ -1,12 +1,10 @@
 /**
- * Painel de teoria por subtópico — resumo + links curados.
- * Server Component.
+ * Painel de teoria por subtópico.
+ * Server Component — cache em `subtopic_theory`; on-demand via IA se vazio.
  */
 import { createClient } from '@/lib/supabase/server';
+import { getOrGenerateTeoria } from '@/lib/llm/on-demand';
 import { MarkdownKatex } from './markdown-katex';
-import type { SupabaseClient } from '@supabase/supabase-js';
-
-type AnyDb = SupabaseClient;
 
 interface Props {
   discipline: string;
@@ -38,14 +36,7 @@ function parseLinks(raw: unknown): TheoryLink[] {
 
 export async function TheoryPanel({ discipline, subtopic }: Props) {
   const supabase = await createClient();
-  const { data } = await (supabase as AnyDb)
-    .from('subtopic_theory')
-    .select('summary_md, links')
-    .eq('discipline', discipline)
-    .eq('subtopic', subtopic)
-    .maybeSingle();
-
-  const row = data as { summary_md: string; links: unknown } | null;
+  const row = await getOrGenerateTeoria(supabase, discipline, subtopic);
   const links = parseLinks(row?.links);
 
   if (!row?.summary_md && links.length === 0) {

@@ -1,8 +1,9 @@
 /**
  * Painel de resolução pré-gerada de uma questão.
- * Server Component — busca direto via supabase server.
+ * Server Component — busca via cache; se vazio, gera on-demand via IA.
  */
 import { createClient } from '@/lib/supabase/server';
+import { getOrGenerateResolucao } from '@/lib/llm/on-demand';
 import { MarkdownKatex } from './markdown-katex';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -14,15 +15,26 @@ interface Props {
 
 export async function SolutionPanel({ questionId }: Props) {
   const supabase = await createClient();
-  const { data } = await (supabase as AnyDb)
-    .from('question_solutions')
-    .select('content_md, conclusion, generated_by, reviewed')
-    .eq('question_id', questionId)
+
+  // Pega contexto da questão (gabarito + subtópico) pra alimentar o prompt
+  const { data: question } = await (supabase as AnyDb)
+    .from('questions')
+    .select('discipline, subtopic, correct_answer')
+    .eq('id', questionId)
     .maybeSingle();
 
-  const row = data as
-    | { content_md: string; conclusion: string; generated_by: string; reviewed: boolean }
-    | null;
+  const ctx = {
+    questionId,
+    discipline:
+      (question as { discipline?: string | null } | null)?.discipline ?? null,
+    subtopic:
+      (question as { subtopic?: string | null } | null)?.subtopic ?? null,
+    correctAnswer:
+      (question as { correct_answer?: string | null } | null)?.correct_answer ??
+      null,
+  };
+
+  const row = await getOrGenerateResolucao(supabase, ctx);
 
   if (!row?.content_md) {
     return (

@@ -124,4 +124,37 @@ export async function streamChat(opts: LLMStreamOptions): Promise<ChainStreamRes
   );
 }
 
+/**
+ * Helper one-shot: roda streamChat e coleta todos os chunks em uma string.
+ * Usa AbortController via timeout pra não estourar o limite da Vercel (60s
+ * em hobby — usamos 25s pra deixar margem). Em caso de timeout/falha,
+ * lança erro pra o caller decidir o fallback.
+ */
+export async function completeChat(
+  opts: LLMStreamOptions,
+  timeoutMs = 25_000,
+): Promise<{ provider: string; content: string }> {
+  const { provider, stream } = await streamChat(opts);
+
+  let timer: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`completeChat timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  const collect = (async (): Promise<string> => {
+    let acc = '';
+    for await (const chunk of stream) acc += chunk;
+    return acc;
+  })();
+
+  try {
+    const content = await Promise.race([collect, timeoutPromise]);
+    return { provider, content };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export type { ChatMessage, LLMProvider, LLMStreamOptions };
