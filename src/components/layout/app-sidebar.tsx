@@ -11,6 +11,7 @@ import {
   Download,
   Gamepad2,
   Home,
+  ListChecks,
   Map as MapIcon,
   MessageSquare,
   Settings,
@@ -58,6 +59,13 @@ const ITEMS: NavItem[] = [
     Icon: Brain,
     match: (p) => p === '/revisao' || p.startsWith('/revisao/'),
     accentVar: '--accent-trilha',
+  },
+  {
+    href: '/missoes',
+    label: 'Missões',
+    Icon: ListChecks,
+    match: (p) => p === '/missoes' || p.startsWith('/missoes/'),
+    accentVar: '--primary',
   },
   {
     href: '/jogos',

@@ -9,7 +9,6 @@ import { PomodoroRestModal } from '@/components/pomodoro-rest-modal';
 import { HeroGreeting } from '@/components/dashboard/hero-greeting';
 import { ContinueSessionCard } from '@/components/dashboard/continue-session-card';
 import { StudyModeCards } from '@/components/dashboard/study-mode-cards';
-import { MissionsCompact } from '@/components/dashboard/missions-compact';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -199,9 +198,6 @@ export default async function DashboardPage() {
 
         {/* 4 cards grandes coloridos — modos de estudo principais */}
         <StudyModeCards userId={user.id} />
-
-        {/* Missões em linha compacta */}
-        <MissionsCompact />
 
         {/* Progresso semanal — gráfico (mantido) */}
         <Card className="flex flex-col gap-4">
