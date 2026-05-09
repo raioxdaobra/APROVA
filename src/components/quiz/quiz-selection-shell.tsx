@@ -181,7 +181,7 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
       if (valid.length === 0) {
         setErrorMsg(
           label === 'mais-cai'
-            ? 'Sem tópicos suficientes pra montar o quiz.'
+            ? 'Sem tópicos suficientes pra montar.'
             : 'Selecione ao menos um tópico.',
         );
         return;
@@ -217,7 +217,7 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
       }
     }
     if (pairs.length === 0) {
-      setErrorMsg('Sem tópicos suficientes pra montar o quiz.');
+      setErrorMsg('Sem tópicos suficientes pra montar.');
       return;
     }
     const poolSize = computePoolSize(pairs);
@@ -261,7 +261,7 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
         selected={selected}
         onToggle={handleToggle}
         title={`${totalAvailable} questões oficiais`}
-        subtitle="Clique numa disciplina pra ver os tópicos · clique nos tópicos pra montar seu quiz"
+        subtitle="Clique numa disciplina pra ver os tópicos · clique nos tópicos pra escolher o que estudar"
       />
 
       {/* Indicador de seleção */}

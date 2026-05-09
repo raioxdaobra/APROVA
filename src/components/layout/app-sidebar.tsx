@@ -39,20 +39,6 @@ const ITEMS: NavItem[] = [
     accentVar: '--primary',
   },
   {
-    href: '/quiz',
-    label: 'Resolver questões',
-    Icon: Target,
-    match: (p) => p === '/quiz' || p.startsWith('/quiz/'),
-    accentVar: '--accent-quiz',
-  },
-  {
-    href: '/simulado',
-    label: 'Simulado',
-    Icon: BarChart3,
-    match: (p) => p === '/simulado' || p.startsWith('/simulado/'),
-    accentVar: '--accent-simulado',
-  },
-  {
     href: '/trilha',
     label: 'Trilha',
     Icon: MapIcon,

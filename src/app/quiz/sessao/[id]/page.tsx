@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { QuizRunner, type QuizQuestion } from '@/components/quiz-runner';
 
 export const metadata = {
-  title: 'Sessão de quiz — APROVA',
+  title: 'Resolvendo questões — APROVA',
 };
 
 export const dynamic = 'force-dynamic';
