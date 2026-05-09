@@ -372,6 +372,11 @@ const topicsQuizSchema = z.object({
   /** Sub-filtros opcionais aplicados sobre os tópicos selecionados. */
   language: languageSchema.nullable().optional(),
   subject: subjectSchema.nullable().optional(),
+  /**
+   * Quantidade de questões pedida. Se omitido ou maior que o pool,
+   * usa todo o pool até o teto MAX_QUIZ_QUESTIONS.
+   */
+  limit: z.number().int().min(1).max(MAX_QUIZ_QUESTIONS).optional(),
 });
 
 export type StartTopicsQuizInput = z.infer<typeof topicsQuizSchema>;
@@ -470,7 +475,10 @@ export async function startTopicsQuizAndRedirect(
     }
   }
 
-  const limited = idChunks.slice(0, MAX_QUIZ_QUESTIONS);
+  // Aplica limite pedido pelo usuário (default: pool inteiro até teto).
+  const requestedLimit = parsed.data.limit ?? MAX_QUIZ_QUESTIONS;
+  const effectiveLimit = Math.min(requestedLimit, MAX_QUIZ_QUESTIONS, idChunks.length);
+  const limited = idChunks.slice(0, effectiveLimit);
   const questionIds = limited.map((r) => r.id);
 
   const filtersJson: Json = {

@@ -35,7 +35,10 @@ import {
 } from '@/lib/quiz/selection';
 import { startTopicsQuizAndRedirect, checkQuestionsCapAction } from '@/app/quiz/actions';
 import { PaywallModal } from '@/components/paywall-modal';
+import { QuestionCountModal } from '@/components/quiz/question-count-modal';
 import { isStripeEnabledClient } from '@/lib/billing/stripe-client';
+
+const MAX_QUIZ_QUESTIONS = 60;
 
 type Discipline =
   | 'matematica'
@@ -80,6 +83,22 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
   const [isPendingSelected, startSelectedTransition] = useTransition();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
+
+  // Modal "Quantas questões?"
+  interface CountModalState {
+    open: boolean;
+    pairs: Array<{ discipline: string; subtopic: string }>;
+    label: 'mais-cai' | 'selecionados';
+    poolSize: number;
+    contextLabel: string;
+  }
+  const [countModal, setCountModal] = useState<CountModalState>({
+    open: false,
+    pairs: [],
+    label: 'selecionados',
+    poolSize: 0,
+    contextLabel: '',
+  });
 
   // Sincroniza ?selected= na URL (deep-link).
   const isFirstSyncRef = useRef(true);
@@ -126,11 +145,33 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
     [data],
   );
 
-  const startQuizFromPairs = useCallback(
+  /**
+   * Calcula o pool size baseado em pares (discipline, subtopic) cruzando com `data`.
+   * Usado pra mostrar quantas questões existem no recorte antes do user escolher quantidade.
+   */
+  const computePoolSize = useCallback(
+    (pairs: Array<{ discipline: string; subtopic: string }>) => {
+      let total = 0;
+      for (const p of pairs) {
+        const node = data.find((d) => d.discipline === p.discipline);
+        if (!node) continue;
+        const topic = node.topics.find((t) => t.topic === p.subtopic);
+        if (topic) total += topic.count;
+      }
+      return total;
+    },
+    [data],
+  );
+
+  /**
+   * Inicia o quiz de fato — chamado pelo modal após o user escolher a quantidade.
+   */
+  const startQuizWithCount = useCallback(
     (
       pairs: Array<{ discipline: string; subtopic: string }>,
       starter: typeof startMaisCaiTransition,
       label: 'mais-cai' | 'selecionados',
+      count: number,
     ) => {
       setErrorMsg(null);
       const valid = pairs.filter(
@@ -152,7 +193,11 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
             setPaywallOpen(true);
             return;
           }
-          await startTopicsQuizAndRedirect({ topics: valid, mode: 'aleatorio' });
+          await startTopicsQuizAndRedirect({
+            topics: valid,
+            mode: 'aleatorio',
+            limit: count,
+          });
         } catch (err) {
           if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) return;
           setErrorMsg(err instanceof Error ? err.message : 'Falha ao iniciar.');
@@ -171,13 +216,40 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
         pairs.push({ discipline, subtopic: t.topic });
       }
     }
-    startQuizFromPairs(pairs, startMaisCaiTransition, 'mais-cai');
-  }, [data, startQuizFromPairs]);
+    if (pairs.length === 0) {
+      setErrorMsg('Sem tópicos suficientes pra montar o quiz.');
+      return;
+    }
+    const poolSize = computePoolSize(pairs);
+    setCountModal({
+      open: true,
+      pairs,
+      label: 'mais-cai',
+      poolSize,
+      contextLabel: `${poolSize} questões disponíveis no top-3 de cada disciplina.`,
+    });
+  }, [data, computePoolSize]);
 
   const handleStudySelected = useCallback(() => {
     if (totalSelectedItems === 0) return;
-    startQuizFromPairs(expandedPairs, startSelectedTransition, 'selecionados');
-  }, [totalSelectedItems, expandedPairs, startQuizFromPairs]);
+    setCountModal({
+      open: true,
+      pairs: expandedPairs,
+      label: 'selecionados',
+      poolSize: totalQuestions,
+      contextLabel: `${totalQuestions} questões disponíveis no que você selecionou.`,
+    });
+  }, [totalSelectedItems, expandedPairs, totalQuestions]);
+
+  const handleConfirmCount = useCallback(
+    (count: number) => {
+      const { pairs, label } = countModal;
+      const starter = label === 'mais-cai' ? startMaisCaiTransition : startSelectedTransition;
+      setCountModal((prev) => ({ ...prev, open: false }));
+      startQuizWithCount(pairs, starter, label, count);
+    },
+    [countModal, startQuizWithCount],
+  );
 
   const isPending = isPendingMaisCai || isPendingSelected;
   const canStartSelected = totalSelectedItems > 0 && !isPending;
@@ -257,6 +329,16 @@ export function QuizSelectionShell({ data }: QuizSelectionShellProps) {
           {isPendingMaisCai ? 'Carregando…' : 'Estudar o que mais cai'}
         </button>
       </div>
+
+      <QuestionCountModal
+        open={countModal.open}
+        poolSize={countModal.poolSize}
+        maxAllowed={MAX_QUIZ_QUESTIONS}
+        contextLabel={countModal.contextLabel}
+        pending={isPending}
+        onConfirm={handleConfirmCount}
+        onCancel={() => setCountModal((prev) => ({ ...prev, open: false }))}
+      />
 
       <PaywallModal
         open={paywallOpen}
