@@ -42,7 +42,12 @@ export function DeleteAllDialog({ username }: { username: string }) {
     startTransition(async () => {
       const result = await deleteAllProgress(formData);
       if (result.ok) {
-        toast.success('Progresso apagado.');
+        const total = Object.values(result.deleted).reduce((a, b) => a + b, 0);
+        toast.success(
+          total > 0
+            ? `Estatísticas zeradas. ${total} ${total === 1 ? 'registro removido' : 'registros removidos'}.`
+            : 'Estatísticas zeradas.',
+        );
         reset();
         router.refresh();
       } else {
