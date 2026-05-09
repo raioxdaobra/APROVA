@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { BackButton } from '@/components/back-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -120,7 +119,6 @@ export default async function QuizSessionEndPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6">
-      <BackButton fallbackHref="/quiz" label="Voltar" className="self-start -ml-2" />
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-foreground">Sessão concluída</h1>
         <p className="text-sm text-muted-foreground">

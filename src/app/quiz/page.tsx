@@ -38,8 +38,8 @@ export default async function QuizPage({ searchParams }: QuizPageProps) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-4 px-4 py-6">
-      <BackButton fallbackHref="/dashboard" label="Voltar" className="self-start -ml-2" />
       <QuizSelectionShell data={topicFreq} />
+      <BackButton fallbackHref="/dashboard" className="self-start" />
     </main>
   );
 }

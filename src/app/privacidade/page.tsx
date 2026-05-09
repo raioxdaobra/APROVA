@@ -10,8 +10,7 @@ export const metadata: Metadata = {
 export default function PrivacidadePage() {
   return (
     <main className="mx-auto max-w-2xl p-8">
-      <BackButton fallbackHref="/" />
-      <h1 className="mt-6 text-3xl font-bold">
+      <h1 className="text-3xl font-bold">
         Política de Privacidade — APROVA
       </h1>
       <p className="mb-8 mt-2 text-sm text-muted-foreground">
@@ -111,6 +110,10 @@ export default function PrivacidadePage() {
           .
         </p>
       </section>
+
+      <div className="mt-4">
+        <BackButton fallbackHref="/" />
+      </div>
     </main>
   );
 }

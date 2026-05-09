@@ -10,8 +10,7 @@ export const metadata: Metadata = {
 export default function TermosPage() {
   return (
     <main className="mx-auto max-w-2xl p-8">
-      <BackButton fallbackHref="/" />
-      <h1 className="mt-6 text-3xl font-bold">Termos de Uso — APROVA</h1>
+      <h1 className="text-3xl font-bold">Termos de Uso — APROVA</h1>
       <p className="mb-8 mt-2 text-sm text-muted-foreground">
         Última atualização: 7 de maio de 2026
       </p>
@@ -81,6 +80,10 @@ export default function TermosPage() {
           renúncia a qualquer outro, por mais privilegiado que seja.
         </p>
       </section>
+
+      <div className="mt-4">
+        <BackButton fallbackHref="/" />
+      </div>
     </main>
   );
 }

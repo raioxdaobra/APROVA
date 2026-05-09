@@ -5,7 +5,6 @@ export const metadata = { title: 'Sobre — APROVA' };
 export default function SobrePage() {
   return (
     <main className="container max-w-2xl py-12">
-      <BackButton fallbackHref="/" />
       <h1 className="mt-6 text-2xl font-semibold">Sobre o APROVA</h1>
       <p className="mt-4 text-base">
         APROVA é um banco de questões oficiais do vestibular de Medicina da Universidade de Fortaleza
@@ -20,6 +19,10 @@ export default function SobrePage() {
       <p className="mt-3 text-sm text-muted-foreground">
         Para notificações de takedown ou contato legal: legal@aprova.app
       </p>
+
+      <div className="mt-10">
+        <BackButton fallbackHref="/" />
+      </div>
     </main>
   );
 }

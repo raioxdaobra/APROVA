@@ -26,7 +26,6 @@ export default async function SimuladoSetupPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-4 py-6">
       <header className="flex flex-col gap-2">
-        <BackButton fallbackHref="/dashboard" label="Voltar" className="self-start -ml-2" />
         <h1 className="text-2xl font-semibold text-foreground">Simulado</h1>
         <p className="text-sm text-muted-foreground">
           Reproduz o formato da prova: tempo cronometrado, sem feedback durante a
@@ -55,6 +54,8 @@ export default async function SimuladoSetupPage() {
           <SimuladoSetupForm />
         </Card>
       </details>
+
+      <BackButton fallbackHref="/dashboard" className="self-start" />
     </main>
   );
 }

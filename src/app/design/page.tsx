@@ -29,8 +29,7 @@ export const metadata = { title: 'Design System — APROVA' };
 export default function DesignPage() {
   return (
     <main className="container max-w-4xl py-12">
-      <div className="flex items-center justify-between">
-        <BackButton fallbackHref="/" />
+      <div className="flex items-center justify-end">
         <ThemeToggle />
       </div>
 
@@ -146,6 +145,10 @@ export default function DesignPage() {
           </div>
         </div>
       </section>
+
+      <div className="mt-12">
+        <BackButton fallbackHref="/" />
+      </div>
     </main>
   );
 }

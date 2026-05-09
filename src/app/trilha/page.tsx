@@ -71,22 +71,19 @@ export default async function TrilhaPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 mx-auto flex w-full max-w-3xl flex-col gap-3 border-b border-border bg-background/80 px-4 py-4 backdrop-blur">
-        <BackButton fallbackHref="/dashboard" className="self-start" />
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-xl font-bold text-foreground sm:text-2xl">
-              Trilha de evolução
-            </h1>
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              Olá, <strong>{displayName}</strong> · {progress.completed}/{progress.total} estações
-              concluídas ({progress.pct}%) · {progress.xpEarned} XP
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
-          </div>
+      <header className="sticky top-0 z-20 mx-auto flex w-full max-w-3xl items-start justify-between gap-4 border-b border-border bg-background/80 px-4 py-4 backdrop-blur">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">
+            Trilha de evolução
+          </h1>
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            Olá, <strong>{displayName}</strong> · {progress.completed}/{progress.total} estações
+            concluídas ({progress.pct}%) · {progress.xpEarned} XP
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
         </div>
       </header>
 
@@ -134,6 +131,8 @@ export default async function TrilhaPage() {
             streakMultiplier={mult}
           />
         )}
+
+        <BackButton fallbackHref="/dashboard" className="self-start" />
       </main>
     </div>
   );

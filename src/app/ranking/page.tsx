@@ -129,20 +129,17 @@ export default async function RankingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-6">
-        <BackButton fallbackHref="/dashboard" label="Voltar" className="self-start -ml-2" />
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold text-foreground">
-              Ranking de Fortaleza
-            </h1>
-            <p className="text-sm text-muted-foreground">esta semana · top 50</p>
-            <ResetCountdown targetIso={resetIso} />
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
-          </div>
+      <header className="mx-auto flex w-full max-w-3xl items-start justify-between gap-4 px-4 py-6">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold text-foreground">
+            Ranking de Fortaleza
+          </h1>
+          <p className="text-sm text-muted-foreground">esta semana · top 50</p>
+          <ResetCountdown targetIso={resetIso} />
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
         </div>
       </header>
 
@@ -249,6 +246,8 @@ export default async function RankingPage() {
             </table>
           </Card>
         )}
+
+        <BackButton fallbackHref="/dashboard" className="self-start" />
       </main>
     </div>
   );
