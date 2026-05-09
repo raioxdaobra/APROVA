@@ -28,7 +28,10 @@ interface Props {
   contextLabel?: string;
 }
 
-const PRESETS = [5, 10, 15, 20, 30];
+// Presets crescentes — só os que cabem no pool atual aparecem (filtrados
+// em visiblePresets). Inclui valores acima de 30 pra disciplinas grandes
+// agora que MAX_QUIZ_QUESTIONS subiu de 60 → 200.
+const PRESETS = [5, 10, 20, 30, 50, 80, 120];
 
 export function QuestionCountModal({
   open,

@@ -38,7 +38,11 @@ import { PaywallModal } from '@/components/paywall-modal';
 import { QuestionCountModal } from '@/components/quiz/question-count-modal';
 import { isStripeEnabledClient } from '@/lib/billing/stripe-client';
 
-const MAX_QUIZ_QUESTIONS = 60;
+// Teto absoluto de questões por sessão. Subiu de 60 → 200 pra atender
+// disciplinas grandes (matemática, biologia) onde "Todas" antes ficava
+// capeado em 60 mesmo com pool maior. 200 é teto de segurança contra abuso
+// (sessões absurdamente longas ou DoS no PostgREST).
+const MAX_QUIZ_QUESTIONS = 200;
 
 type Discipline =
   | 'matematica'

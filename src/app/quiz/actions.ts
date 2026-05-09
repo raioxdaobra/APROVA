@@ -12,7 +12,10 @@ import {
 import { classifyLanguage, classifySubject } from '@/lib/stats/sub-filters';
 
 const EXAM = 'unifor-medicina';
-const MAX_QUIZ_QUESTIONS = 60;
+// Teto absoluto de questões por sessão. Subiu de 60 → 200 pra atender
+// disciplinas grandes (matemática, biologia) cujo pool excede 60. Mantém
+// teto de segurança contra abuso (sessões absurdas / DoS no PostgREST).
+const MAX_QUIZ_QUESTIONS = 200;
 
 const disciplineSchema = z.enum([
   'matematica',
