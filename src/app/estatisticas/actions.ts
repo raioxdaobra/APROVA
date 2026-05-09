@@ -10,7 +10,9 @@ export type DeleteAllProgressResult =
 export async function deleteAllProgress(
   formData: FormData,
 ): Promise<DeleteAllProgressResult> {
-  const confirmation = String(formData.get('confirmation') ?? '').trim();
+  // Confirmação simplificada (alinhada ao novo dialog "Zerar estatísticas"):
+  // o user digita "Confirmo" — sem precisar lembrar o username.
+  const confirmation = String(formData.get('confirmation') ?? '').trim().toLowerCase();
 
   const supabase = await createClient();
   const {
@@ -20,14 +22,8 @@ export async function deleteAllProgress(
     return { ok: false, error: 'Sessão expirada.' };
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (!profile?.username || profile.username !== confirmation) {
-    return { ok: false, error: 'Username não confere.' };
+  if (confirmation !== 'confirmo') {
+    return { ok: false, error: 'Digite "Confirmo" pra prosseguir.' };
   }
 
   const tables = [
