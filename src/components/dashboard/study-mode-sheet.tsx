@@ -82,11 +82,11 @@ export function StudyModeSheet({ open, onClose, totalQuestions }: Props) {
       badgeText: 'text-primary',
     },
     {
-      href: '/quiz?status=wrong',
+      href: '/revisar-erros',
       Icon: RotateCw,
       emoji: '🔁',
       label: 'Revisar erros',
-      description: 'Volta nas questões que você errou',
+      description: 'Volta nas questões que você errou — com estatísticas',
       badge: 'Reforço',
       badgeBg: 'bg-success-bg',
       badgeText: 'text-success',

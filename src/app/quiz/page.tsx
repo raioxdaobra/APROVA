@@ -11,7 +11,7 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 interface QuizPageProps {
-  searchParams?: { random?: string };
+  searchParams?: { random?: string; status?: string };
 }
 
 export default async function QuizPage({ searchParams }: QuizPageProps) {
@@ -27,6 +27,18 @@ export default async function QuizPage({ searchParams }: QuizPageProps) {
   if (searchParams?.random === 'true') {
     const res = await startQuizSession({
       filters: { hide_annulled: true, status: 'todas' },
+      mode: 'aleatorio',
+    });
+    if (res.ok) {
+      redirect(`/quiz/sessao/${res.sessionId}`);
+    }
+  }
+
+  // Atalho de /revisar-erros: ?status=wrong cria sessão so com questões
+  // que o user ja errou (latest attempt is_correct=false).
+  if (searchParams?.status === 'wrong') {
+    const res = await startQuizSession({
+      filters: { hide_annulled: true, status: 'wrong' },
       mode: 'aleatorio',
     });
     if (res.ok) {
