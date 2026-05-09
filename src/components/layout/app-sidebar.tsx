@@ -40,7 +40,7 @@ const ITEMS: NavItem[] = [
   },
   {
     href: '/quiz',
-    label: 'Quiz',
+    label: 'Resolver questões',
     Icon: Target,
     match: (p) => p === '/quiz' || p.startsWith('/quiz/'),
     accentVar: '--accent-quiz',

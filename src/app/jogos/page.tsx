@@ -134,7 +134,7 @@ export default async function JogosPage() {
             </p>
             <div>
               <Button asChild size="sm">
-                <Link href="/quiz">Começar quiz</Link>
+                <Link href="/quiz">Resolver questões</Link>
               </Button>
             </div>
           </Card>

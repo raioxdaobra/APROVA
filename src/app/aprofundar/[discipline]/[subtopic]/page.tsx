@@ -343,7 +343,7 @@ export default async function AprofundarPage({ params }: PageProps) {
           </h2>
           <Card className="flex flex-col gap-3 p-5">
             <p className="text-sm text-muted-foreground">
-              Inicia uma sessão de quiz com até 10 questões aleatórias deste
+              Inicia uma sessão com até 10 questões aleatórias deste
               subtópico.
             </p>
             <form action={startSubtopicQuiz}>

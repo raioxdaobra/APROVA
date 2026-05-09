@@ -21,7 +21,7 @@ interface OpenSession {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  quiz: 'Quiz',
+  quiz: 'Resolver questões',
   simulado: 'Simulado',
   diagnostic: 'Diagnóstico',
   revisao: 'Revisão',

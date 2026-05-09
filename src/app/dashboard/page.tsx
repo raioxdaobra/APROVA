@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Flame } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
@@ -106,7 +105,6 @@ export default async function DashboardPage() {
     attemptsTodayRes,
     attempts7dRes,
     weeklyXpRes,
-    leaderboardRes,
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -136,17 +134,10 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .eq('week_start', weekStartIso)
       .maybeSingle(),
-    supabase
-      .from('weekly_leaderboard')
-      .select('username, display_name, xp, questions_answered, position')
-      .eq('week_start', weekStartIso)
-      .order('position', { ascending: true })
-      .limit(5),
   ]);
 
   const profile = profileRes.data;
   const displayName = profile?.display_name ?? profile?.username ?? 'estudante';
-  const username = profile?.username ?? '';
   const dailyGoal = profile?.daily_goal_questions ?? 20;
   const currentStreak = streakRes.data?.current_streak ?? 0;
   const longestStreak =
@@ -157,28 +148,11 @@ export default async function DashboardPage() {
   const weeklyXpVal = weeklyXpRes.data?.xp ?? 0;
   const weeklyGoal = dailyGoal * 7;
 
-  // Posicao do user no ranking
-  let myPosition: number | null = null;
-  let myWeeklyXp: number | null = null;
-  if (username) {
-    const { data: myRow } = await supabase
-      .from('weekly_leaderboard')
-      .select('position, xp')
-      .eq('week_start', weekStartIso)
-      .eq('username', username)
-      .maybeSingle();
-    myPosition = myRow?.position ?? null;
-    myWeeklyXp = myRow?.xp ?? null;
-  }
-
   const buckets = buildDailyBuckets(today, attempts7d);
   const maxBarValue = Math.max(dailyGoal, ...buckets.map((b) => b.count), 1);
 
   const weeklyDiff = weeklyAnswered - weeklyGoal;
   const weeklyPct = weeklyGoal > 0 ? Math.round((weeklyDiff / weeklyGoal) * 100) : 0;
-
-  const leaderboard = leaderboardRes.data ?? [];
-  const userInTop5 = leaderboard.some((row) => row.username === username);
 
   // Heurística pro contexto da frase motivacional
   const hadHigherStreak = currentStreak === 0 && longestStreak > 3;
@@ -229,22 +203,6 @@ export default async function DashboardPage() {
         {/* Missões em linha compacta */}
         <MissionsCompact />
 
-        {/* Mais ferramentas — link sutil em vez de cards grandes */}
-        <p className="text-xs text-muted-foreground">
-          Mais ferramentas:{' '}
-          <Link href="/quiz?status=wrong" className="text-primary hover:underline">
-            Revisar erros
-          </Link>
-          {' · '}
-          <Link href="/jogos" className="text-primary hover:underline">
-            Jogos
-          </Link>
-          {' · '}
-          <Link href="/estatisticas" className="text-primary hover:underline">
-            Estatísticas
-          </Link>
-        </p>
-
         {/* Progresso semanal — gráfico (mantido) */}
         <Card className="flex flex-col gap-4">
           <div className="flex items-baseline justify-between">
@@ -288,68 +246,6 @@ export default async function DashboardPage() {
               ? `Você está ${weeklyPct}% acima da sua meta semanal.`
               : `Faltam ${-weeklyDiff} ${-weeklyDiff === 1 ? 'questão' : 'questões'} pra bater sua meta semanal.`}
           </p>
-        </Card>
-
-        {/* Ranking semanal */}
-        <Card className="flex flex-col gap-4">
-          <div className="flex items-baseline justify-between">
-            <CardTitle className="text-base">Ranking semanal</CardTitle>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/ranking">Ver ranking completo</Link>
-            </Button>
-          </div>
-          {leaderboard.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Ainda sem ranking nesta semana.
-            </p>
-          ) : (
-            <ol className="flex flex-col gap-2">
-              {leaderboard.map((row) => {
-                const isMe = row.username === username;
-                return (
-                  <li
-                    key={row.username}
-                    className={
-                      isMe
-                        ? 'flex items-center justify-between rounded border border-primary/40 bg-primary-light px-3 py-2 text-sm'
-                        : 'flex items-center justify-between rounded px-3 py-2 text-sm'
-                    }
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="w-6 font-mono text-xs text-muted-foreground">
-                        {row.position}.
-                      </span>
-                      <span className="font-medium text-foreground">@{row.username}</span>
-                      {isMe && (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase text-primary-foreground">
-                          você
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {row.xp ?? 0} XP
-                    </span>
-                  </li>
-                );
-              })}
-              {!userInTop5 && myPosition !== null && (
-                <li className="mt-1 flex items-center justify-between rounded border border-primary/40 bg-primary-light px-3 py-2 text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className="w-6 font-mono text-xs text-muted-foreground">
-                      {myPosition}.
-                    </span>
-                    <span className="font-medium text-foreground">@{username}</span>
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase text-primary-foreground">
-                      você
-                    </span>
-                  </span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {myWeeklyXp ?? 0} XP
-                  </span>
-                </li>
-              )}
-            </ol>
-          )}
         </Card>
       </main>
 

@@ -278,7 +278,7 @@ export function QuizSetupForm({
   return (
     <Card className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-foreground">Quiz</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Resolver questões</h1>
         <p className="text-sm text-muted-foreground">
           Filtre por disciplina, subtópico, prova ou status pessoal e comece a praticar.
         </p>

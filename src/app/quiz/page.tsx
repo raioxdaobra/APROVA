@@ -4,7 +4,7 @@ import { QuizSelectionShell } from '@/components/quiz/quiz-selection-shell';
 import { getTopicFrequency, startQuizSession } from './actions';
 
 export const metadata = {
-  title: 'Quiz — APROVA',
+  title: 'Resolver questões — APROVA',
 };
 
 export const dynamic = 'force-dynamic';
