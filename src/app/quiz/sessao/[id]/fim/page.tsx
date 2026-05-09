@@ -33,10 +33,10 @@ export default async function QuizSessionEndPage({ params }: PageProps) {
     redirect(`/quiz/sessao/${params.id}`);
   }
 
-  // Tentativas desta sessão
+  // Tentativas desta sessão (com discipline pra breakdown)
   const { data: attemptRows } = await supabase
     .from('attempts')
-    .select('is_correct, answer')
+    .select('is_correct, answer, question_id, questions(discipline)')
     .eq('session_id', session.id)
     .eq('user_id', user.id);
 
@@ -47,6 +47,43 @@ export default async function QuizSessionEndPage({ params }: PageProps) {
   const skipped = Math.max(0, totalQuestions - attempts.length);
   const aproveitamento =
     totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 0;
+
+  // Breakdown por disciplina nesta sessão
+  const byDiscipline = new Map<string, { total: number; correct: number }>();
+  for (const a of attempts) {
+    const q = a.questions as { discipline?: string | null } | null | Array<{ discipline?: string | null }>;
+    const disc = Array.isArray(q) ? q[0]?.discipline : q?.discipline;
+    if (!disc) continue;
+    const cur = byDiscipline.get(disc) ?? { total: 0, correct: 0 };
+    cur.total += 1;
+    if (a.is_correct === true) cur.correct += 1;
+    byDiscipline.set(disc, cur);
+  }
+  const disciplineRows = [...byDiscipline.entries()]
+    .map(([discipline, stats]) => ({
+      discipline,
+      total: stats.total,
+      correct: stats.correct,
+      pct: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  const DISC_LABEL: Record<string, string> = {
+    matematica: 'Matemática',
+    fisica: 'Física',
+    quimica: 'Química',
+    biologia: 'Biologia',
+    humanas: 'Humanas',
+    linguagens: 'Linguagens',
+  };
+  const DISC_ACCENT: Record<string, string> = {
+    matematica: '--accent-quiz',
+    fisica: '--accent-simulado',
+    quimica: '--accent-trilha',
+    biologia: '--accent-chat',
+    humanas: '--accent-jogos',
+    linguagens: '--accent-ranking',
+  };
 
   // XP estimado (DB calcula real via trigger; aqui é apenas indicativo)
   const xpEarned = attempts.length * 10 + correct * 5;
@@ -127,6 +164,46 @@ export default async function QuizSessionEndPage({ params }: PageProps) {
           XP estimado nesta sessão: <strong>+{xpEarned} XP</strong>
         </p>
       </Card>
+
+      {disciplineRows.length > 1 ? (
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <CardTitle className="text-base">Acerto por disciplina (esta sessão)</CardTitle>
+            <span className="text-xs text-muted-foreground">só desta sessão</span>
+          </div>
+          <ul className="flex flex-col gap-2.5">
+            {disciplineRows.map((d) => (
+              <li key={d.discipline} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-foreground">
+                    {DISC_LABEL[d.discipline] ?? d.discipline}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {d.correct}/{d.total} · <strong className="text-foreground">{d.pct}%</strong>
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${d.pct}%`,
+                      backgroundColor: `hsl(var(${DISC_ACCENT[d.discipline] ?? '--primary'}))`,
+                    }}
+                    aria-hidden
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-muted-foreground">
+            O acumulado completo (todas as sessões) fica em{' '}
+            <Link href="/estatisticas" className="text-primary hover:underline">
+              Estatísticas
+            </Link>
+            .
+          </p>
+        </Card>
+      ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button asChild size="lg" className="w-full">

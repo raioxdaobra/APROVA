@@ -203,9 +203,10 @@ export default async function ResultadoPage({
       </Card>
 
       <Card className="p-5">
-        <h2 className="mb-3 text-lg font-semibold text-foreground">
-          Por disciplina
-        </h2>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Por disciplina</h2>
+          <span className="text-xs text-muted-foreground">só deste simulado</span>
+        </div>
         {breakdownRows.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sem dados.</p>
         ) : (
@@ -248,6 +249,13 @@ export default async function ResultadoPage({
             </tbody>
           </table>
         )}
+        <p className="mt-3 text-xs text-muted-foreground">
+          O acumulado completo (todas as sessões) fica em{' '}
+          <Link href="/estatisticas" className="text-primary hover:underline">
+            Estatísticas
+          </Link>
+          .
+        </p>
       </Card>
 
       <Card className="p-5">
