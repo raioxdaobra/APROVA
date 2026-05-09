@@ -743,9 +743,12 @@ export function QuizRunner({
           a sessao. Sticky garante que aparece mesmo quando rola pra baixo
           do conteudo da questao. */}
       <div className="sticky top-0 z-30 -mx-4 mb-4 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6">
+        {/* Sair vai pra /dashboard (tela com os cards da prova) — user
+            pediu pra voltar pro "menu da prova" e nao pra /quiz que e a
+            tela de selecao de disciplinas/topicos. */}
         <button
           type="button"
-          onClick={() => router.push('/quiz')}
+          onClick={() => router.push('/dashboard')}
           aria-label="Sair da sessão"
           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >

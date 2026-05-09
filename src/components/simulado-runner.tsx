@@ -320,14 +320,15 @@ export function SimuladoRunner({
     <>
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
         {/* Botao Sair com confirm — abandonar simulado perde tempo cronometrado.
-            User pediu pra ter saida visivel; confirm() evita saida acidental. */}
+            User pediu pra ter saida visivel; confirm() evita saida acidental.
+            Volta pro /dashboard (menu da prova) ao confirmar. */}
         <button
           type="button"
           onClick={() => {
             const ok = typeof window !== 'undefined'
               ? window.confirm('Sair do simulado? O tempo decorrido continua contando.')
               : true;
-            if (ok) router.push('/simulado');
+            if (ok) router.push('/dashboard');
           }}
           aria-label="Sair do simulado"
           className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"

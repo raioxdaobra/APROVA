@@ -427,19 +427,25 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
           </>}
         />
 
-        {/* Zona de perigo — zerar estatísticas */}
-        <section aria-labelledby="actions" className="mt-2 flex flex-col gap-3 border-t border-border pt-6">
-          <h2 id="actions" className="text-lg font-semibold text-foreground">
-            Zona de perigo
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Zerar estatísticas remove tentativas, sessões, XP, sequência e domínio de
-            subtópicos. Sua conta permanece intacta.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {username ? <DeleteAllDialog username={username} /> : null}
-          </div>
-        </section>
+        {/* Zona de perigo — zerar estatísticas. APENAS ADMIN.
+            User reportou que estudante final nao deveria ter acesso a
+            zerar (risco de perder progresso por engano). Mantido pra admin
+            por causa de testes/QA — operacionalmente, user normal so via
+            suporte. */}
+        {profile?.is_admin === true ? (
+          <section aria-labelledby="actions" className="mt-2 flex flex-col gap-3 border-t border-border pt-6">
+            <h2 id="actions" className="text-lg font-semibold text-foreground">
+              Zona de perigo · Admin
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Zerar estatísticas remove tentativas, sessões, XP, sequência e domínio
+              de subtópicos. Sua conta permanece intacta. Visível apenas pra admin.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {username ? <DeleteAllDialog username={username} /> : null}
+            </div>
+          </section>
+        ) : null}
 
         <BackButton fallbackHref="/dashboard" className="self-start" />
       </main>
