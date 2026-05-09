@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { QuestionResultExpander } from '@/components/question-result-expander';
+import { ReviewErrorsBanner } from '@/components/simulado/review-errors-banner';
 import { DifficultyChip } from '@/components/difficulty-chip';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/server';
@@ -193,6 +194,13 @@ export default async function ResultadoPage({
           {correctCount} de {totalForRate} acertos · {accuracy}% de aproveitamento
         </p>
       </header>
+
+      <ReviewErrorsBanner
+        wrongCount={wrongs}
+        wrongQuestionIds={sortedAttempts
+          .filter((a) => a.is_correct === false)
+          .map((a) => a.question_id)}
+      />
 
       <Card className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-5">
         <Stat label="Acertos" value={String(correctCount)} tone="success" />

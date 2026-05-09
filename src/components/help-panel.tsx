@@ -8,10 +8,18 @@
  *  - GET /api/question/[id]/theory?discipline=&subtopic=
  *  - Chat tira-dúvidas via QuestionChat (GET/POST /api/chat/[id]).
  */
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MarkdownKatex } from '@/components/markdown-katex';
 import { QuestionChat } from '@/components/question-chat';
+
+/**
+ * Handle imperativo: permite o parent forçar mudança de aba e scroll
+ * (ex: banner "Ver resolução" ao errar no quiz).
+ */
+export interface HelpPanelHandle {
+  openTab: (tab: 'resolucao' | 'teoria' | 'chat') => void;
+}
 
 interface Props {
   questionId: string;
@@ -32,13 +40,26 @@ interface TheoryData {
   links: Array<{ title: string; url: string; source?: string }>;
 }
 
-export function HelpPanel({
-  questionId,
-  discipline,
-  subtopic,
-  defaultTab = 'resolucao',
-}: Props) {
+export const HelpPanel = forwardRef<HelpPanelHandle, Props>(function HelpPanel(
+  { questionId, discipline, subtopic, defaultTab = 'resolucao' },
+  ref,
+) {
   const [tab, setTab] = useState<string>(defaultTab);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openTab: (next) => {
+        setTab(next);
+        // scroll suave pra trazer o painel ao foco
+        requestAnimationFrame(() => {
+          rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      },
+    }),
+    [],
+  );
   const [solution, setSolution] = useState<SolutionData | null>(null);
   const [solutionLoaded, setSolutionLoaded] = useState(false);
   const [theory, setTheory] = useState<TheoryData | null>(null);
@@ -94,7 +115,7 @@ export function HelpPanel({
   }, [tab, theoryLoaded, questionId, discipline, subtopic]);
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div ref={rootRef} className="rounded-lg border border-border bg-card p-4">
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full">
           <TabsTrigger value="resolucao" className="flex-1">
@@ -175,4 +196,4 @@ export function HelpPanel({
       </Tabs>
     </div>
   );
-}
+});

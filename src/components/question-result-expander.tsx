@@ -4,10 +4,16 @@
  * Ao expandir, mostra mini-versão do `QuestionLayout` (imagem à esquerda em
  * desktop, explicação à direita) — sem fullscreen, mas com lightbox.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
 import { HelpPanel } from '@/components/help-panel';
 import { QuestionLayout } from '@/components/question-layout';
+
+/**
+ * Evento global pra forçar abertura de um expander específico (usado pelo
+ * card "Revisar erros com IA" no topo do resultado do simulado).
+ */
+const EXPAND_EVENT = 'aprova:expand-question' as const;
 
 interface Props {
   questionId: string;
@@ -30,6 +36,23 @@ export function QuestionResultExpander({
   children,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Escuta evento global pra abrir + scroll quando o user clica
+  // "Revisar erros com IA" no topo do resultado.
+  useEffect(() => {
+    function handler(e: Event) {
+      const detail = (e as CustomEvent<{ questionId: string }>).detail;
+      if (detail?.questionId === questionId) {
+        setOpen(true);
+        requestAnimationFrame(() => {
+          rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      }
+    }
+    window.addEventListener(EXPAND_EVENT, handler);
+    return () => window.removeEventListener(EXPAND_EVENT, handler);
+  }, [questionId]);
 
   const helpPanel = (
     <HelpPanel
@@ -40,7 +63,7 @@ export function QuestionResultExpander({
   );
 
   return (
-    <div className="rounded-md border border-border bg-card">
+    <div ref={rootRef} className="rounded-md border border-border bg-card">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

@@ -5,7 +5,8 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { HelpPanel } from '@/components/help-panel';
+import { HelpPanel, type HelpPanelHandle } from '@/components/help-panel';
+import { Lightbulb } from 'lucide-react';
 import { DifficultyChip } from '@/components/difficulty-chip';
 import { PomodoroTimer } from '@/components/pomodoro-timer';
 import { QuestionLayout } from '@/components/question-layout';
@@ -109,6 +110,13 @@ export function QuizRunner({
   const [weeklyXp, setWeeklyXp] = useState<number>(initialWeeklyXp);
   const [rankUpOpen, setRankUpOpen] = useState(false);
   const lastRankIdRef = useRef<string>(rankFromXp(initialWeeklyXp).id);
+
+  // Estado do banner "Bora entender?" que aparece ao errar.
+  // Map por questionId pra resetar quando o user navega.
+  const [reviewBannerDismissed, setReviewBannerDismissed] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const helpPanelRef = useRef<HelpPanelHandle | null>(null);
 
   const startedAtRef = useRef<number>(Date.now());
 
@@ -534,8 +542,61 @@ export function QuizRunner({
         </div>
       ) : null}
 
+      {/* Banner "Bora entender?" — só ao errar e se ainda não dispensado */}
+      {showFeedback &&
+      !currentAnswer.is_correct &&
+      !current.annulled &&
+      !reviewBannerDismissed.has(current.id) ? (
+        <div
+          className="flex flex-col gap-3 rounded-lg border-2 border-primary/40 bg-primary/5 p-4 sm:flex-row sm:items-center"
+          role="region"
+          aria-label="Sugestão de revisão"
+        >
+          <div className="flex flex-1 items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+            >
+              <Lightbulb className="h-5 w-5" />
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm font-semibold text-foreground">
+                Bora entender essa?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                A IA explica direto onde você errou. 30 segundos.
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => helpPanelRef.current?.openTab('resolucao')}
+              className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              Ver resolução
+              <span aria-hidden="true">→</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setReviewBannerDismissed((prev) => {
+                  const next = new Set(prev);
+                  next.add(current.id);
+                  return next;
+                })
+              }
+              className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Pular
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {currentAnswer.selected !== null ? (
         <HelpPanel
+          ref={helpPanelRef}
           key={current.id}
           questionId={current.id}
           discipline={current.discipline}
