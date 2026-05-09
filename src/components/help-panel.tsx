@@ -12,6 +12,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MarkdownKatex } from '@/components/markdown-katex';
 import { QuestionChat } from '@/components/question-chat';
+import { ResolutionFeedback } from '@/components/resolution-feedback';
+import { SolutionMarkdown } from '@/components/solution-markdown';
 
 /**
  * Handle imperativo: permite o parent forçar mudança de aba e scroll
@@ -137,13 +139,22 @@ export const HelpPanel = forwardRef<HelpPanelHandle, Props>(function HelpPanel(
               Resolução em preparação. Volte em breve!
             </div>
           ) : (
-            <div className="space-y-3">
-              <MarkdownKatex>{solution.content_md}</MarkdownKatex>
+            <div className="flex flex-col gap-4">
+              {/* SolutionMarkdown estiliza headers H2 com emoji + linha
+                  colorida (Abordagem amarelo, Resolução azul, etc.).
+                  Resoluções sem headers caem no fluxo padrão de markdown. */}
+              <SolutionMarkdown>{solution.content_md}</SolutionMarkdown>
+
               {solution.reviewed === false ? (
                 <p className="text-xs text-muted-foreground">
                   Resolução gerada por IA — pode conter imprecisões.
                 </p>
               ) : null}
+
+              {/* Feedback emoji "O que achou da resolucao?" no fim. Salva
+                  voto em localStorage por question_id; futuro: migrar pra
+                  tabela resolution_feedback quando tiver dashboard admin. */}
+              <ResolutionFeedback questionId={questionId} />
             </div>
           )}
         </TabsContent>
