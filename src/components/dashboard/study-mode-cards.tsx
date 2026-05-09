@@ -1,16 +1,19 @@
 /**
- * Grid de 4 cards grandes coloridos pros principais modos de estudo.
+ * Grid de 2 cards grandes coloridos pros 2 caminhos primários de estudo:
+ * Resolver questões e Simulado. Cada um com cor accent (mesma da sidebar)
+ * + ícone + número motivador + CTA explícito.
  *
- * Resolver questões / Simulado / Trilha / Revisão — cada um com sua cor
- * accent (mesma da sidebar) + ícone + número motivador + CTA explícito.
+ * Trilha e Revisão NÃO entram aqui — vivem só na sidebar. A regra é:
+ * dashboard = entradas ativas pra começar a estudar; sidebar = navegação
+ * geral. Sem duplicação.
  *
  * O card "Resolver questões" tem um botão secundário "Revisar erros" pra
- * filtrar direto questões erradas, sem precisar ir num "Mais ferramentas".
+ * filtrar direto questões erradas.
  *
  * Server component — faz queries pra preencher os números reais.
  */
 import Link from 'next/link';
-import { ArrowRight, Brain, Map as MapIcon, BarChart3, Target } from 'lucide-react';
+import { ArrowRight, BarChart3, Target } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
 import { fetchAll } from '@/lib/supabase/fetch-all';
@@ -27,10 +30,10 @@ interface ModeCardData {
   secondary?: { href: string; label: string };
 }
 
-export async function StudyModeCards({ userId }: { userId: string }) {
+export async function StudyModeCards({ userId: _userId }: { userId: string }) {
   const supabase = await createClient();
 
-  // 1. Total de questões não-anuladas. Pagina pra contornar cap 1000 do PostgREST.
+  // Total de questões não-anuladas. Pagina pra contornar cap 1000 do PostgREST.
   const allQuestions = await fetchAll<{ id: string }>(({ from, to }) =>
     supabase
       .from('questions')
@@ -40,54 +43,6 @@ export async function StudyModeCards({ userId }: { userId: string }) {
       .range(from, to),
   );
   const totalQuestions = allQuestions.length;
-
-  // 2. Trilha: rank atual do user (mais alto desbloqueado).
-  let currentRank = 1;
-  try {
-    type TrilhaRow = { user_completed: boolean; rank_id: string };
-    type TrilhaQuery = {
-      from: (table: string) => {
-        select: (cols: string) => {
-          eq: (
-            col: string,
-            val: string,
-          ) => Promise<{ data: TrilhaRow[] | null }>;
-        };
-      };
-    };
-    const sb = supabase as unknown as TrilhaQuery;
-    const { data } = await sb
-      .from('user_trilha_full')
-      .select('rank_id, user_completed')
-      .eq('user_id', userId);
-    if (data && data.length > 0) {
-      const ranksWithProgress = new Set(
-        data
-          .filter((r) => r.user_completed)
-          .map((r) => parseInt(r.rank_id?.replace(/\D/g, '') || '1', 10))
-          .filter((n) => Number.isFinite(n) && n > 0),
-      );
-      const maxRank = ranksWithProgress.size > 0 ? Math.max(...ranksWithProgress) : 1;
-      currentRank = Math.min(8, Math.max(1, maxRank));
-    }
-  } catch {
-    // tabela pode não existir — fallback pro 1
-  }
-
-  // 3. Revisão: cards due hoje
-  let dueToday = 0;
-  try {
-    const nowIso = new Date().toISOString();
-    type FlashcardCount = { count: number | null };
-    const res = (await supabase
-      .from('flashcard_reviews' as never)
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .lte('due_at', nowIso)) as unknown as FlashcardCount;
-    dueToday = res.count ?? 0;
-  } catch {
-    // tabela pode não existir
-  }
 
   const cards: ModeCardData[] = [
     {
@@ -108,24 +63,6 @@ export async function StudyModeCards({ userId }: { userId: string }) {
       highlight: 'Real',
       caption: 'cronômetro + bônus',
       cta: 'Iniciar simulado',
-    },
-    {
-      href: '/trilha',
-      label: 'Trilha',
-      Icon: MapIcon,
-      accentVar: '--accent-trilha',
-      highlight: `R${currentRank}/8`,
-      caption: 'ranks da jornada',
-      cta: 'Continuar trilha',
-    },
-    {
-      href: '/revisao',
-      label: 'Revisão',
-      Icon: Brain,
-      accentVar: '--accent-chat',
-      highlight: dueToday > 0 ? `${dueToday}` : '✓',
-      caption: dueToday > 0 ? 'cards pra hoje' : 'em dia',
-      cta: dueToday > 0 ? 'Revisar agora' : 'Ver flashcards',
     },
   ];
 
