@@ -11,7 +11,8 @@
  * inteira a virar client.
  */
 import { useState } from 'react';
-import { CheckCircle2, Target } from 'lucide-react';
+import Link from 'next/link';
+import { BarChart3, Target } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { StudyModeSheet } from './study-mode-sheet';
 
@@ -39,6 +40,10 @@ export function ResolverQuestoesCard({
           backgroundColor: 'hsl(var(--accent-quiz) / 0.04)',
         }}
       >
+        {/* Click target principal: abre o bottom-sheet com modos de estudo.
+            Stats ficam FORA do button pra que o icone "ver estatisticas"
+            possa ser um <Link> proprio (HTML invalido pra <a> dentro de
+            <button>). */}
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
@@ -72,48 +77,6 @@ export function ResolverQuestoesCard({
             </span>
           </div>
 
-          {/* Stats inline — % acerto + barra de progresso. Visivel
-              direto no card sem precisar ir pra /estatisticas. */}
-          {totalAnswered > 0 && accuracyPct !== null ? (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  <strong className="text-foreground tabular-nums">
-                    {totalAnswered}
-                  </strong>{' '}
-                  respondidas
-                </span>
-                <span
-                  className="font-semibold tabular-nums"
-                  style={{ color: 'hsl(var(--accent-quiz))' }}
-                >
-                  {accuracyPct}% acerto
-                </span>
-              </div>
-              <div
-                role="progressbar"
-                aria-valuenow={accuracyPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label={`Taxa de acerto: ${accuracyPct}%`}
-                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-              >
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${accuracyPct}%`,
-                    backgroundColor: 'hsl(var(--accent-quiz))',
-                  }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground">
-              Você ainda não respondeu nenhuma questão
-            </div>
-          )}
-
           <span
             className="mt-auto inline-flex items-center self-start rounded-full px-3 py-1 text-xs font-semibold"
             style={{
@@ -124,6 +87,43 @@ export function ResolverQuestoesCard({
             Treinar
           </span>
         </button>
+
+        {/* Stats line — fora do button. So mostra % de acerto e icone
+            clicavel pra ir em /estatisticas (substitui o item "Estatisticas"
+            removido da sidebar). */}
+        {totalAnswered > 0 && accuracyPct !== null ? (
+          <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-2">
+            <span className="text-sm">
+              <strong
+                className="font-bold tabular-nums"
+                style={{ color: 'hsl(var(--accent-quiz))' }}
+              >
+                {accuracyPct}%
+              </strong>{' '}
+              <span className="text-muted-foreground">de acerto</span>
+            </span>
+            <Link
+              href="/estatisticas"
+              aria-label="Ver estatísticas detalhadas"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <BarChart3 className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-2">
+            <span className="text-xs text-muted-foreground">
+              Você ainda não respondeu nenhuma questão
+            </span>
+            <Link
+              href="/estatisticas"
+              aria-label="Ver estatísticas detalhadas"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <BarChart3 className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+        )}
       </Card>
 
       <StudyModeSheet

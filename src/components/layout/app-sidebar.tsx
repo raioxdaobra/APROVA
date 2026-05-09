@@ -81,13 +81,9 @@ const ITEMS: NavItem[] = [
     match: (p) => p === '/ranking' || p.startsWith('/ranking/'),
     accentVar: '--accent-ranking',
   },
-  {
-    href: '/estatisticas',
-    label: 'Estatísticas',
-    Icon: BarChart3,
-    match: (p) => p === '/estatisticas' || p.startsWith('/estatisticas/'),
-    accentVar: '--accent-chat',
-  },
+  // "Estatísticas" REMOVIDA da sidebar — virou icone clicavel no card
+  // "Resolver questões" do dashboard. Continua acessivel via /estatisticas
+  // direto (link no card + footer do dashboard).
   {
     href: '/admin/usuarios',
     label: 'Admin',
