@@ -74,15 +74,13 @@ export function HeroSection() {
           </form>
         ) : null}
 
-        {/* Link "Ja tenho conta": estava text-sm muted (quase invisivel).
-            Agora text-base font-semibold com cor primary, underline sempre
-            visivel e padding maior pra area de toque mobile. */}
-        <Link
-          href="/login"
-          className="rounded-md px-3 py-2 text-base font-semibold text-primary underline underline-offset-4 transition-colors hover:bg-primary/10 hover:text-primary/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          Já tenho conta — Entrar
-        </Link>
+        {/* "Ja tenho conta - Entrar": agora caixinha bordered estilo botao
+            (era underlined link quase invisivel). User reportou dificuldade
+            pra encontrar a opcao de login. Combinado com o "Entrar" da top
+            nav fixa, login fica ultra-visivel. */}
+        <Button asChild variant="secondary" size="md" className="w-full sm:w-auto">
+          <Link href="/login">Já tenho conta · Entrar</Link>
+        </Button>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">

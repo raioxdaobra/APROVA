@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { BackButton } from '@/components/back-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,9 +30,7 @@ export default function DesignPage() {
   return (
     <main className="container max-w-4xl py-12">
       <div className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">
-          ← Voltar
-        </Link>
+        <BackButton fallbackHref="/" />
         <ThemeToggle />
       </div>
 

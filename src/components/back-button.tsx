@@ -10,16 +10,16 @@
  *   - Se for entrada direta (deep-link, refresh, share), cai pro fallbackHref
  *     (default: /dashboard)
  *
- * Visual: ícone ← + label opcional (só aparece em sm+ pra economizar espaço
- * em mobile). Tap target generoso (h-9 w-9) pra acessibilidade.
+ * Visual: caixinha clicável com texto "Voltar" — sem seta, conforme
+ * preferência do user. Border + bg-card + hover bg-muted pra deixar bem
+ * claro que é clicável. Tap target h-9 (36px), respeitando WCAG.
  */
-import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface BackButtonProps {
   /** Rota fallback se não houver histórico de browser. Default: /dashboard. */
   fallbackHref?: string;
-  /** Texto adicional ao lado do ícone (só aparece em sm+). */
+  /** Texto do botão. Default: "Voltar". */
   label?: string;
   /** Classe extra opcional pra ajustar margens. */
   className?: string;
@@ -27,7 +27,7 @@ interface BackButtonProps {
 
 export function BackButton({
   fallbackHref = '/dashboard',
-  label,
+  label = 'Voltar',
   className,
 }: BackButtonProps) {
   const router = useRouter();
@@ -47,14 +47,13 @@ export function BackButton({
     <button
       type="button"
       onClick={handleClick}
-      aria-label="Voltar"
+      aria-label={label}
       className={[
-        'inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+        'inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         className ?? '',
       ].join(' ')}
     >
-      <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-      {label ? <span className="hidden sm:inline">{label}</span> : null}
+      {label}
     </button>
   );
 }

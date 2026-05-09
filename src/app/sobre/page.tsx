@@ -1,13 +1,11 @@
-import Link from 'next/link';
+import { BackButton } from '@/components/back-button';
 
 export const metadata = { title: 'Sobre — APROVA' };
 
 export default function SobrePage() {
   return (
     <main className="container max-w-2xl py-12">
-      <Link href="/" className="text-sm text-muted-foreground hover:underline">
-        ← Voltar
-      </Link>
+      <BackButton fallbackHref="/" />
       <h1 className="mt-6 text-2xl font-semibold">Sobre o APROVA</h1>
       <p className="mt-4 text-base">
         APROVA é um banco de questões oficiais do vestibular de Medicina da Universidade de Fortaleza

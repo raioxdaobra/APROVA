@@ -11,6 +11,29 @@ import { Button } from '@/components/ui/button';
 export default function HomePage() {
   return (
     <main className="flex flex-col bg-background text-foreground">
+      {/* Top nav fixa: logo + botao "Entrar" sempre visivel. User reportou
+          que o link de login na landing era dificil de encontrar; com nav
+          fixa, "Entrar" aparece logo de cara em qualquer altura da pagina. */}
+      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
+        <div className="container mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <Link
+            href="/"
+            className="text-xl font-semibold tracking-tight text-primary"
+            aria-label="APROVA - página inicial"
+          >
+            APROVA
+          </Link>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/login">Entrar</Link>
+            </Button>
+            <Button asChild variant="primary" size="sm">
+              <Link href="/signup">Começar grátis</Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
       <HeroSection />
       <ShowcaseSection />
       <FeatureCards />

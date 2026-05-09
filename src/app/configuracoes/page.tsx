@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { BackButton } from '@/components/back-button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { createClient } from '@/lib/supabase/server';
@@ -45,16 +46,14 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-2xl items-center justify-between gap-4 px-4 py-6">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            <Link href="/dashboard" className="hover:underline">
-              ← Voltar
-            </Link>
-          </p>
-          <h1 className="text-2xl font-semibold text-foreground">Configurações</h1>
+      <header className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 py-6">
+        <BackButton fallbackHref="/dashboard" className="self-start" />
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-foreground">Configurações</h1>
+          </div>
+          <ThemeToggle />
         </div>
-        <ThemeToggle />
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-10">

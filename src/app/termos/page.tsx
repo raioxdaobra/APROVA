@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
+import { BackButton } from '@/components/back-button';
 
 export const metadata: Metadata = {
   title: 'Termos de Uso — APROVA',
@@ -10,9 +10,7 @@ export const metadata: Metadata = {
 export default function TermosPage() {
   return (
     <main className="mx-auto max-w-2xl p-8">
-      <Link href="/" className="text-sm text-muted-foreground hover:underline">
-        ← Voltar
-      </Link>
+      <BackButton fallbackHref="/" />
       <h1 className="mt-6 text-3xl font-bold">Termos de Uso — APROVA</h1>
       <p className="mb-8 mt-2 text-sm text-muted-foreground">
         Última atualização: 7 de maio de 2026
