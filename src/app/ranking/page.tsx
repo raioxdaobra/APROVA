@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Trophy } from 'lucide-react';
+import { BackButton } from '@/components/back-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { Card } from '@/components/ui/card';
@@ -128,28 +129,25 @@ export default async function RankingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-3xl items-start justify-between gap-4 px-4 py-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-foreground">
-            Ranking de Fortaleza
-          </h1>
-          <p className="text-sm text-muted-foreground">esta semana · top 50</p>
-          <ResetCountdown targetIso={resetIso} />
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
+      <header className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-6">
+        <BackButton fallbackHref="/dashboard" label="Voltar" className="self-start -ml-2" />
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-foreground">
+              Ranking de Fortaleza
+            </h1>
+            <p className="text-sm text-muted-foreground">esta semana · top 50</p>
+            <ResetCountdown targetIso={resetIso} />
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 pb-10">
-        <nav aria-label="Navegação" className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/dashboard"
-            className="rounded border border-border bg-card px-3 py-1.5 hover:bg-muted"
-          >
-            Início
-          </Link>
+        <nav aria-label="Atalhos" className="flex flex-wrap gap-2 text-sm">
           <Link
             href="/estatisticas"
             className="rounded border border-border bg-card px-3 py-1.5 hover:bg-muted"

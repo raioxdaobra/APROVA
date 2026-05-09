@@ -132,7 +132,15 @@ export function AppShell({
         </button>
       )}
 
-      <div className="min-w-0 flex-1">{children}</div>
+      {/* Wrapper de conteúdo. Bottom padding em mobile compensa a altura do
+          <MobileBottomNav> (h-14 = 56px) + safe-area do iPhone. Sem isso,
+          o último elemento da página (botões, links) fica por baixo da nav
+          fixa e não dá pra clicar. Desktop não tem bottom nav, sem padding. */}
+      <div
+        className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] md:pb-0"
+      >
+        {children}
+      </div>
     </div>
   );
 }

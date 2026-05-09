@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { BackButton } from '@/components/back-button';
 import { ShareButton } from '@/components/share-button';
 import {
   DisciplineBarChart,
@@ -284,34 +285,23 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-4xl items-start justify-between gap-4 px-4 py-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-foreground">Estatísticas</h1>
-          <p className="text-sm text-muted-foreground">
-            Seu progresso, semana a semana e por disciplina.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
+      <header className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-6">
+        <BackButton fallbackHref="/dashboard" label="Voltar" className="self-start -ml-2" />
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-foreground">Estatísticas</h1>
+            <p className="text-sm text-muted-foreground">
+              Seu progresso, semana a semana e por disciplina.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pb-10">
-        <nav aria-label="Navegação" className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/dashboard"
-            className="rounded border border-border bg-card px-3 py-1.5 hover:bg-muted"
-          >
-            Início
-          </Link>
-          <Link
-            href="/ranking"
-            className="rounded border border-border bg-card px-3 py-1.5 hover:bg-muted"
-          >
-            Ranking semanal
-          </Link>
-        </nav>
 
         {/* Big stats — inspirado no respostaCerta. Em vez de 6 cards
             pequenos uniformes, 4 cards grandes com emoji + numero

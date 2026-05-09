@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/back-button';
 import { DailyMissionsCard } from '@/components/daily-missions-card';
 import { createClient } from '@/lib/supabase/server';
 
@@ -28,6 +27,8 @@ export default async function MissoesPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
+      <BackButton fallbackHref="/dashboard" label="Voltar" className="self-start -ml-2" />
+
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-foreground">Missões diárias</h1>
         <p className="text-sm text-muted-foreground">
@@ -36,12 +37,6 @@ export default async function MissoesPage() {
       </header>
 
       <DailyMissionsCard />
-
-      <div className="flex justify-end">
-        <Button asChild variant="secondary">
-          <Link href="/dashboard">Voltar ao dashboard</Link>
-        </Button>
-      </div>
     </main>
   );
 }

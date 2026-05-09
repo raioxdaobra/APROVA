@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { BackButton } from '@/components/back-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { QuestionResultExpander } from '@/components/question-result-expander';
@@ -186,6 +187,7 @@ export default async function ResultadoPage({
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-4 px-4 py-6">
+      <BackButton fallbackHref="/simulado" label="Voltar pra simulados" className="self-start -ml-2" />
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-foreground">
           Resultado do simulado
