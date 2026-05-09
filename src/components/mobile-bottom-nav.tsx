@@ -1,8 +1,34 @@
 'use client';
 
+/**
+ * Bottom nav GLOBAL — visivel em mobile E desktop em todas as rotas
+ * autenticadas. Substitui a sidebar lateral (removida do AppShell)
+ * conforme pedido do user "excluir o menu lateral".
+ *
+ * Itens: Início, Trilha, Revisão, Missões, Jogos, Configurações.
+ *
+ * Estatísticas e Ranking NÃO aparecem aqui — viraram icones grandes
+ * coloridos no card "Resolver questões" do dashboard. Regra: o que esta
+ * no card nao duplica na barra horizontal.
+ *
+ * Comportamento:
+ * - Esconde em rotas publicas (/, /login, /signup, /sobre, etc)
+ * - Esconde em /inicio (selecao de prova, tela limpa)
+ * - Esconde em rotas imersivas (sessao ativa de quiz/simulado, jogo)
+ *
+ * Mantido o nome "MobileBottomNav" pra evitar churn em imports — apesar
+ * de agora aparecer tambem no desktop. Pode ser renomeado depois.
+ */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Brain, Gamepad2, Home, Map as MapIcon, User } from 'lucide-react';
+import {
+  Brain,
+  Gamepad2,
+  Home,
+  ListChecks,
+  Map as MapIcon,
+  Settings,
+} from 'lucide-react';
 
 interface NavItem {
   href: string;
@@ -36,6 +62,13 @@ const ITEMS: NavItem[] = [
     accentVar: '--accent-chat',
   },
   {
+    href: '/missoes',
+    label: 'Missões',
+    Icon: ListChecks,
+    match: (p) => p === '/missoes' || p.startsWith('/missoes/'),
+    accentVar: '--primary',
+  },
+  {
     href: '/jogos',
     label: 'Jogos',
     Icon: Gamepad2,
@@ -44,8 +77,8 @@ const ITEMS: NavItem[] = [
   },
   {
     href: '/configuracoes',
-    label: 'Perfil',
-    Icon: User,
+    label: 'Config.',
+    Icon: Settings,
     match: (p) => p === '/configuracoes' || p.startsWith('/configuracoes/'),
     accentVar: '--neutral-500',
   },
@@ -59,8 +92,8 @@ const PUBLIC_ROUTES = new Set<string>([
   '/privacidade',
   '/termos',
   '/instalar',
-  // /inicio é a tela "limpa" de seleção de prova — sem sidebar nem
-  // bottom nav, pra não distrair da decisão.
+  // /inicio é a tela "limpa" de seleção de prova — sem nav nem
+  // sidebar, pra não distrair da decisão.
   '/inicio',
 ]);
 
@@ -77,7 +110,7 @@ function isPublicRoute(pathname: string): boolean {
 
 /**
  * Rotas "imersivas" — sessões ativas onde a barra atrapalha (cobre teclado
- * virtual no Wordle, esconde Alternativa E e botão Próxima no quiz, etc).
+ * virtual no Wordle, esconde alternativa E e botão Próxima no quiz, etc).
  * O `/jogos` (lobby) continua mostrando; só `/jogos/<gameId>/...` esconde.
  */
 function isImmersiveRoute(pathname: string): boolean {
@@ -95,10 +128,12 @@ export function MobileBottomNav(): JSX.Element | null {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur md:hidden"
+      // SEM "md:hidden" — agora aparece em mobile e desktop. Substitui
+      // a sidebar lateral que foi removida.
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto grid max-w-screen-sm grid-cols-5">
+      <ul className="mx-auto grid max-w-2xl grid-cols-6">
         {ITEMS.map(({ href, label, Icon, match, accentVar }) => {
           const active = match(pathname);
           return (

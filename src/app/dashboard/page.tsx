@@ -8,7 +8,6 @@ import { PomodoroRestModal } from '@/components/pomodoro-rest-modal';
 import { HeroGreeting } from '@/components/dashboard/hero-greeting';
 import { ContinueSessionCard } from '@/components/dashboard/continue-session-card';
 import { StudyModeCards } from '@/components/dashboard/study-mode-cards';
-import { DashboardQuickNav } from '@/components/dashboard/quick-nav';
 import { TopBarStats } from '@/components/dashboard/top-bar-stats';
 import { createClient } from '@/lib/supabase/server';
 
@@ -243,11 +242,6 @@ export default async function DashboardPage() {
               : `Faltam ${-weeklyDiff} ${-weeklyDiff === 1 ? 'questão' : 'questões'} pra bater sua meta semanal.`}
           </p>
         </Card>
-
-        {/* Barra horizontal de navegacao com icones — replicando os itens
-            da sidebar pra acesso rapido sem precisar abrir o menu lateral.
-            User pediu pra ter no fim do dashboard. */}
-        <DashboardQuickNav />
       </main>
 
       <footer className="mx-auto flex w-full max-w-2xl items-center justify-center gap-4 px-4 pb-6 text-xs text-muted-foreground">

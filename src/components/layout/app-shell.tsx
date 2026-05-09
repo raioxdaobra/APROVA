@@ -1,11 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+/**
+ * AppShell pos-remocao da sidebar.
+ *
+ * User pediu pra "excluir o menu lateral" — agora navegacao e feita via
+ * <MobileBottomNav> (que apesar do nome historico, aparece em mobile e
+ * desktop) + cards do dashboard com icones (Estatisticas + Ranking).
+ *
+ * Este componente preserva apenas o wrapper de padding pra que o conteudo
+ * de cada pagina nao fique escondido pela bottom nav fixa.
+ */
 import { usePathname } from 'next/navigation';
-import { Menu, X } from 'lucide-react';
-import { AppSidebar } from '@/components/layout/app-sidebar';
-import { useSidebarState } from '@/lib/hooks/use-sidebar-state';
-import { cn } from '@/lib/utils';
 
 const PUBLIC_PREFIXES = new Set([
   '/',
@@ -34,113 +39,24 @@ function isPublicRoute(pathname: string): boolean {
 
 export function AppShell({
   children,
-  isAdmin,
 }: {
   children: React.ReactNode;
-  isAdmin: boolean;
+  /** Mantido na assinatura pra compat com layout.tsx (passa isAdmin),
+   *  mas nao usado mais — sidebar foi removida. */
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname() ?? '/';
-  const { collapsed, toggle, hydrated } = useSidebarState();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Fecha drawer ao navegar
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [pathname]);
-
-  // Trava scroll do body quando drawer aberto em mobile
-  useEffect(() => {
-    if (drawerOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [drawerOpen]);
-
-  // ESC fecha drawer
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerOpen(false);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [drawerOpen]);
 
   if (isPublicRoute(pathname)) {
     return <>{children}</>;
   }
 
+  // Sem sidebar — bottom nav (MobileBottomNav) e a unica navegacao em
+  // mobile e desktop. Wrapper de padding garante que o conteudo do fim
+  // de cada pagina nao fique sob a barra fixa.
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar desktop (md+) */}
-      <div className="sticky top-0 hidden h-screen shrink-0 md:block">
-        <AppSidebar
-          collapsed={hydrated ? collapsed : false}
-          onToggle={toggle}
-          isAdmin={isAdmin}
-          variant="desktop"
-        />
-      </div>
-
-      {/* Drawer mobile */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <button
-            type="button"
-            aria-label="Fechar menu"
-            onClick={() => setDrawerOpen(false)}
-            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
-          />
-          <div className="absolute inset-y-0 left-0 h-full motion-safe:animate-[drawer-slide_220ms_ease-out]">
-            <AppSidebar
-              collapsed={false}
-              onToggle={() => undefined}
-              onNavigate={() => setDrawerOpen(false)}
-              isAdmin={isAdmin}
-              variant="drawer"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Botão hambúrguer flutuante mobile (só aparece em rotas autenticadas) */}
-      <button
-        type="button"
-        onClick={() => setDrawerOpen(true)}
-        aria-label="Abrir menu"
-        className={cn(
-          'fixed left-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-md md:hidden',
-          drawerOpen && 'hidden',
-        )}
-        style={{ top: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
-      >
-        <Menu className="h-5 w-5" aria-hidden="true" />
-      </button>
-
-      {/* Botão de fechar dentro do drawer (header float) */}
-      {drawerOpen && (
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(false)}
-          aria-label="Fechar menu"
-          className="fixed right-3 top-3 z-50 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-md md:hidden"
-          style={{ top: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
-        >
-          <X className="h-5 w-5" aria-hidden="true" />
-        </button>
-      )}
-
-      {/* Wrapper de conteúdo. Bottom padding em mobile compensa a altura do
-          <MobileBottomNav> (h-14 = 56px) + safe-area do iPhone. Sem isso,
-          o último elemento da página (botões, links) fica por baixo da nav
-          fixa e não dá pra clicar. Desktop não tem bottom nav, sem padding. */}
-      <div
-        className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] md:pb-0"
-      >
-        {children}
-      </div>
+    <div className="min-h-screen pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)]">
+      {children}
     </div>
   );
 }

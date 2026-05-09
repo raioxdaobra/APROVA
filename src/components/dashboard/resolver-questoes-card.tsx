@@ -12,7 +12,7 @@
  */
 import { useState } from 'react';
 import Link from 'next/link';
-import { BarChart3, Target } from 'lucide-react';
+import { BarChart3, Target, Trophy } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { StudyModeSheet } from './study-mode-sheet';
 
@@ -88,11 +88,13 @@ export function ResolverQuestoesCard({
           </span>
         </button>
 
-        {/* Stats line — fora do button. So mostra % de acerto e icone
-            clicavel pra ir em /estatisticas (substitui o item "Estatisticas"
-            removido da sidebar). */}
-        {totalAnswered > 0 && accuracyPct !== null ? (
-          <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-2">
+        {/* Stats line — fora do button. Mostra % de acerto + 2 icones
+            grandes coloridos (Estatisticas + Ranking) que substituem
+            esses itens da sidebar. Icones h-12 w-12 com background SOLIDO
+            da cor accent + icone branco — bem visiveis e harmoniosos
+            com o card. */}
+        <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-3">
+          {totalAnswered > 0 && accuracyPct !== null ? (
             <span className="text-sm">
               <strong
                 className="font-bold tabular-nums"
@@ -102,36 +104,38 @@ export function ResolverQuestoesCard({
               </strong>{' '}
               <span className="text-muted-foreground">de acerto</span>
             </span>
-            <Link
-              href="/estatisticas"
-              aria-label="Ver estatísticas detalhadas"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              style={{
-                backgroundColor: 'hsl(var(--accent-quiz) / 0.16)',
-                color: 'hsl(var(--accent-quiz))',
-              }}
-            >
-              <BarChart3 className="h-5 w-5" aria-hidden="true" />
-            </Link>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-2">
+          ) : (
             <span className="text-xs text-muted-foreground">
-              Você ainda não respondeu nenhuma questão
+              Sem questões respondidas ainda
             </span>
+          )}
+          <div className="flex items-center gap-2">
             <Link
               href="/estatisticas"
               aria-label="Ver estatísticas detalhadas"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              title="Estatísticas"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{
-                backgroundColor: 'hsl(var(--accent-quiz) / 0.16)',
-                color: 'hsl(var(--accent-quiz))',
+                backgroundColor: 'hsl(var(--accent-quiz))',
+                color: 'white',
               }}
             >
-              <BarChart3 className="h-5 w-5" aria-hidden="true" />
+              <BarChart3 className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
+            </Link>
+            <Link
+              href="/ranking"
+              aria-label="Ver ranking semanal"
+              title="Ranking"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              style={{
+                backgroundColor: 'hsl(var(--accent-ranking))',
+                color: 'white',
+              }}
+            >
+              <Trophy className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
             </Link>
           </div>
-        )}
+        </div>
       </Card>
 
       <StudyModeSheet
