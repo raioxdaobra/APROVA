@@ -59,6 +59,9 @@ const PUBLIC_ROUTES = new Set<string>([
   '/privacidade',
   '/termos',
   '/instalar',
+  // /inicio é a tela "limpa" de seleção de prova — sem sidebar nem
+  // bottom nav, pra não distrair da decisão.
+  '/inicio',
 ]);
 
 function isPublicRoute(pathname: string): boolean {
@@ -68,6 +71,7 @@ function isPublicRoute(pathname: string): boolean {
   if (pathname.startsWith('/onboarding')) return true;
   if (pathname.startsWith('/aguardando-aprovacao')) return true;
   if (pathname.startsWith('/conta-bloqueada')) return true;
+  if (pathname.startsWith('/inicio/')) return true;
   return false;
 }
 

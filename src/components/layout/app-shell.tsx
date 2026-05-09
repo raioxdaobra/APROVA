@@ -18,9 +18,18 @@ const PUBLIC_PREFIXES = new Set([
 
 const PUBLIC_DYNAMIC = ['/auth', '/onboarding', '/aguardando-aprovacao', '/conta-bloqueada'];
 
+// Rotas autenticadas que NÃO mostram sidebar. Hoje só /inicio: tela de
+// seleção de prova fica "limpa", sem distração de menu lateral. Sidebar
+// volta a aparecer assim que o user clica num card e cai no /dashboard.
+const NO_SIDEBAR_ROUTES = ['/inicio'];
+
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_PREFIXES.has(pathname)) return true;
-  return PUBLIC_DYNAMIC.some((p) => pathname.startsWith(p));
+  if (PUBLIC_DYNAMIC.some((p) => pathname.startsWith(p))) return true;
+  if (NO_SIDEBAR_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return true;
+  }
+  return false;
 }
 
 export function AppShell({
