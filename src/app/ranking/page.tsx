@@ -56,6 +56,61 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('pt-BR').format(value);
 }
 
+/**
+ * Codinomes animais pra anonimizar usuarios no ranking. User pediu pra
+ * nao identificar concorrentes — pontuacoes ficam visiveis (compete
+ * funciona) mas sem expor quem e quem.
+ *
+ * 30 animais brasileiros/universais associados a virtudes de estudo
+ * (foco, resistencia, esperteza, paciencia). Alfa mantida estavel via
+ * hash determinístico do username — mesmo user sempre vê mesmo codinome.
+ */
+const CODINOMES_ANIMAIS = [
+  'Águia',
+  'Falcão',
+  'Coruja',
+  'Tigre',
+  'Leão',
+  'Pantera',
+  'Lobo',
+  'Lince',
+  'Tubarão',
+  'Orca',
+  'Cervo',
+  'Raposa',
+  'Elefante',
+  'Tartaruga',
+  'Beija-flor',
+  'Touro',
+  'Urso',
+  'Onça',
+  'Capivara',
+  'Tatu',
+  'Jaguar',
+  'Tucano',
+  'Boto',
+  'Polvo',
+  'Pinguim',
+  'Golfinho',
+  'Pavão',
+  'Camaleão',
+  'Andorinha',
+  'Falcão-peregrino',
+];
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function codinomeFor(username: string): string {
+  const idx = hashString(username) % CODINOMES_ANIMAIS.length;
+  return CODINOMES_ANIMAIS[idx] ?? 'Vestibulando';
+}
+
 function PositionCell({ position }: { position: number }) {
   if (position <= 3) {
     const colors: Record<number, string> = {
@@ -214,6 +269,11 @@ export default async function RankingPage() {
               <tbody>
                 {top50Rows.map((row) => {
                   const isMe = row.username === username;
+                  // Anonimiza concorrentes via codinome animal estavel.
+                  // Self continua vendo o proprio nome + badge "você".
+                  const displayLabel = isMe
+                    ? row.display_name
+                    : codinomeFor(row.username);
                   return (
                     <tr
                       key={`${row.username}-${row.position}`}
@@ -226,7 +286,7 @@ export default async function RankingPage() {
                         <PositionCell position={row.position} />
                       </td>
                       <td className="px-4 py-2.5 font-medium text-foreground">
-                        {row.display_name}
+                        {displayLabel}
                         {isMe ? (
                           <span className="ml-2 text-xs font-normal text-primary">
                             você
