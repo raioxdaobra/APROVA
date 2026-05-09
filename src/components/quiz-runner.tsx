@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DidYouKnowTip } from '@/components/did-you-know-tip';
 import { HelpPanel, type HelpPanelHandle } from '@/components/help-panel';
-import { HighlightableText } from '@/components/highlightable-text';
 import { Lightbulb } from 'lucide-react';
 import { DifficultyChip } from '@/components/difficulty-chip';
 import { PomodoroTimer } from '@/components/pomodoro-timer';
@@ -499,8 +498,12 @@ export function QuizRunner({
     </div>
   );
 
+  // Footer reorganizado: stack vertical SEMPRE (estrela em cima, navegacao
+  // embaixo) — porque no desktop o body column fica estreito (~40% da tela)
+  // e o sm:flex-row de antes brigava com o pouco espaço, gerando os botoes
+  // espremidos da v anterior. Agora tudo respira em qualquer largura.
   const footerSlot = (
-    <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-t border-border pt-4">
       <button
         type="button"
         onClick={handleToggleReview}
@@ -512,28 +515,27 @@ export function QuizRunner({
         )}
       >
         <span aria-hidden>{currentMarked ? '★' : '☆'}</span>
-        {currentMarked ? 'Marcada para revisar' : 'Marcar p/ revisar depois'}
+        {currentMarked ? 'Marcada para revisar' : 'Marcar p/ revisar'}
       </button>
 
-      <div className="flex gap-2 sm:gap-3">
+      <div className="flex items-stretch gap-2">
         <Button
           type="button"
           variant="secondary"
           size="md"
           onClick={handlePrev}
           disabled={isFirst}
+          className="flex-1"
         >
           Anterior
         </Button>
-        {/* "Proxima"/"Finalizar": maior peso visual no fim do flow.
-            size="lg" + min-w-[10rem] pra ficar marcante mesmo no mobile,
-            inspirado no botao "Continuar" do respostaCerta. */}
+        {/* "Proxima"/"Finalizar": maior peso visual no fim do flow. */}
         <Button
           type="button"
           size="lg"
           onClick={handleNext}
           disabled={finishing}
-          className="min-w-[8rem] flex-1 sm:flex-none sm:min-w-[10rem]"
+          className="flex-[2]"
         >
           {isLast ? (finishing ? 'Finalizando…' : 'Finalizar') : 'Próxima'}
         </Button>
@@ -554,17 +556,10 @@ export function QuizRunner({
         />
       ) : null}
 
-      {/* Enunciado em texto com marca-texto (Passo 1). So renderiza onde
-          questions.description estiver populada — a maioria das questões
-          atuais ainda depende da imagem escaneada (image_url). Apos OCR
-          (Passo 2 do plano), todas teriam description e o componente
-          aparece sempre. */}
-      {current.description && current.description.trim().length > 0 ? (
-        <HighlightableText
-          text={current.description}
-          questionId={current.id}
-        />
-      ) : null}
+      {/* Enunciado em texto + marca-texto removidos a pedido do user.
+          A questao e exibida via imagem escaneada (image_url) — quando
+          nao houver imagem, o fallback no imageSlot mostra o description
+          em formato simples. */}
 
       {alternativesSlot}
 

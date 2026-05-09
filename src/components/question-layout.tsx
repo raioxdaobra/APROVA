@@ -102,7 +102,12 @@ export function QuestionLayout({
   const wrapperClass = useMemo(
     () =>
       cn(
-        'grid w-full gap-4 lg:gap-6 lg:grid-cols-[3fr_2fr]',
+        // Desktop: 1:1 split entre imagem e body. Antes era 3fr_2fr que deixava
+        // o body column muito estreito (~40% da tela), espremendo as alternativas
+        // e o footer Anterior/Proxima. Agora 1fr_1fr da espaco igual pros dois.
+        // xl+: 5fr_4fr — em telas largas (>1280px) a imagem cresce um pouco mais
+        // pra aproveitar espaco, mas o body ainda tem folga (~44%).
+        'grid w-full gap-4 lg:gap-6 lg:grid-cols-[1fr_1fr] xl:grid-cols-[5fr_4fr]',
         // No fullscreen, ocupa viewport inteiro com scroll vertical.
         fullscreen
           ? 'fixed inset-0 z-50 h-screen w-screen overflow-auto bg-background p-4 lg:p-6'

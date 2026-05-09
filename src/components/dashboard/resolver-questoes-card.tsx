@@ -11,8 +11,7 @@
  * inteira a virar client.
  */
 import { useState } from 'react';
-import Link from 'next/link';
-import { BarChart3, Brain, Target, Trophy } from 'lucide-react';
+import { Target } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { StudyModeSheet } from './study-mode-sheet';
 
@@ -88,13 +87,12 @@ export function ResolverQuestoesCard({
           </span>
         </button>
 
-        {/* Stats line — fora do button. Mostra % de acerto + 2 icones
-            grandes coloridos (Estatisticas + Ranking) que substituem
-            esses itens da sidebar. Icones h-12 w-12 com background SOLIDO
-            da cor accent + icone branco — bem visiveis e harmoniosos
-            com o card. */}
-        <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-3">
-          {totalAnswered > 0 && accuracyPct !== null ? (
+        {/* Stats line — apenas % de acerto. Icones de Estatisticas/Ranking/
+            Revisao foram movidos pra barra horizontal acima do card (em
+            <StudyModeCards>) por decisao do user: unificar atalhos numa
+            barra so e nao duplicar icones por card. */}
+        {totalAnswered > 0 && accuracyPct !== null ? (
+          <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-3">
             <span className="text-sm">
               <strong
                 className="font-bold tabular-nums"
@@ -104,54 +102,8 @@ export function ResolverQuestoesCard({
               </strong>{' '}
               <span className="text-muted-foreground">de acerto</span>
             </span>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              Sem questões respondidas ainda
-            </span>
-          )}
-          {/* Icones agora carregam ?context=quiz pra que as paginas
-              destino mostrem dados FILTRADOS so do quiz/revisao/review
-              (sem misturar simulado). Importante pro user saber em qual
-              modo errou mais. */}
-          <div className="flex items-center gap-2">
-            <Link
-              href="/estatisticas?context=quiz"
-              aria-label="Ver estatísticas de quiz"
-              title="Estatísticas (quiz)"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              style={{
-                backgroundColor: 'hsl(var(--accent-quiz))',
-                color: 'white',
-              }}
-            >
-              <BarChart3 className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
-            </Link>
-            <Link
-              href="/ranking?context=quiz"
-              aria-label="Ver ranking semanal de quiz"
-              title="Ranking (quiz)"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              style={{
-                backgroundColor: 'hsl(var(--accent-ranking))',
-                color: 'white',
-              }}
-            >
-              <Trophy className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
-            </Link>
-            <Link
-              href="/revisar-erros?context=quiz"
-              aria-label="Revisar erros de quiz"
-              title="Revisar erros (quiz)"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              style={{
-                backgroundColor: 'hsl(var(--accent-chat))',
-                color: 'white',
-              }}
-            >
-              <Brain className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
-            </Link>
           </div>
-        </div>
+        ) : null}
       </Card>
 
       <StudyModeSheet

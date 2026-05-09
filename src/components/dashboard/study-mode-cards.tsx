@@ -6,9 +6,18 @@
  * % acerto SO de quiz/revisao (sem simulado); Simulado mostra # de
  * simulados feitos + % acerto SO em context='simulado'.
  *
+ * Acima dos cards renderizamos uma "barra de atalhos" horizontal alinhada
+ * a direita com 3 icones: Estatisticas, Ranking, Revisao. Antes esses
+ * icones viviam DENTRO de cada card e levavam pra paginas filtradas por
+ * contexto (?context=quiz | ?context=simulado). User pediu pra unificar:
+ * agora um clique vai pra pagina compilada (sem filtro), com dados de
+ * todas as modalidades juntas.
+ *
  * Server component — faz queries pra preencher os numeros reais e passa
  * pros componentes via props.
  */
+import Link from 'next/link';
+import { BarChart3, Brain, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { fetchAll } from '@/lib/supabase/fetch-all';
 import { ResolverQuestoesCard } from './resolver-questoes-card';
@@ -62,19 +71,64 @@ export async function StudyModeCards({ userId }: { userId: string }) {
   const simuladosFeitos = simuladoCountRes.count ?? 0;
 
   return (
-    <section
-      aria-label="Modos de estudo"
-      className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-    >
-      <ResolverQuestoesCard
-        totalQuestions={totalQuestions}
-        totalAnswered={quizAnswered}
-        accuracyPct={quizAccuracyPct}
-      />
-      <SimuladoCard
-        simuladosFeitos={simuladosFeitos}
-        simuladoAccuracyPct={simuladoAccuracyPct}
-      />
+    <section aria-label="Modos de estudo" className="flex flex-col gap-3">
+      {/* Barra de atalhos horizontal — alinhada a direita, acima do
+          primeiro card. Compila stats de TODAS as modalidades (sem filtro
+          de contexto). 3 icones grandes coloridos pra acesso rapido a
+          Estatisticas, Ranking e Revisao. */}
+      <div
+        aria-label="Atalhos"
+        className="flex items-center justify-end gap-2"
+      >
+        <Link
+          href="/estatisticas"
+          aria-label="Ver estatísticas"
+          title="Estatísticas"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          style={{
+            backgroundColor: 'hsl(var(--accent-quiz))',
+            color: 'white',
+          }}
+        >
+          <BarChart3 className="h-5 w-5" aria-hidden="true" strokeWidth={2.25} />
+        </Link>
+        <Link
+          href="/ranking"
+          aria-label="Ver ranking"
+          title="Ranking"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          style={{
+            backgroundColor: 'hsl(var(--accent-ranking))',
+            color: 'white',
+          }}
+        >
+          <Trophy className="h-5 w-5" aria-hidden="true" strokeWidth={2.25} />
+        </Link>
+        <Link
+          href="/revisar-erros"
+          aria-label="Revisar erros"
+          title="Revisar erros"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          style={{
+            backgroundColor: 'hsl(var(--accent-chat))',
+            color: 'white',
+          }}
+        >
+          <Brain className="h-5 w-5" aria-hidden="true" strokeWidth={2.25} />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ResolverQuestoesCard
+          totalQuestions={totalQuestions}
+          totalAnswered={quizAnswered}
+          accuracyPct={quizAccuracyPct}
+        />
+        <SimuladoCard
+          simuladosFeitos={simuladosFeitos}
+          simuladoAccuracyPct={simuladoAccuracyPct}
+        />
+      </div>
     </section>
   );
 }
