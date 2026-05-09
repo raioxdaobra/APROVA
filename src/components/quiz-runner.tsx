@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DidYouKnowTip } from '@/components/did-you-know-tip';
@@ -119,6 +120,12 @@ export function QuizRunner({
   );
   const helpPanelRef = useRef<HelpPanelHandle | null>(null);
 
+  // Draft selection — estado da letra clicada pelo user ANTES de confirmar.
+  // Inspirado no respostaCerta: click numa alternativa apenas seleciona;
+  // submissao só rola ao clicar "Responder questão". Permite trocar de
+  // ideia sem ter que aceitar a resposta de cara. Reset ao trocar de questão.
+  const [selectedDraft, setSelectedDraft] = useState<AnswerLetter | null>(null);
+
   const startedAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
@@ -132,9 +139,10 @@ export function QuizRunner({
     }
   }, [questions]);
 
-  // Reset cronômetro ao trocar de questão
+  // Reset cronômetro + draft ao trocar de questão
   useEffect(() => {
     startedAtRef.current = Date.now();
+    setSelectedDraft(null);
     if (questions[currentIndex]) {
       track('question_viewed', {
         question_id: questions[currentIndex].id,
@@ -171,13 +179,22 @@ export function QuizRunner({
   const handleNextRef = useRef<() => void>(() => {});
   const handlePrevRef = useRef<() => void>(() => {});
 
+  // Atalhos de teclado:
+  //   A-E: seleciona a alternativa (igual ao click — fica como draft)
+  //   Enter: se ja respondeu, vai pra proxima; se ainda nao, confirma
+  //          a alternativa selecionada
+  //   Espaco: igual Enter
+  //   ArrowLeft/Right: navega entre questoes
+  const handleSelectRef = useRef<(letter: AnswerLetter) => void>(() => {});
+  const handleConfirmRef = useRef<() => void>(() => {});
+
   const shortcuts = useMemo(
     () => ({
-      a: () => handleAnswerRef.current('A'),
-      b: () => handleAnswerRef.current('B'),
-      c: () => handleAnswerRef.current('C'),
-      d: () => handleAnswerRef.current('D'),
-      e: () => handleAnswerRef.current('E'),
+      a: () => handleSelectRef.current('A'),
+      b: () => handleSelectRef.current('B'),
+      c: () => handleSelectRef.current('C'),
+      d: () => handleSelectRef.current('D'),
+      e: () => handleSelectRef.current('E'),
       ArrowLeft: () => handlePrevRef.current(),
       ArrowRight: (e: KeyboardEvent) => {
         e.preventDefault();
@@ -185,11 +202,11 @@ export function QuizRunner({
       },
       ' ': (e: KeyboardEvent) => {
         e.preventDefault();
-        handleNextRef.current();
+        handleConfirmRef.current();
       },
       Enter: (e: KeyboardEvent) => {
         e.preventDefault();
-        handleNextRef.current();
+        handleConfirmRef.current();
       },
     }),
     [],
@@ -364,9 +381,29 @@ export function QuizRunner({
   const showFeedback = currentAnswer.selected !== null && !current.annulled;
   const correctLetter = currentAnswer.correct;
 
+  // handleSelect: click numa alternativa apenas seta o draft (nao submete).
+  // User pode trocar de ideia ate clicar "Responder questão".
+  const handleSelect = (letter: AnswerLetter) => {
+    if (showFeedback || current.annulled || currentAnswer.submitting) return;
+    setSelectedDraft(letter);
+  };
+
+  // handleConfirm: confirma o draft. Se ja respondeu, vai pra proxima.
+  const handleConfirm = () => {
+    if (showFeedback) {
+      handleNext();
+      return;
+    }
+    if (selectedDraft && !current.annulled && !currentAnswer.submitting) {
+      handleAnswer(selectedDraft);
+    }
+  };
+
   // Atualiza refs (declarados antes do early return) com os handlers atuais —
   // assim os atalhos de teclado sempre disparam a versão mais recente.
   handleAnswerRef.current = handleAnswer;
+  handleSelectRef.current = handleSelect;
+  handleConfirmRef.current = handleConfirm;
   handleNextRef.current = handleNext;
   handlePrevRef.current = handlePrev;
 
@@ -398,23 +435,8 @@ export function QuizRunner({
 
   const headerSlot = (
     <header className="flex flex-col gap-2">
-      {/* Linha 1: botao "Sair" + contador de questoes. User pediu pra ter
-          como desistir/voltar a qualquer momento durante a sessao. */}
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => router.push('/quiz')}
-          aria-label="Sair da sessao"
-          className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          Sair
-        </button>
-        <span className="text-xs font-medium text-muted-foreground tabular-nums">
-          {currentIndex + 1} / {total}
-        </span>
-      </div>
-
-      {/* Linha 2: chips de metadados da questao. */}
+      {/* Chips de metadados da questao (disciplina, ano, etc.).
+          Botao "Sair" foi promovido pra um sticky page-level, abaixo. */}
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(
@@ -443,54 +465,89 @@ export function QuizRunner({
     </header>
   );
 
+  // Alternativas como cards com letra em quadrado destacado (estilo
+  // respostaCerta). Click seleciona (draft); user confirma com botao
+  // "Responder questão" abaixo. Permite trocar de ideia antes de confirmar.
   const alternativesSlot = (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
       {ANSWER_LETTERS.map((letter) => {
-          const isSelected = currentAnswer.selected === letter;
-          const isCorrect = correctLetter === letter;
-          let stateClass = '';
-          if (showFeedback) {
-            if (isCorrect) {
-              stateClass = 'border-success bg-success-bg text-success';
-            } else if (isSelected && !isCorrect) {
-              stateClass = 'border-error bg-error-bg text-error';
-            } else {
-              stateClass = 'opacity-60';
-            }
-          }
-          return (
-            <Button
-              key={letter}
-              type="button"
-              variant="secondary"
-              size="lg"
-              disabled={
-                current.annulled ||
-                currentAnswer.submitting ||
-                currentAnswer.selected !== null
-              }
-              onClick={() => handleAnswer(letter)}
+        const isSubmitted = currentAnswer.selected === letter;
+        const isDraft = !showFeedback && selectedDraft === letter;
+        const isCorrect = correctLetter === letter;
+
+        // Classes do CARD inteiro
+        let cardClass = 'border-border bg-background';
+        if (showFeedback) {
+          if (isCorrect) cardClass = 'border-success/60 bg-success-bg/30';
+          else if (isSubmitted && !isCorrect)
+            cardClass = 'border-destructive/60 bg-destructive/5';
+          else cardClass = 'border-border bg-background opacity-60';
+        } else if (isDraft) {
+          cardClass = 'border-primary/60 bg-primary/5 ring-2 ring-primary/30';
+        }
+
+        // Classes do BOX da letra (quadradinho A/B/C/D/E)
+        let letterBoxClass =
+          'border-border bg-card text-foreground';
+        if (showFeedback) {
+          if (isCorrect)
+            letterBoxClass = 'border-success bg-success text-success-foreground';
+          else if (isSubmitted && !isCorrect)
+            letterBoxClass = 'border-destructive bg-destructive text-destructive-foreground';
+        } else if (isDraft) {
+          letterBoxClass = 'border-primary bg-primary text-primary-foreground';
+        }
+
+        return (
+          <button
+            key={letter}
+            type="button"
+            disabled={current.annulled || currentAnswer.submitting || showFeedback}
+            onClick={() => handleSelect(letter)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-all',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+              !showFeedback && !current.annulled && 'hover:-translate-y-0.5 hover:shadow-sm',
+              cardClass,
+            )}
+            aria-pressed={isDraft || isSubmitted}
+          >
+            {/* Letra em quadrado destacado (igual respostaCerta) */}
+            <span
+              aria-hidden="true"
               className={cn(
-                'w-full justify-start text-base transition-colors duration-motion-base',
-                stateClass,
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-md border font-bold transition-colors',
+                letterBoxClass,
               )}
-              aria-pressed={isSelected}
             >
-              <span
-                className={cn(
-                  'mr-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border font-semibold',
-                  showFeedback && isCorrect ? 'border-success text-success' : '',
-                  showFeedback && isSelected && !isCorrect ? 'border-error text-error' : '',
-                )}
-              >
-                {letter}
-              </span>
+              {letter}
+            </span>
+            <span className="text-base font-medium text-foreground">
               Alternativa {letter}
-            </Button>
-          );
-        })}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
+
+  // Botão "Responder questão" — confirma o draft. Verde igual respostaCerta
+  // quando habilitado, cinza quando desabilitado.
+  const respondButtonSlot = !showFeedback && !current.annulled ? (
+    <Button
+      type="button"
+      size="lg"
+      onClick={handleConfirm}
+      disabled={!selectedDraft || currentAnswer.submitting}
+      className="w-full text-base font-semibold"
+    >
+      {currentAnswer.submitting
+        ? 'Enviando…'
+        : selectedDraft
+        ? 'Responder questão'
+        : 'Selecione uma alternativa'}
+    </Button>
+  ) : null;
 
   const footerSlot = (
     <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -548,6 +605,9 @@ export function QuizRunner({
       ) : null}
 
       {alternativesSlot}
+
+      {/* Botão "Responder questão" — só aparece antes de submeter */}
+      {respondButtonSlot}
 
       {current.annulled ? (
         <div className="rounded-lg bg-warning-bg p-3 text-sm text-warning" role="status">
@@ -678,6 +738,26 @@ export function QuizRunner({
 
   return (
     <>
+      {/* Sticky bar fixa no topo — Sair (esquerda) + contador (direita).
+          User pediu pra ter saida bem visivel a qualquer momento durante
+          a sessao. Sticky garante que aparece mesmo quando rola pra baixo
+          do conteudo da questao. */}
+      <div className="sticky top-0 z-30 -mx-4 mb-4 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6">
+        <button
+          type="button"
+          onClick={() => router.push('/quiz')}
+          aria-label="Sair da sessão"
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+          Sair
+        </button>
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          {currentIndex + 1}{' '}
+          <span className="text-muted-foreground">/ {total}</span>
+        </span>
+      </div>
+
       <QuestionLayout
         image={imageSlot}
         body={bodySlot}
