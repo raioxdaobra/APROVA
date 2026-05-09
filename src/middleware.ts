@@ -17,7 +17,12 @@ const PUBLIC_ROUTES = new Set([
 ]);
 const ONBOARDING_PREFIX = '/onboarding';
 const DIAGNOSTIC_ROUTE = '/diagnostico';
-const APP_ROUTE = '/dashboard';
+// Tela inicial do app pós-login. Mudou de /dashboard pra /inicio na Fase 1
+// do projeto multi-vestibular: agora o user cai primeiro nos cards de
+// seleção de prova (Unifor / ENEM / UECE). Click num card ativo (server
+// action setActiveExam) leva pro /dashboard. Spec:
+// docs/superpowers/specs/2026-05-09-multi-vestibular-design.md
+const APP_ROUTE = '/inicio';
 const PENDING_ROUTE = '/aguardando-aprovacao';
 const BLOCKED_ROUTE = '/conta-bloqueada';
 const ADMIN_PREFIX = '/admin';
