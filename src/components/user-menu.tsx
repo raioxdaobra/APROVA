@@ -1,12 +1,10 @@
 'use client';
 
 import { useRef } from 'react';
-import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { logout } from '@/app/dashboard/actions';
@@ -19,9 +17,14 @@ function initialOf(name: string): string {
   return String.fromCodePoint(codePoint).toUpperCase();
 }
 
+/**
+ * UserMenu — dropdown ao clicar no avatar/inicial. User pediu pra deixar
+ * apenas "Sair" aqui, ja que Estatisticas/Ranking/Jogos/Configuracoes
+ * agora vivem nos cards do dashboard e na bottom-nav. Menu fica enxuto:
+ * 1 acao apenas. isAdmin prop mantida na assinatura por compat.
+ */
 export function UserMenu({
   displayName,
-  isAdmin = false,
 }: {
   displayName: string;
   isAdmin?: boolean;
@@ -37,42 +40,10 @@ export function UserMenu({
       >
         {initial}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={6} className="min-w-[12rem]">
-        {isAdmin ? (
-          <>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/usuarios" className="w-full cursor-pointer">
-                Admin
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        <DropdownMenuItem asChild>
-          <Link href="/estatisticas" className="w-full cursor-pointer">
-            Estatísticas
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/jogos" className="w-full cursor-pointer">
-            Jogos
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/ranking" className="w-full cursor-pointer">
-            Ranking
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/configuracoes" className="w-full cursor-pointer">
-            Configurações
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {/* Form fora do Item: o item dispara requestSubmit via onSelect.
-            Aninhar form dentro de Radix.Item com asChild faz o onSelect
-            fechar o menu antes do submit propagar — quebra o logout. */}
+      <DropdownMenuContent align="end" sideOffset={6} className="min-w-[10rem]">
+        {/* Form fora do Item: requestSubmit() via onSelect; aninhar form
+            dentro de Radix.Item com asChild faz o onSelect fechar o menu
+            antes do submit propagar — quebra o logout. */}
         <form ref={logoutFormRef} action={logout} className="hidden" />
         <DropdownMenuItem
           onSelect={(event) => {

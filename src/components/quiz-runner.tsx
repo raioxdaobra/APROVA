@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DidYouKnowTip } from '@/components/did-you-know-tip';
 import { HelpPanel, type HelpPanelHandle } from '@/components/help-panel';
+import { HighlightableText } from '@/components/highlightable-text';
 import { Lightbulb } from 'lucide-react';
 import { DifficultyChip } from '@/components/difficulty-chip';
 import { PomodoroTimer } from '@/components/pomodoro-timer';
@@ -550,6 +551,18 @@ export function QuizRunner({
         <DidYouKnowTip
           id="quiz-keyboard-shortcut"
           text="Pressione A, B, C, D ou E pra responder pelo teclado. ← e → navegam entre questões."
+        />
+      ) : null}
+
+      {/* Enunciado em texto com marca-texto (Passo 1). So renderiza onde
+          questions.description estiver populada — a maioria das questões
+          atuais ainda depende da imagem escaneada (image_url). Apos OCR
+          (Passo 2 do plano), todas teriam description e o componente
+          aparece sempre. */}
+      {current.description && current.description.trim().length > 0 ? (
+        <HighlightableText
+          text={current.description}
+          questionId={current.id}
         />
       ) : null}
 
