@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { KeyboardHintsOverlay } from '@/components/keyboard-hints-overlay';
 import { QuestionLayout } from '@/components/question-layout';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { track } from '@/lib/analytics';
@@ -370,8 +369,6 @@ export function SimuladoRunner({
           }}
         />
       ) : null}
-
-      <KeyboardHintsOverlay />
     </>
   );
 }

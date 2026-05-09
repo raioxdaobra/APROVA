@@ -2,6 +2,22 @@ import Link from 'next/link';
 import { Brain, Share2, Smartphone, Monitor, ArrowRight } from 'lucide-react';
 import QRCode from 'qrcode';
 import { CopyLinkButton } from '@/components/copy-link-button';
+import { ShareWhatsAppButton } from '@/components/share-whatsapp-button';
+
+const INVITE_MESSAGE = `🩺 Achei um app pra estudar pra Medicina Unifor que tá demais.
+
+✅ 1015 questões oficiais (todas as provas, 2015 a 2026)
+✅ Resolução com IA pra cada questão
+✅ Trilha gamificada estilo Duolingo
+✅ Revisão espaçada (Anki) com as questões reais
+✅ Estatísticas pessoais por matéria
+✅ Funciona offline depois de instalar
+
+Sem App Store. Só clicar no link e adicionar à tela inicial:
+
+👉 https://aprova-five.vercel.app/instalar
+
+Tem 7 dias grátis pra testar tudo.`;
 
 export const metadata = {
   title: 'Instalar APROVA — App no celular',
@@ -166,6 +182,17 @@ export default async function InstalarPage() {
             </span>
           </li>
         </ol>
+      </section>
+
+      {/* Compartilhar */}
+      <section className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-5">
+        <h2 className="text-lg font-semibold">Conhece alguém estudando pra Unifor?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manda o link com a mensagem pronta — explicando os diferenciais do app.
+        </p>
+        <div className="mt-4">
+          <ShareWhatsAppButton message={INVITE_MESSAGE} />
+        </div>
       </section>
 
       {/* CTA volta */}

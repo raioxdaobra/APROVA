@@ -265,16 +265,42 @@ function DoneSummary({
     return m;
   }, [results]);
 
+  const total = questions.length;
+  const pct = Math.round((score / Math.max(total, 1)) * 100);
+
+  // Mensagem motivacional baseada no resultado
+  let headline: string;
+  let sub: string;
+  if (score === total) {
+    headline = 'Cinco em cinco! 🔥';
+    sub = 'Você manda bem. Bora continuar pra manter o ritmo nos 1015 questões oficiais.';
+  } else if (score >= Math.ceil(total * 0.6)) {
+    headline = `Mandou bem! ${score} de ${total} acertos.`;
+    sub = 'Você já tem base. Agora é só consistência diária pra refinar onde ainda erra.';
+  } else if (score > 0) {
+    headline = `${score} de ${total} acertos — bom começo!`;
+    sub =
+      'Calma, esse é só o ponto de partida. Cada questão resolvida vai te aproximar da aprovação.';
+  } else {
+    headline = 'Calma, é só o começo.';
+    sub =
+      'Todo mundo começa do zero. Vamos pro app — você tem 7 dias de Trial Pro pra explorar tudo.';
+  }
+
   return (
     <Card className="flex flex-col gap-5 p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-foreground">
-          {score} de {questions.length} acertos
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Esse é seu ponto de partida. Ele não conta XP nem sequência — apenas
-          calibra o que sugerir nos próximos dias.
-        </p>
+      <div className="flex flex-col items-center gap-2 text-center">
+        <span className="text-5xl" aria-hidden="true">
+          {score === total ? '🎉' : score >= Math.ceil(total * 0.6) ? '👏' : '💪'}
+        </span>
+        <h1 className="text-2xl font-semibold text-foreground">{headline}</h1>
+        <p className="text-sm text-muted-foreground">{sub}</p>
+        <div className="mt-2 inline-flex items-baseline gap-2 rounded-full bg-primary/10 px-4 py-1.5">
+          <span className="text-xs uppercase tracking-wide text-primary">
+            Seu desempenho
+          </span>
+          <span className="text-xl font-bold tabular-nums text-primary">{pct}%</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
@@ -306,7 +332,7 @@ function DoneSummary({
       </div>
 
       <Button type="button" size="lg" onClick={onContinue} className="w-full">
-        Ir pro dashboard
+        Continuar pro app →
       </Button>
     </Card>
   );

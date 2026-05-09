@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { HelpPanel } from '@/components/help-panel';
 import { DifficultyChip } from '@/components/difficulty-chip';
-import { KeyboardHintsOverlay } from '@/components/keyboard-hints-overlay';
 import { PomodoroTimer } from '@/components/pomodoro-timer';
 import { QuestionLayout } from '@/components/question-layout';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
@@ -578,7 +577,6 @@ export function QuizRunner({
         onClose={() => setRankUpOpen(false)}
       />
       <PomodoroTimer />
-      <KeyboardHintsOverlay />
     </>
   );
 }
