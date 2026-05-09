@@ -2,12 +2,15 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { Card, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { RankBadge } from '@/components/rank-badge';
-import { DailyMissionsCard } from '@/components/daily-missions-card';
 import { PomodoroRestModal } from '@/components/pomodoro-rest-modal';
+import { HeroGreeting } from '@/components/dashboard/hero-greeting';
+import { ContinueSessionCard } from '@/components/dashboard/continue-session-card';
+import { StudyModeCards } from '@/components/dashboard/study-mode-cards';
+import { MissionsCompact } from '@/components/dashboard/missions-compact';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -17,11 +20,8 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 const TZ = 'America/Fortaleza';
-const DAY_MS = 86_400_000;
 const WEEK_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
-// Retorna a data atual (ano-mes-dia) no fuso de Fortaleza, alinhada à DB
-// (aprova_today). Convertemos a partir do UTC para nao depender do TZ do node.
 function fortalezaToday(): Date {
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: TZ,
@@ -37,8 +37,7 @@ function fortalezaToday(): Date {
 }
 
 function startOfWeek(d: Date): Date {
-  // Postgres date_trunc('week', x) usa segunda-feira como inicio.
-  const day = d.getUTCDay(); // 0=Dom, 1=Seg, ... 6=Sab
+  const day = d.getUTCDay();
   const offset = day === 0 ? -6 : 1 - day;
   const r = new Date(d);
   r.setUTCDate(r.getUTCDate() + offset);
@@ -65,7 +64,6 @@ function buildDailyBuckets(today: Date, attempts: Array<{ created_at: string | n
   }
   for (const a of attempts) {
     if (!a.created_at) continue;
-    // Reduz para o dia local (Fortaleza) para alinhar com aprova_today()
     const fmt = new Intl.DateTimeFormat('en-CA', {
       timeZone: TZ,
       year: 'numeric',
@@ -108,17 +106,18 @@ export default async function DashboardPage() {
     attemptsTodayRes,
     attempts7dRes,
     weeklyXpRes,
-    lastAttemptRes,
-    pendingWrongsRes,
     leaderboardRes,
-    userPosRes,
   ] = await Promise.all([
     supabase
       .from('profiles')
       .select('display_name, username, daily_goal_questions, is_admin')
       .eq('id', user.id)
       .maybeSingle(),
-    supabase.from('streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
+    supabase
+      .from('streaks')
+      .select('current_streak, longest_streak')
+      .eq('user_id', user.id)
+      .maybeSingle(),
     supabase
       .from('attempts')
       .select('id', { count: 'exact', head: true })
@@ -138,30 +137,11 @@ export default async function DashboardPage() {
       .eq('week_start', weekStartIso)
       .maybeSingle(),
     supabase
-      .from('attempts')
-      .select('session_id, context, created_at')
-      .eq('user_id', user.id)
-      .neq('context', 'diagnostic')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('user_question_status')
-      .select('question_id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('status', 'wrong'),
-    supabase
       .from('weekly_leaderboard')
       .select('username, display_name, xp, questions_answered, position')
       .eq('week_start', weekStartIso)
       .order('position', { ascending: true })
       .limit(5),
-    supabase
-      .from('weekly_leaderboard')
-      .select('username, display_name, xp, questions_answered, position')
-      .eq('week_start', weekStartIso)
-      .eq('username', '__placeholder__')
-      .maybeSingle(),
   ]);
 
   const profile = profileRes.data;
@@ -169,15 +149,15 @@ export default async function DashboardPage() {
   const username = profile?.username ?? '';
   const dailyGoal = profile?.daily_goal_questions ?? 20;
   const currentStreak = streakRes.data?.current_streak ?? 0;
+  const longestStreak =
+    (streakRes.data as { longest_streak?: number | null } | null)?.longest_streak ?? 0;
   const attemptsToday = attemptsTodayRes.count ?? 0;
   const attempts7d = attempts7dRes.data ?? [];
   const weeklyAnswered = weeklyXpRes.data?.questions_answered ?? 0;
   const weeklyXpVal = weeklyXpRes.data?.xp ?? 0;
   const weeklyGoal = dailyGoal * 7;
-  const pendingWrongs = pendingWrongsRes.count ?? 0;
 
-  // Posicao do usuario no ranking — buscamos manualmente porque a view aplica
-  // RLS apenas para perfis publicos; usuarios ocultos nao aparecem na view.
+  // Posicao do user no ranking
   let myPosition: number | null = null;
   let myWeeklyXp: number | null = null;
   if (username) {
@@ -190,134 +170,82 @@ export default async function DashboardPage() {
     myPosition = myRow?.position ?? null;
     myWeeklyXp = myRow?.xp ?? null;
   }
-  // userPosRes serve apenas como fallback / typecheck; ignoramos.
-  void userPosRes;
 
   const buckets = buildDailyBuckets(today, attempts7d);
   const maxBarValue = Math.max(dailyGoal, ...buckets.map((b) => b.count), 1);
 
-
-  // CTA principal — sessao recente nas ultimas 24h.
-  const lastAttempt = lastAttemptRes.data;
-  let primaryCta: { label: string; href: string };
-  if (
-    lastAttempt &&
-    lastAttempt.session_id &&
-    lastAttempt.created_at &&
-    Date.now() - new Date(lastAttempt.created_at).getTime() < 24 * 60 * 60 * 1000
-  ) {
-    const ctx = lastAttempt.context;
-    const sid = lastAttempt.session_id;
-    const href =
-      ctx === 'simulado'
-        ? `/simulado/sessao/${sid}`
-        : ctx === 'revisao' || ctx === 'review'
-          ? `/quiz/sessao/${sid}?modo=revisao`
-          : `/quiz/sessao/${sid}`;
-    primaryCta = { label: 'Continuar de onde parou', href };
-  } else {
-    primaryCta = { label: 'Começar a estudar', href: '/quiz' };
-  }
-
-  // Comparacao com meta semanal
   const weeklyDiff = weeklyAnswered - weeklyGoal;
   const weeklyPct = weeklyGoal > 0 ? Math.round((weeklyDiff / weeklyGoal) * 100) : 0;
 
   const leaderboard = leaderboardRes.data ?? [];
   const userInTop5 = leaderboard.some((row) => row.username === username);
 
+  // Heurística pro contexto da frase motivacional
+  const hadHigherStreak = currentStreak === 0 && longestStreak > 3;
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-2xl items-start justify-between gap-4 px-4 py-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold text-foreground">Olá, {displayName}</h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {currentStreak > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-bg px-2.5 py-1 text-xs font-semibold text-warning">
-                <Flame className="h-3.5 w-3.5" aria-hidden="true" />
-                {currentStreak} {currentStreak === 1 ? 'dia seguido' : 'dias seguidos'}
-              </span>
-            ) : (
-              <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                Comece sua sequência hoje
-              </span>
-            )}
-            <p className="text-sm text-muted-foreground">
-              {attemptsToday > 0
-                ? `Hoje você já fez ${attemptsToday} ${attemptsToday === 1 ? 'questão' : 'questões'}`
-                : 'Hoje você ainda não estudou'}
-            </p>
-            <RankBadge xp={weeklyXpVal} />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+      <header className="mx-auto flex w-full max-w-2xl items-start justify-between gap-3 px-4 py-6">
+        <HeroGreeting
+          userId={user.id}
+          displayName={displayName}
+          streakDays={currentStreak}
+          hadHigherStreak={hadHigherStreak}
+          questionsToday={attemptsToday}
+        />
+        <div className="flex shrink-0 items-center gap-2">
           <ThemeToggle />
           <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-10">
-        <Button asChild size="lg" className="w-full">
-          <Link href={primaryCta.href}>{primaryCta.label}</Link>
-        </Button>
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 pb-10">
+        {/* Linha de chips: streak + rank + atividade hoje */}
+        <div className="flex flex-wrap items-center gap-2">
+          {currentStreak > 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-bg px-2.5 py-1 text-xs font-semibold text-warning">
+              <Flame className="h-3.5 w-3.5" aria-hidden="true" />
+              {currentStreak} {currentStreak === 1 ? 'dia seguido' : 'dias seguidos'}
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+              Comece sua sequência hoje
+            </span>
+          )}
+          <RankBadge xp={weeklyXpVal} />
+          <span className="text-xs text-muted-foreground">
+            {attemptsToday > 0
+              ? `Hoje: ${attemptsToday} ${attemptsToday === 1 ? 'questão' : 'questões'}`
+              : 'Hoje você ainda não estudou'}
+          </span>
+        </div>
 
-        <DailyMissionsCard />
+        {/* Continuar de onde parou — condicional: só aparece se houver sessão aberta < 24h */}
+        <ContinueSessionCard userId={user.id} />
 
-        <section aria-label="Modos de estudo" className="-mx-4 px-4">
-          <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0">
-            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
-              <CardTitle className="text-base">Quiz por disciplina</CardTitle>
-              <CardDescription>Escolha a matéria e treine focado.</CardDescription>
-              <Button asChild variant="secondary" size="sm" className="mt-2">
-                <Link href="/quiz?modo=disciplina">Começar</Link>
-              </Button>
-            </Card>
-            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
-              <CardTitle className="text-base">Trilha</CardTitle>
-              <CardDescription>40 estações, 8 ranks. Avance no seu ritmo.</CardDescription>
-              <Button asChild variant="secondary" size="sm" className="mt-2">
-                <Link href="/trilha">Continuar</Link>
-              </Button>
-            </Card>
-            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
-              <CardTitle className="text-base">Revisão (SRS)</CardTitle>
-              <CardDescription>
-                Repetição espaçada com as questões oficiais. Anki para vestibular.
-              </CardDescription>
-              <Button asChild variant="secondary" size="sm" className="mt-2">
-                <Link href="/revisao">Revisar agora</Link>
-              </Button>
-            </Card>
-            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
-              <CardTitle className="text-base">Simulado completo</CardTitle>
-              <CardDescription>Cronômetro, formato real, bônus por tempo.</CardDescription>
-              <Button asChild variant="secondary" size="sm" className="mt-2">
-                <Link href="/simulado">Iniciar</Link>
-              </Button>
-            </Card>
-            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
-              <CardTitle className="text-base">Revisar erros</CardTitle>
-              <CardDescription>
-                {pendingWrongs > 0
-                  ? `${pendingWrongs} ${pendingWrongs === 1 ? 'questão' : 'questões'} para revisar`
-                  : 'Nada pendente. Continue estudando.'}
-              </CardDescription>
-              <Button asChild variant="secondary" size="sm" className="mt-2">
-                <Link href="/quiz?status=wrong">Revisar</Link>
-              </Button>
-            </Card>
-            <Card className="flex min-w-[14rem] shrink-0 flex-col gap-2 sm:min-w-0">
-              <CardTitle className="text-base">Jogos</CardTitle>
-              <CardDescription>
-                10 mini-games. Estude 15 min hoje e desbloqueie.
-              </CardDescription>
-              <Button asChild variant="secondary" size="sm" className="mt-2">
-                <Link href="/jogos">Abrir lobby</Link>
-              </Button>
-            </Card>
-          </div>
-        </section>
+        {/* 4 cards grandes coloridos — modos de estudo principais */}
+        <StudyModeCards userId={user.id} />
 
+        {/* Missões em linha compacta */}
+        <MissionsCompact />
+
+        {/* Mais ferramentas — link sutil em vez de cards grandes */}
+        <p className="text-xs text-muted-foreground">
+          Mais ferramentas:{' '}
+          <Link href="/quiz?status=wrong" className="text-primary hover:underline">
+            Revisar erros
+          </Link>
+          {' · '}
+          <Link href="/jogos" className="text-primary hover:underline">
+            Jogos
+          </Link>
+          {' · '}
+          <Link href="/estatisticas" className="text-primary hover:underline">
+            Estatísticas
+          </Link>
+        </p>
+
+        {/* Progresso semanal — gráfico (mantido) */}
         <Card className="flex flex-col gap-4">
           <div className="flex items-baseline justify-between">
             <CardTitle className="text-base">Progresso da semana</CardTitle>
@@ -325,8 +253,10 @@ export default async function DashboardPage() {
               {weeklyAnswered} / {weeklyGoal}
             </span>
           </div>
-          <div className="relative h-32" aria-label="Questões resolvidas por dia nos últimos 7 dias">
-            {/* Linha tracejada da meta diaria */}
+          <div
+            className="relative h-32"
+            aria-label="Questões resolvidas por dia nos últimos 7 dias"
+          >
             <div
               aria-hidden="true"
               className="absolute inset-x-0 border-t border-dashed border-primary/60"
@@ -334,7 +264,10 @@ export default async function DashboardPage() {
             />
             <div className="flex h-full items-end gap-2">
               {buckets.map((b) => {
-                const heightPct = Math.max((b.count / maxBarValue) * 100, b.count > 0 ? 4 : 0);
+                const heightPct = Math.max(
+                  (b.count / maxBarValue) * 100,
+                  b.count > 0 ? 4 : 0,
+                );
                 return (
                   <div key={b.iso} className="flex flex-1 flex-col items-center gap-1">
                     <div className="flex h-full w-full items-end">
@@ -357,6 +290,7 @@ export default async function DashboardPage() {
           </p>
         </Card>
 
+        {/* Ranking semanal */}
         <Card className="flex flex-col gap-4">
           <div className="flex items-baseline justify-between">
             <CardTitle className="text-base">Ranking semanal</CardTitle>
@@ -365,7 +299,9 @@ export default async function DashboardPage() {
             </Button>
           </div>
           {leaderboard.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Ainda sem ranking nesta semana.</p>
+            <p className="text-sm text-muted-foreground">
+              Ainda sem ranking nesta semana.
+            </p>
           ) : (
             <ol className="flex flex-col gap-2">
               {leaderboard.map((row) => {
