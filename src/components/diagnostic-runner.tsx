@@ -332,7 +332,7 @@ function DoneSummary({
       </div>
 
       <Button type="button" size="lg" onClick={onContinue} className="w-full">
-        Continuar pro app →
+        Continuar pro app
       </Button>
     </Card>
   );

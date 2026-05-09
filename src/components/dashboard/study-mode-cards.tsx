@@ -13,7 +13,7 @@
  * Server component — faz queries pra preencher os números reais.
  */
 import Link from 'next/link';
-import { ArrowRight, BarChart3, Target } from 'lucide-react';
+import { BarChart3, Target } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
 import { fetchAll } from '@/lib/supabase/fetch-all';
@@ -47,7 +47,7 @@ export async function StudyModeCards({ userId: _userId }: { userId: string }) {
   const cards: ModeCardData[] = [
     {
       href: '/quiz',
-      label: 'Resolver questões',
+      label: 'Resolva questões por área de interesse',
       Icon: Target,
       accentVar: '--accent-quiz',
       highlight: `${totalQuestions}q`,
@@ -61,7 +61,7 @@ export async function StudyModeCards({ userId: _userId }: { userId: string }) {
       Icon: BarChart3,
       accentVar: '--accent-simulado',
       highlight: 'Real',
-      caption: 'cronômetro + bônus',
+      caption: 'Preparamos com base no que mais cai',
       cta: 'Iniciar simulado',
     },
   ];
@@ -119,16 +119,16 @@ function ModeCard({
           <span className="text-base font-semibold text-foreground">{label}</span>
           <span className="text-xs text-muted-foreground">{caption}</span>
         </div>
-        {/* CTA explícito — botão visualmente distinto pra ficar claro que dá pra clicar */}
+        {/* CTA explícito — pílula visualmente distinta pra ficar claro que da pra clicar.
+            Sem seta: user pediu visual mais limpo. */}
         <span
-          className="mt-auto inline-flex items-center gap-1 self-start rounded-full px-3 py-1 text-xs font-semibold transition-transform group-hover:translate-x-0.5"
+          className="mt-auto inline-flex items-center self-start rounded-full px-3 py-1 text-xs font-semibold"
           style={{
             backgroundColor: `hsl(var(${accentVar}) / 0.16)`,
             color: `hsl(var(${accentVar}))`,
           }}
         >
           {cta}
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
       </Link>
       {secondary ? (
@@ -136,7 +136,7 @@ function ModeCard({
           href={secondary.href}
           className="self-start text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
         >
-          {secondary.label} →
+          {secondary.label}
         </Link>
       ) : null}
     </Card>

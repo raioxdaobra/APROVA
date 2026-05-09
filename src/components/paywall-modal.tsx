@@ -217,8 +217,8 @@ export function PaywallModal({
                 {isPending
                   ? 'Abrindo checkout...'
                   : selected === 'annual'
-                  ? 'Garantir minha vaga → R$ 119/ano'
-                  : 'Garantir minha vaga → R$ 14,90/mês'}
+                  ? 'Garantir minha vaga · R$ 119/ano'
+                  : 'Garantir minha vaga · R$ 14,90/mês'}
               </Button>
               <button
                 type="button"

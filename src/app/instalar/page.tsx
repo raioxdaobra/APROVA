@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Brain, Share2, Smartphone, Monitor, ArrowRight } from 'lucide-react';
+import { Brain, Share2, Smartphone, Monitor } from 'lucide-react';
 import QRCode from 'qrcode';
 import { CopyLinkButton } from '@/components/copy-link-button';
 import { ShareWhatsAppButton } from '@/components/share-whatsapp-button';
@@ -199,9 +199,8 @@ export default async function InstalarPage() {
       <div className="text-center">
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          className="text-sm font-medium text-primary hover:underline"
         >
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
           Voltar pra página inicial
         </Link>
       </div>

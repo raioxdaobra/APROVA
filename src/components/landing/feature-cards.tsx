@@ -91,7 +91,7 @@ export function FeatureCards() {
                   className="mt-4 inline-flex items-center gap-1 text-sm font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
                   style={{ color: 'hsl(var(--accent))' }}
                 >
-                  Explorar →
+                  Explorar
                 </span>
               </Link>
             </ScrollReveal>

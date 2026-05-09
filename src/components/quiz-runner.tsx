@@ -509,7 +509,7 @@ export function QuizRunner({
           onClick={handleNext}
           disabled={finishing}
         >
-          {isLast ? (finishing ? 'Finalizando…' : 'Finalizar') : 'Próxima →'}
+          {isLast ? (finishing ? 'Finalizando…' : 'Finalizar') : 'Próxima'}
         </Button>
       </div>
     </div>
@@ -575,7 +575,6 @@ export function QuizRunner({
               className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
             >
               Ver resolução
-              <span aria-hidden="true">→</span>
             </button>
             <button
               type="button"

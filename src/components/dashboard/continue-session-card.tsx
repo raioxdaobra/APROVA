@@ -6,7 +6,6 @@
  * só rouba atenção quando faz sentido pro user.
  */
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
 
@@ -81,7 +80,7 @@ export async function ContinueSessionCard({ userId }: { userId: string }) {
   const accent = TYPE_ACCENT[type] ?? '--primary';
 
   return (
-    <Link href={href} className="group block">
+    <Link href={href} className="block">
       <Card
         className="flex items-center gap-3 border-l-4 p-4 transition-colors hover:bg-muted/50"
         style={{ borderLeftColor: `hsl(var(${accent}))` }}
@@ -94,10 +93,6 @@ export async function ContinueSessionCard({ userId }: { userId: string }) {
             {label} · {progress}
           </span>
         </div>
-        <ArrowRight
-          className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
-          aria-hidden="true"
-        />
       </Card>
     </Link>
   );
