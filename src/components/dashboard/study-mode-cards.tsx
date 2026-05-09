@@ -47,11 +47,11 @@ export async function StudyModeCards({ userId: _userId }: { userId: string }) {
   const cards: ModeCardData[] = [
     {
       href: '/quiz',
-      label: 'Resolva questões por área de interesse',
+      label: 'Resolver questões',
       Icon: Target,
       accentVar: '--accent-quiz',
       highlight: `${totalQuestions}q`,
-      caption: 'questões oficiais',
+      caption: 'Resolva questões por área de interesse',
       cta: 'Começar agora',
       secondary: { href: '/quiz?status=wrong', label: 'Revisar erros' },
     },
@@ -61,7 +61,7 @@ export async function StudyModeCards({ userId: _userId }: { userId: string }) {
       Icon: BarChart3,
       accentVar: '--accent-simulado',
       highlight: 'Real',
-      caption: 'Preparamos com base no que mais cai',
+      caption: 'Preparamos um simulado pra você com base no que mais cai',
       cta: 'Iniciar simulado',
     },
   ];
