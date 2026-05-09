@@ -7,18 +7,27 @@
  *
  * É um wrapper client-side que recebe os dados via props (renderizados
  * pelo server component <StudyModeCards>). Isso preserva SSR pros números
- * (totalQuestions) sem forçar a página inteira a virar client.
+ * (totalQuestions, totalAnswered, accuracyPct) sem forçar a página
+ * inteira a virar client.
  */
 import { useState } from 'react';
-import { Target } from 'lucide-react';
+import { CheckCircle2, Target } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { StudyModeSheet } from './study-mode-sheet';
 
 interface Props {
   totalQuestions: number;
+  /** Total de questões já respondidas pelo user (excluindo diagnóstico). */
+  totalAnswered: number;
+  /** % de acerto sobre as respondidas. null se nunca respondeu. */
+  accuracyPct: number | null;
 }
 
-export function ResolverQuestoesCard({ totalQuestions }: Props) {
+export function ResolverQuestoesCard({
+  totalQuestions,
+  totalAnswered,
+  accuracyPct,
+}: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
@@ -62,6 +71,49 @@ export function ResolverQuestoesCard({ totalQuestions }: Props) {
               Resolva questões por área de interesse
             </span>
           </div>
+
+          {/* Stats inline — % acerto + barra de progresso. Visivel
+              direto no card sem precisar ir pra /estatisticas. */}
+          {totalAnswered > 0 && accuracyPct !== null ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  <strong className="text-foreground tabular-nums">
+                    {totalAnswered}
+                  </strong>{' '}
+                  respondidas
+                </span>
+                <span
+                  className="font-semibold tabular-nums"
+                  style={{ color: 'hsl(var(--accent-quiz))' }}
+                >
+                  {accuracyPct}% acerto
+                </span>
+              </div>
+              <div
+                role="progressbar"
+                aria-valuenow={accuracyPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Taxa de acerto: ${accuracyPct}%`}
+                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${accuracyPct}%`,
+                    backgroundColor: 'hsl(var(--accent-quiz))',
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">
+              Você ainda não respondeu nenhuma questão
+            </div>
+          )}
+
           <span
             className="mt-auto inline-flex items-center self-start rounded-full px-3 py-1 text-xs font-semibold"
             style={{
@@ -69,7 +121,7 @@ export function ResolverQuestoesCard({ totalQuestions }: Props) {
               color: 'hsl(var(--accent-quiz))',
             }}
           >
-            Começar agora
+            Treinar
           </span>
         </button>
       </Card>

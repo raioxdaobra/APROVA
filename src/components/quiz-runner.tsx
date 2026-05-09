@@ -397,7 +397,24 @@ export function QuizRunner({
   );
 
   const headerSlot = (
-    <header className="flex flex-wrap items-center justify-between gap-2">
+    <header className="flex flex-col gap-2">
+      {/* Linha 1: botao "Sair" + contador de questoes. User pediu pra ter
+          como desistir/voltar a qualquer momento durante a sessao. */}
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => router.push('/quiz')}
+          aria-label="Sair da sessao"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          Sair
+        </button>
+        <span className="text-xs font-medium text-muted-foreground tabular-nums">
+          {currentIndex + 1} / {total}
+        </span>
+      </div>
+
+      {/* Linha 2: chips de metadados da questao. */}
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(
@@ -423,9 +440,6 @@ export function QuizRunner({
           </span>
         ) : null}
       </div>
-      <span className="text-xs font-medium text-muted-foreground">
-        {currentIndex + 1} / {total}
-      </span>
     </header>
   );
 

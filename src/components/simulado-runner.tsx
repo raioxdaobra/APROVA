@@ -319,9 +319,21 @@ export function SimuladoRunner({
   return (
     <>
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
-        <span className="text-sm font-semibold text-foreground">
-          {currentIndex + 1} <span className="text-muted-foreground">/ {total}</span>
-        </span>
+        {/* Botao Sair com confirm — abandonar simulado perde tempo cronometrado.
+            User pediu pra ter saida visivel; confirm() evita saida acidental. */}
+        <button
+          type="button"
+          onClick={() => {
+            const ok = typeof window !== 'undefined'
+              ? window.confirm('Sair do simulado? O tempo decorrido continua contando.')
+              : true;
+            if (ok) router.push('/simulado');
+          }}
+          aria-label="Sair do simulado"
+          className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          Sair
+        </button>
         <span
           className={cn(
             'font-mono text-2xl font-semibold tabular-nums',
@@ -332,8 +344,8 @@ export function SimuladoRunner({
         >
           {formatMmSs(remainingSec)}
         </span>
-        <span className="text-xs text-muted-foreground">
-          {answeredCount} resp.
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {currentIndex + 1}/{total} · {answeredCount} resp.
         </span>
       </header>
 
