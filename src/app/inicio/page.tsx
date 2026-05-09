@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
 import { createClient } from '@/lib/supabase/server';
+import { fetchAll } from '@/lib/supabase/fetch-all';
 import { setActiveExam } from './actions';
 
 export const metadata = {
@@ -34,6 +35,18 @@ export default async function InicioPage() {
     .eq('id', user.id)
     .maybeSingle();
   const displayName = profile?.display_name ?? profile?.username ?? 'estudante';
+
+  // Total de questões da Unifor (única prova ativa). Pagina pra contornar
+  // o cap de 1000 do PostgREST.
+  const uniforQuestions = await fetchAll<{ id: string }>(({ from, to }) =>
+    supabase
+      .from('questions')
+      .select('id')
+      .eq('exam', 'unifor-medicina')
+      .eq('annulled', false)
+      .range(from, to),
+  );
+  const uniforCount = uniforQuestions.length;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -67,7 +80,7 @@ export default async function InicioPage() {
             <button
               type="submit"
               className="group block w-full text-left"
-              aria-label="Estudar Vestibular Medicina Unifor"
+              aria-label={`Estudar Vestibular Medicina Unifor — ${uniforCount} questões`}
             >
               <Card
                 className="flex h-full flex-col gap-3 border-l-4 p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
@@ -97,8 +110,14 @@ export default async function InicioPage() {
                   <span className="text-base font-semibold text-foreground">
                     Vestibular Medicina Unifor
                   </span>
+                  <span
+                    className="text-sm font-semibold tabular-nums"
+                    style={{ color: 'hsl(var(--accent-quiz))' }}
+                  >
+                    {uniforCount} questões oficiais
+                  </span>
                   <span className="text-xs text-muted-foreground">
-                    Questões oficiais, simulados, trilha gamificada e revisão com IA.
+                    Simulados, trilha gamificada e revisão com IA.
                   </span>
                 </div>
                 <span
