@@ -108,6 +108,20 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
   const tabParam = Array.isArray(tabParamRaw) ? tabParamRaw[0] : tabParamRaw;
   const initialTab: 'visao' | 'fracos' = tabParam === 'fracos' ? 'fracos' : 'visao';
 
+  // Filtro de contexto via query param. 'quiz' agrega quiz/revisao/review;
+  // 'simulado' so context='simulado'; sem param mostra tudo (exceto
+  // diagnostico). User pediu pra ter stats por card no dashboard.
+  const contextParamRaw = searchParams?.context;
+  const contextParam = Array.isArray(contextParamRaw)
+    ? contextParamRaw[0]
+    : contextParamRaw;
+  const contextFilter: 'quiz' | 'simulado' | null =
+    contextParam === 'quiz'
+      ? 'quiz'
+      : contextParam === 'simulado'
+        ? 'simulado'
+        : null;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -178,12 +192,20 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
   const username = profile?.username ?? null;
   const displayName = profile?.display_name ?? username ?? 'estudante';
 
-  const attempts: AttemptRow[] = (attemptsAll ?? []).map((a) => ({
+  // Aplica filtro de contexto se vier do card especifico. Para "quiz"
+  // inclui quiz/revisao/review (tudo que nao e simulado nem diagnostic).
+  const allAttempts: AttemptRow[] = (attemptsAll ?? []).map((a) => ({
     is_correct: a.is_correct,
     context: a.context,
     created_at: a.created_at,
     question_id: a.question_id,
   }));
+  const attempts: AttemptRow[] = allAttempts.filter((a) => {
+    if (a.context === 'diagnostic') return false;
+    if (contextFilter === 'simulado') return a.context === 'simulado';
+    if (contextFilter === 'quiz') return a.context !== 'simulado';
+    return true; // sem filtro
+  });
 
   const totalCorrect = attempts.filter(
     (a) => a.context !== 'diagnostic' && a.is_correct === true,
@@ -283,13 +305,27 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
     };
   });
 
+  // Label do contexto pra mostrar na header
+  const contextSuffix =
+    contextFilter === 'quiz'
+      ? ' · Quiz'
+      : contextFilter === 'simulado'
+        ? ' · Simulado'
+        : '';
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-4xl items-start justify-between gap-4 px-4 py-6">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-foreground">Estatísticas</h1>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Estatísticas{contextSuffix}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Seu progresso, semana a semana e por disciplina.
+            {contextFilter === 'simulado'
+              ? 'Apenas tentativas em simulado.'
+              : contextFilter === 'quiz'
+                ? 'Apenas tentativas em quiz e revisão.'
+                : 'Seu progresso, semana a semana e por disciplina.'}
           </p>
         </div>
         <div className="flex items-center gap-2">

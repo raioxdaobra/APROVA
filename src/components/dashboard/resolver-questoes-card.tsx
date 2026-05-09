@@ -109,11 +109,15 @@ export function ResolverQuestoesCard({
               Sem questões respondidas ainda
             </span>
           )}
+          {/* Icones agora carregam ?context=quiz pra que as paginas
+              destino mostrem dados FILTRADOS so do quiz/revisao/review
+              (sem misturar simulado). Importante pro user saber em qual
+              modo errou mais. */}
           <div className="flex items-center gap-2">
             <Link
-              href="/estatisticas"
-              aria-label="Ver estatísticas detalhadas"
-              title="Estatísticas"
+              href="/estatisticas?context=quiz"
+              aria-label="Ver estatísticas de quiz"
+              title="Estatísticas (quiz)"
               className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{
                 backgroundColor: 'hsl(var(--accent-quiz))',
@@ -123,9 +127,9 @@ export function ResolverQuestoesCard({
               <BarChart3 className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
             </Link>
             <Link
-              href="/ranking"
-              aria-label="Ver ranking semanal"
-              title="Ranking"
+              href="/ranking?context=quiz"
+              aria-label="Ver ranking semanal de quiz"
+              title="Ranking (quiz)"
               className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{
                 backgroundColor: 'hsl(var(--accent-ranking))',
@@ -135,9 +139,9 @@ export function ResolverQuestoesCard({
               <Trophy className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
             </Link>
             <Link
-              href="/revisao"
-              aria-label="Ir pra revisão (flashcards)"
-              title="Revisão"
+              href="/revisar-erros?context=quiz"
+              aria-label="Revisar erros de quiz"
+              title="Revisar erros (quiz)"
               className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{
                 backgroundColor: 'hsl(var(--accent-chat))',

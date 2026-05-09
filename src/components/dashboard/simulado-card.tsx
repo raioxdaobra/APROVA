@@ -92,11 +92,14 @@ export function SimuladoCard({ simuladosFeitos, simuladoAccuracyPct }: Props) {
             Você ainda não fez nenhum simulado
           </span>
         )}
+        {/* Icones com ?context=simulado pra mostrar dados FILTRADOS so
+            de tentativas em context='simulado'. Permite ao user comparar
+            seu desempenho em simulado vs quiz separadamente. */}
         <div className="flex items-center gap-2">
           <Link
-            href="/estatisticas"
-            aria-label="Ver estatísticas detalhadas"
-            title="Estatísticas"
+            href="/estatisticas?context=simulado"
+            aria-label="Ver estatísticas de simulado"
+            title="Estatísticas (simulado)"
             className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             style={{
               backgroundColor: 'hsl(var(--accent-quiz))',
@@ -106,9 +109,9 @@ export function SimuladoCard({ simuladosFeitos, simuladoAccuracyPct }: Props) {
             <BarChart3 className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
           </Link>
           <Link
-            href="/ranking"
-            aria-label="Ver ranking semanal"
-            title="Ranking"
+            href="/ranking?context=simulado"
+            aria-label="Ver ranking semanal de simulado"
+            title="Ranking (simulado)"
             className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             style={{
               backgroundColor: 'hsl(var(--accent-ranking))',
@@ -118,9 +121,9 @@ export function SimuladoCard({ simuladosFeitos, simuladoAccuracyPct }: Props) {
             <Trophy className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
           </Link>
           <Link
-            href="/revisao"
-            aria-label="Ir pra revisão (flashcards)"
-            title="Revisão"
+            href="/revisar-erros?context=simulado"
+            aria-label="Revisar erros de simulado"
+            title="Revisar erros (simulado)"
             className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             style={{
               backgroundColor: 'hsl(var(--accent-chat))',

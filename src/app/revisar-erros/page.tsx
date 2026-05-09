@@ -49,27 +49,50 @@ interface QuestionRow {
  * a sessão de revisão. Inspirada no padrão respostaCerta + nos cards
  * coloridos do APROVA.
  *
+ * Suporta `?context=quiz` ou `?context=simulado` pra filtrar so erros
+ * daquele modo de estudo. Default (sem param): todos os contextos
+ * exceto diagnostico.
+ *
  * Fluxo:
  *   1. Mostra big number de erros + breakdown por disciplina
  *   2. CTA "Começar revisão" leva pra /quiz?status=wrong (que ja cria
  *      session com filtro wrong e redireciona)
- *
- * User pediu: ambiente intuitivo e leve com estatística do erro.
  */
-export default async function RevisarErrosPage() {
+interface PageProps {
+  searchParams?: { context?: string };
+}
+
+export default async function RevisarErrosPage({ searchParams }: PageProps) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/');
 
+  // Filtro de contexto via query param. Aceita 'quiz' (= quiz/revisao/review)
+  // ou 'simulado'. Outros valores ignorados.
+  const contextFilter: 'quiz' | 'simulado' | null =
+    searchParams?.context === 'quiz'
+      ? 'quiz'
+      : searchParams?.context === 'simulado'
+        ? 'simulado'
+        : null;
+
   // 1. Tentativas do user (excluindo diagnostico). Pegamos latest por
   //    question_id pra contar so questoes UNICAS erradas (nao toda tentativa).
-  const { data: attempts } = await supabase
+  let attemptsQuery = supabase
     .from('attempts')
     .select('question_id, is_correct, created_at, context')
     .eq('user_id', user.id)
     .neq('context', 'diagnostic');
+
+  if (contextFilter === 'simulado') {
+    attemptsQuery = attemptsQuery.eq('context', 'simulado');
+  } else if (contextFilter === 'quiz') {
+    attemptsQuery = attemptsQuery.neq('context', 'simulado');
+  }
+
+  const { data: attempts } = await attemptsQuery;
 
   const latestByQuestion = new Map<string, AttemptRow>();
   for (const a of (attempts ?? []) as AttemptRow[]) {
@@ -115,27 +138,57 @@ export default async function RevisarErrosPage() {
     .map(([discipline, count]) => ({ discipline, count }))
     .sort((a, b) => b.count - a.count);
 
+  // Label do contexto pra header da pagina.
+  const contextLabel =
+    contextFilter === 'quiz'
+      ? 'do quiz'
+      : contextFilter === 'simulado'
+        ? 'do simulado'
+        : '';
+
+  // Quando vier de um card especifico, o CTA deve preservar o contexto
+  // pra que a sessao criada use o filtro certo (status=wrong ja cobre,
+  // o context filter aqui e so visual/estatistico, nao precisa chegar
+  // ate /quiz?status=wrong — pode-se adicionar no futuro se quiser
+  // sessao filtrada por contexto tambem).
+
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
-      <header className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex h-10 w-10 items-center justify-center rounded-lg shadow-sm"
-            style={{
-              backgroundColor: 'hsl(var(--success))',
-              color: 'white',
-            }}
-            aria-hidden="true"
-          >
-            <RotateCw className="h-5 w-5" strokeWidth={2.25} />
+    <>
+      {/* Sticky bar com Sair — user pediu pra ter saida visivel ao
+          desistir de revisar. Padrao igual ao do quiz-runner. */}
+      <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur">
+        <BackButton fallbackHref="/dashboard" label="Sair" />
+        {contextFilter ? (
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {contextFilter === 'simulado' ? 'Simulado' : 'Quiz'}
           </span>
-          <h1 className="text-2xl font-semibold text-foreground">Revisar erros</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Volte nas questões que você errou pra fortalecer o conteúdo. Cada
-          questão aparece só uma vez (a tentativa mais recente conta).
-        </p>
-      </header>
+        ) : null}
+      </div>
+      <main className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
+        <header className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-lg shadow-sm"
+              style={{
+                backgroundColor: 'hsl(var(--success))',
+                color: 'white',
+              }}
+              aria-hidden="true"
+            >
+              <RotateCw className="h-5 w-5" strokeWidth={2.25} />
+            </span>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Revisar erros{contextLabel ? ` ${contextLabel}` : ''}
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {contextFilter
+              ? `Mostrando apenas erros ${contextLabel} — `
+              : ''}
+            Volte nas questões que você errou pra fortalecer o conteúdo. Cada
+            questão aparece só uma vez (a tentativa mais recente conta).
+          </p>
+        </header>
 
       {totalWrong === 0 ? (
         <Card className="flex flex-col items-center gap-3 py-10 text-center">
@@ -245,7 +298,8 @@ export default async function RevisarErrosPage() {
         </>
       )}
 
-      <BackButton fallbackHref="/dashboard" className="self-start" />
-    </main>
+        <BackButton fallbackHref="/dashboard" className="self-start" />
+      </main>
+    </>
   );
 }
