@@ -28,6 +28,13 @@ interface HeadingStyle {
 function getHeadingStyle(text: string): HeadingStyle {
   const t = text.toLowerCase();
   // Ordem importa: matches mais específicos primeiro.
+  if (
+    t.includes('análise das alternativas') ||
+    t.includes('analise das alternativas') ||
+    t.includes('alternativas')
+  ) {
+    return { emoji: '📋', color: '#8b5cf6' }; // roxo — analise por alternativa
+  }
   if (t.includes('abordagem') || t.includes('estratégia') || t.includes('estrategia')) {
     return { emoji: '🤔', color: '#f59e0b' }; // amarelo
   }
@@ -44,7 +51,7 @@ function getHeadingStyle(text: string): HeadingStyle {
     return { emoji: '✅', color: '#10b981' }; // verde
   }
   if (t.includes('passo') || t.includes('etapa')) {
-    return { emoji: '📌', color: '#8b5cf6' }; // roxo
+    return { emoji: '📌', color: '#0ea5e9' }; // azul claro (passos)
   }
   if (t.includes('atenç') || t.includes('cuidado') || t.includes('observ')) {
     return { emoji: '⚠️', color: '#ef4444' }; // vermelho

@@ -105,9 +105,13 @@ export function ResolverQuestoesCard({
             <Link
               href="/estatisticas"
               aria-label="Ver estatísticas detalhadas"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              style={{
+                backgroundColor: 'hsl(var(--accent-quiz) / 0.16)',
+                color: 'hsl(var(--accent-quiz))',
+              }}
             >
-              <BarChart3 className="h-4 w-4" aria-hidden="true" />
+              <BarChart3 className="h-5 w-5" aria-hidden="true" />
             </Link>
           </div>
         ) : (
@@ -118,9 +122,13 @@ export function ResolverQuestoesCard({
             <Link
               href="/estatisticas"
               aria-label="Ver estatísticas detalhadas"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              style={{
+                backgroundColor: 'hsl(var(--accent-quiz) / 0.16)',
+                color: 'hsl(var(--accent-quiz))',
+              }}
             >
-              <BarChart3 className="h-4 w-4" aria-hidden="true" />
+              <BarChart3 className="h-5 w-5" aria-hidden="true" />
             </Link>
           </div>
         )}

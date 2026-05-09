@@ -52,14 +52,46 @@ interface GenerationResult {
 
 function buildPrompt(q: QuestionRow): string {
   const letter = q.correct_answer ?? 'A';
+  // Prompt estruturado em 3 secoes (Abordagem / Resolucao / Analise das
+  // alternativas). O <SolutionMarkdown> renderiza headers H2 com emoji +
+  // linha colorida automatic-amente (ex: 🤔 Abordagem em amarelo,
+  // ➡️ Resolucao em azul). User pediu (opcao γ) que resolucoes novas
+  // explicassem cada alternativa correta/erradas — e e isso que a secao
+  // "## Análise das alternativas" cobre.
   return [
-    'Você é um professor universitário. Resolva esta questão de vestibular Unifor Medicina,',
-    'mostrando o raciocínio passo a passo. A resposta CORRETA é a alternativa ' + letter + '.',
-    'Sua resolução DEVE convergir para esta alternativa. Use Markdown e LaTeX KaTeX para',
-    'fórmulas. Cite fontes confiáveis quando aplicável.',
+    'Você é um professor universitário. Resolva esta questão de vestibular',
+    'Unifor Medicina mostrando o raciocínio passo a passo. A resposta CORRETA',
+    'é a alternativa ' + letter + '. Sua resolução DEVE convergir para esta',
+    'alternativa. Use Markdown e LaTeX KaTeX para fórmulas. Cite fontes',
+    'confiáveis quando aplicável.',
     '',
     'Disciplina: ' + q.discipline,
     'Subtópico: ' + q.subtopic,
+    '',
+    'ESTRUTURA OBRIGATÓRIA (use exatamente esses headers H2):',
+    '',
+    '## Abordagem',
+    'Em 2-4 frases, explique qual conceito cobrado e qual estratégia usar.',
+    'Foque na "ideia" — sem cálculos ainda.',
+    '',
+    '## Resolução',
+    'Passo a passo do raciocínio até chegar na alternativa correta.',
+    'Use sub-headers `### Passo 1`, `### Passo 2` etc. quando o problema',
+    'tiver mais de uma etapa. Use blocos $$...$$ pra equações.',
+    '',
+    '## Análise das alternativas',
+    'Liste as 5 alternativas (A, B, C, D, E) — uma linha por alternativa,',
+    'em formato de lista markdown:',
+    '',
+    '- **A)** breve descrição da alternativa — Errada porque [motivo conciso].',
+    '- **B)** breve descrição — Errada porque [motivo conciso].',
+    '- **' + letter + ')** descrição da alternativa — **CORRETA**: [motivo].',
+    '- **D)** breve descrição — Errada porque [motivo conciso].',
+    '- **E)** breve descrição — Errada porque [motivo conciso].',
+    '',
+    '(Substitua A/B/C/D/E na ordem real e marque a correta com **CORRETA**.',
+    'Os motivos das erradas devem ser pedagogicamente úteis — apontem o',
+    'erro conceitual ou de cálculo, não só "está errado".)',
     '',
     'OBRIGATÓRIO: termine com a frase EXATA:',
     '"Portanto, a alternativa correta é a letra ' + letter + '."',
