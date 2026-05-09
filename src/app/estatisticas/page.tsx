@@ -5,12 +5,6 @@ import {
   DisciplineBarChart,
   type DisciplineRow,
 } from '@/components/stats/discipline-bar-chart';
-import { TopicMapMatrix } from '@/components/topic-map-matrix';
-import {
-  buildDisciplineProgress,
-  type DisciplineProgress,
-  type DisciplineTopicNode,
-} from '@/lib/stats/topic-frequency';
 import {
   WeeklyXpChart,
   type WeeklyXpPoint,
@@ -21,7 +15,6 @@ import { Card } from '@/components/ui/card';
 import { WeakPointsView } from '@/components/stats/weak-points-view';
 import { createClient } from '@/lib/supabase/server';
 import { fetchAll } from '@/lib/supabase/fetch-all';
-import { slugify } from '@/lib/slug';
 import { fetchWeakPoints } from '@/lib/stats/weak-points';
 import type { Discipline } from '@/lib/supabase/types';
 import { DeleteAllDialog } from './_components/delete-all-dialog';
@@ -32,15 +25,6 @@ export const metadata = {
 };
 
 export const dynamic = 'force-dynamic';
-
-const DISCIPLINE_LABEL: Record<Discipline, string> = {
-  matematica: 'Matemática',
-  fisica: 'Física',
-  quimica: 'Química',
-  biologia: 'Biologia',
-  humanas: 'Humanas',
-  linguagens: 'Linguagens',
-};
 
 const DISCIPLINES: Discipline[] = [
   'matematica',
@@ -60,22 +44,8 @@ interface AttemptRow {
   question_id: string;
 }
 
-interface QuestionRow {
-  id: string;
-  discipline: string;
-  subtopic: string;
-  subtopic_short: string;
-  annulled: boolean | null;
-  exam: string;
-}
-
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('pt-BR').format(value);
-}
-
-function formatPercent(numerator: number, denominator: number): string {
-  if (denominator === 0) return '—';
-  return `${Math.round((numerator / denominator) * 100)}%`;
 }
 
 /**
@@ -156,7 +126,6 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
     { data: attemptsAll },
     { data: attemptsRecent },
     { data: questionsAll },
-    { data: masteryRows },
     { data: leaderboardRows },
   ] = await Promise.all([
     supabase
@@ -184,18 +153,16 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
       .neq('context', 'diagnostic')
       .gt('created_at', twelveWeeksAgoIso),
     // Pagina pra contornar cap 1000 do PostgREST (1015+ rows elegíveis).
-    fetchAll<{ id: string; discipline: string; subtopic: string; subtopic_short: string; annulled: boolean | null; exam: string }>(
+    // Usado APENAS pelo grafico "Acerto por disciplina" — nao precisa
+    // de subtopic/subtopic_short depois que removemos a tabela detalhada.
+    fetchAll<{ id: string; discipline: string; annulled: boolean | null }>(
       ({ from, to }) =>
         supabase
           .from('questions')
-          .select('id, discipline, subtopic, subtopic_short, annulled, exam')
+          .select('id, discipline, annulled')
           .eq('exam', 'unifor-medicina')
           .range(from, to),
     ).then((data) => ({ data, error: null })),
-    supabase
-      .from('subtopic_mastery')
-      .select('discipline, subtopic')
-      .eq('user_id', user.id),
     supabase
       .from('weekly_leaderboard')
       .select('username, position, week_start')
@@ -269,23 +236,17 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
     };
   });
 
-  // Tabela por disciplina
-  const allQuestions: QuestionRow[] = (questionsAll ?? []).filter((q) => !q.annulled);
+  // Para "resolvidas" e "% acerto" por disciplina, considere a tentativa
+  // mais recente por questão do usuario (excluindo diagnostic).
+  const allQuestions = (questionsAll ?? []).filter((q) => !q.annulled);
   const totalsByDiscipline = new Map<string, number>();
-  const totalsBySubtopic = new Map<string, { discipline: string; total: number; subtopic_short: string }>();
   for (const q of allQuestions) {
     totalsByDiscipline.set(q.discipline, (totalsByDiscipline.get(q.discipline) ?? 0) + 1);
-    const key = `${q.discipline}::${q.subtopic}`;
-    const existing = totalsBySubtopic.get(key);
-    if (existing) existing.total += 1;
-    else totalsBySubtopic.set(key, { discipline: q.discipline, total: 1, subtopic_short: q.subtopic_short });
   }
 
-  const questionsById = new Map<string, QuestionRow>();
-  for (const q of allQuestions) questionsById.set(q.id, q);
+  const questionDisciplineById = new Map<string, string>();
+  for (const q of allQuestions) questionDisciplineById.set(q.id, q.discipline);
 
-  // Para "resolvidas" e "% acerto" por disciplina/subtópico, considere a tentativa mais recente
-  // por questão do usuário (excluindo diagnostic).
   const latestAttemptByQuestion = new Map<string, AttemptRow>();
   for (const a of attempts) {
     if (a.context === 'diagnostic') continue;
@@ -300,56 +261,13 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
   }
 
   const resolvedByDiscipline = new Map<string, { total: number; correct: number }>();
-  const resolvedBySubtopic = new Map<string, { total: number; correct: number }>();
-
   for (const [questionId, attempt] of latestAttemptByQuestion) {
-    const q = questionsById.get(questionId);
-    if (!q) continue;
-    const dKey = q.discipline;
-    const sKey = `${q.discipline}::${q.subtopic}`;
-    const dRow = resolvedByDiscipline.get(dKey) ?? { total: 0, correct: 0 };
+    const discipline = questionDisciplineById.get(questionId);
+    if (!discipline) continue;
+    const dRow = resolvedByDiscipline.get(discipline) ?? { total: 0, correct: 0 };
     dRow.total += 1;
     if (attempt.is_correct === true) dRow.correct += 1;
-    resolvedByDiscipline.set(dKey, dRow);
-
-    const sRow = resolvedBySubtopic.get(sKey) ?? { total: 0, correct: 0 };
-    sRow.total += 1;
-    if (attempt.is_correct === true) sRow.correct += 1;
-    resolvedBySubtopic.set(sKey, sRow);
-  }
-
-  const masterySet = new Set(
-    (masteryRows ?? []).map((m) => `${m.discipline}::${m.subtopic}`),
-  );
-
-  // Agrupar subtopicos por disciplina para a tabela detalhada
-  const subtopicsByDiscipline = new Map<
-    string,
-    Array<{
-      subtopic: string;
-      subtopic_short: string;
-      total: number;
-      resolved: number;
-      correct: number;
-      mastered: boolean;
-    }>
-  >();
-  for (const [key, value] of totalsBySubtopic) {
-    const [discipline, subtopic] = key.split('::') as [string, string];
-    const resolved = resolvedBySubtopic.get(key) ?? { total: 0, correct: 0 };
-    const list = subtopicsByDiscipline.get(discipline) ?? [];
-    list.push({
-      subtopic,
-      subtopic_short: value.subtopic_short,
-      total: value.total,
-      resolved: resolved.total,
-      correct: resolved.correct,
-      mastered: masterySet.has(key),
-    });
-    subtopicsByDiscipline.set(discipline, list);
-  }
-  for (const list of subtopicsByDiscipline.values()) {
-    list.sort((a, b) => a.subtopic_short.localeCompare(b.subtopic_short, 'pt-BR'));
+    resolvedByDiscipline.set(discipline, dRow);
   }
 
   // Linha de dados pro gráfico de barras por disciplina
@@ -363,25 +281,6 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
       correct: resolved.correct,
     };
   });
-
-  // Mapa de tópicos: top por disciplina (a partir de TODAS as questões disponíveis,
-  // não apenas as resolvidas pelo usuário — mostra o que a banca cobra mais).
-  const topicMatrixData: DisciplineTopicNode[] = DISCIPLINES.map((d) => {
-    const list = subtopicsByDiscipline.get(d) ?? [];
-    const topics = list
-      .map((s) => ({ topic: s.subtopic_short || s.subtopic, count: s.total }))
-      .sort((a, b) => b.count - a.count);
-    const count = topics.reduce((acc, t) => acc + t.count, 0);
-    return { discipline: d, count, topics };
-  });
-
-  // Progresso pessoal por disciplina pra mini-barra do card.
-  const progressByDiscipline: Record<string, DisciplineProgress> = {};
-  for (const d of DISCIPLINES) {
-    const total = totalsByDiscipline.get(d) ?? 0;
-    const resolved = resolvedByDiscipline.get(d) ?? { total: 0, correct: 0 };
-    progressByDiscipline[d] = buildDisciplineProgress(total, resolved.total, resolved.correct);
-  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -527,170 +426,17 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
           </Card>
         </section>
 
-        {/* Mapa de tópicos — cards equivalentes com selo MAIS CAI */}
-        <section aria-labelledby="topic-map" className="flex flex-col gap-3">
-          <div className="flex items-end justify-between">
-            <h2 id="topic-map" className="text-lg font-semibold text-foreground">
-              Tópicos mais cobrados
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              top-3 destacado por disciplina
-            </span>
-          </div>
-          <Card className="p-4">
-            <TopicMapMatrix
-              data={topicMatrixData}
-              progress={progressByDiscipline}
-              mode="explore"
-            />
-          </Card>
-        </section>
-
-        {/* Tabela por disciplina */}
-        <section aria-labelledby="by-discipline" className="flex flex-col gap-3">
-          <h2 id="by-discipline" className="text-lg font-semibold text-foreground">
-            Por disciplina
-          </h2>
-          <Card className="overflow-hidden p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2 font-semibold">Disciplina</th>
-                  <th className="px-3 py-2 font-semibold">Disponíveis</th>
-                  <th className="px-3 py-2 font-semibold">Resolvidas</th>
-                  <th className="px-3 py-2 font-semibold">% acerto</th>
-                  <th className="px-3 py-2 font-semibold">Progresso</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DISCIPLINES.map((d) => {
-                  const total = totalsByDiscipline.get(d) ?? 0;
-                  const resolved = resolvedByDiscipline.get(d) ?? { total: 0, correct: 0 };
-                  const pct = total === 0 ? 0 : Math.min(100, (resolved.total / total) * 100);
-                  return (
-                    <tr key={d} className="border-b border-border last:border-0">
-                      <td className="px-3 py-2.5 font-medium text-foreground">
-                        {DISCIPLINE_LABEL[d]}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
-                        {formatNumber(total)}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums text-foreground">
-                        {formatNumber(resolved.total)}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums text-foreground">
-                        {formatPercent(resolved.correct, resolved.total)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div
-                          className="h-2 w-full overflow-hidden rounded-full bg-muted"
-                          role="progressbar"
-                          aria-valuenow={Math.round(pct)}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-label={`Progresso em ${DISCIPLINE_LABEL[d]}: ${Math.round(pct)}%`}
-                        >
-                          <div
-                            className="h-full bg-primary"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
-        </section>
-
-        {/* Subtopicos */}
-        <section aria-labelledby="by-subtopic" className="flex flex-col gap-3">
-          <h2 id="by-subtopic" className="text-lg font-semibold text-foreground">
-            Por subtópico
-          </h2>
-          <div className="flex flex-col gap-2">
-            {DISCIPLINES.filter((d) => (subtopicsByDiscipline.get(d) ?? []).length > 0).map(
-              (d, idx) => {
-                const list = subtopicsByDiscipline.get(d) ?? [];
-                const totalAvail = list.reduce((s, x) => s + x.total, 0);
-                const totalResolved = list.reduce((s, x) => s + x.resolved, 0);
-                return (
-                  <details
-                    key={d}
-                    className="group rounded-lg border border-border bg-card"
-                    {...(idx === 0 ? { open: true } : {})}
-                  >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/50">
-                      <span>{DISCIPLINE_LABEL[d]}</span>
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {formatNumber(totalResolved)} / {formatNumber(totalAvail)} resolvidas
-                      </span>
-                    </summary>
-                    <div className="overflow-x-auto border-t border-border">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                            <th className="px-3 py-2 font-semibold">Subtópico</th>
-                            <th className="px-3 py-2 font-semibold">Resolvidas</th>
-                            <th className="px-3 py-2 font-semibold">% acerto</th>
-                            <th className="px-3 py-2 text-center font-semibold">Domínio</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {list.map((s) => {
-                            const slug = slugify(s.subtopic_short || s.subtopic);
-                            const href = `/aprofundar/${d}/${slug}`;
-                            return (
-                              <tr
-                                key={`${d}-${s.subtopic}`}
-                                className="border-b border-border last:border-0 hover:bg-muted/40"
-                              >
-                                <td className="px-3 py-2 text-foreground">
-                                  <Link
-                                    href={href}
-                                    className="block text-primary hover:underline"
-                                  >
-                                    {s.subtopic_short}
-                                  </Link>
-                                </td>
-                                <td className="px-3 py-2 tabular-nums text-foreground">
-                                  <Link href={href} className="block">
-                                    {formatNumber(s.resolved)} / {formatNumber(s.total)}
-                                  </Link>
-                                </td>
-                                <td className="px-3 py-2 tabular-nums text-foreground">
-                                  <Link href={href} className="block">
-                                    {formatPercent(s.correct, s.resolved)}
-                                  </Link>
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                  {s.mastered ? (
-                                    <span
-                                      aria-label="Domínio confirmado"
-                                      title="Domínio confirmado"
-                                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-success-bg text-xs text-success"
-                                    >
-                                      ✓
-                                    </span>
-                                  ) : (
-                                    <span className="text-muted-foreground" aria-hidden>
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </details>
-                );
-              },
-            )}
-          </div>
-        </section>
+        {/* Aprofundar: link sutil pra quem quer detalhes por subtopico.
+            A vista de subtopicos com tabela detalhada saiu daqui — vivia
+            confundindo. Quem precisa de drilldown vai pra /quiz que ja tem
+            navegacao por disciplina/subtopico. */}
+        <p className="text-xs text-muted-foreground">
+          Quer ver questões por subtópico?{' '}
+          <Link href="/quiz" className="text-primary hover:underline">
+            Explorar disciplinas em Resolver questões
+          </Link>
+          .
+        </p>
           </>}
         />
 
