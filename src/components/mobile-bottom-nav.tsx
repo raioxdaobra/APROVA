@@ -22,7 +22,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Brain,
   Gamepad2,
   Home,
   ListChecks,
@@ -39,6 +38,8 @@ interface NavItem {
   accentVar: string;
 }
 
+// Revisão saiu daqui — virou icone grande no card "Resolver questões" do
+// dashboard (regra: o que esta no card nao duplica na barra horizontal).
 const ITEMS: NavItem[] = [
   {
     href: '/dashboard',
@@ -53,13 +54,6 @@ const ITEMS: NavItem[] = [
     Icon: MapIcon,
     match: (p) => p === '/trilha' || p.startsWith('/trilha/'),
     accentVar: '--accent-trilha',
-  },
-  {
-    href: '/revisao',
-    label: 'Revisão',
-    Icon: Brain,
-    match: (p) => p === '/revisao' || p.startsWith('/revisao/'),
-    accentVar: '--accent-chat',
   },
   {
     href: '/missoes',
@@ -133,7 +127,7 @@ export function MobileBottomNav(): JSX.Element | null {
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto grid max-w-2xl grid-cols-6">
+      <ul className="mx-auto grid max-w-2xl grid-cols-5">
         {ITEMS.map(({ href, label, Icon, match, accentVar }) => {
           const active = match(pathname);
           return (

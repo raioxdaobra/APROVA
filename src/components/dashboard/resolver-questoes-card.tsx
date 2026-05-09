@@ -12,7 +12,7 @@
  */
 import { useState } from 'react';
 import Link from 'next/link';
-import { BarChart3, Target, Trophy } from 'lucide-react';
+import { BarChart3, Brain, Target, Trophy } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { StudyModeSheet } from './study-mode-sheet';
 
@@ -133,6 +133,18 @@ export function ResolverQuestoesCard({
               }}
             >
               <Trophy className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
+            </Link>
+            <Link
+              href="/revisao"
+              aria-label="Ir pra revisão (flashcards)"
+              title="Revisão"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-lg shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              style={{
+                backgroundColor: 'hsl(var(--accent-chat))',
+                color: 'white',
+              }}
+            >
+              <Brain className="h-6 w-6" aria-hidden="true" strokeWidth={2.25} />
             </Link>
           </div>
         </div>
