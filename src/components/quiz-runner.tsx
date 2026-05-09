@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DidYouKnowTip } from '@/components/did-you-know-tip';
 import { HelpPanel, type HelpPanelHandle } from '@/components/help-panel';
 import { Lightbulb } from 'lucide-react';
 import { DifficultyChip } from '@/components/difficulty-chip';
@@ -493,7 +494,7 @@ export function QuizRunner({
         {currentMarked ? 'Marcada para revisar' : 'Marcar p/ revisar depois'}
       </button>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 sm:gap-3">
         <Button
           type="button"
           variant="secondary"
@@ -501,13 +502,17 @@ export function QuizRunner({
           onClick={handlePrev}
           disabled={isFirst}
         >
-          ← Anterior
+          Anterior
         </Button>
+        {/* "Proxima"/"Finalizar": maior peso visual no fim do flow.
+            size="lg" + min-w-[10rem] pra ficar marcante mesmo no mobile,
+            inspirado no botao "Continuar" do respostaCerta. */}
         <Button
           type="button"
-          size="md"
+          size="lg"
           onClick={handleNext}
           disabled={finishing}
+          className="min-w-[8rem] flex-1 sm:flex-none sm:min-w-[10rem]"
         >
           {isLast ? (finishing ? 'Finalizando…' : 'Finalizar') : 'Próxima'}
         </Button>
@@ -518,6 +523,16 @@ export function QuizRunner({
   const bodySlot = (
     <>
       {headerSlot}
+
+      {/* Dica de UX dispensavel — mostra atalho de teclado A-E. Persiste
+          em localStorage; user fecha uma vez e nao volta. */}
+      {!showFeedback ? (
+        <DidYouKnowTip
+          id="quiz-keyboard-shortcut"
+          text="Pressione A, B, C, D ou E pra responder pelo teclado. ← e → navegam entre questões."
+        />
+      ) : null}
+
       {alternativesSlot}
 
       {current.annulled ? (
@@ -529,16 +544,50 @@ export function QuizRunner({
       {showFeedback && correctLetter ? (
         <div
           className={cn(
-            'rounded-lg border p-3 text-sm font-medium',
+            // Card prominente inspirado no respostaCerta. Border-2 + padding
+            // generoso + emoji grande + titulo bold pra dar peso visual ao
+            // resultado. Detalhes (gabarito, sua resposta) em linha menor.
+            'flex items-start gap-3 rounded-xl border-2 p-4',
             currentAnswer.is_correct
-              ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300'
-              : 'border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300',
+              ? 'border-success/40 bg-success-bg/40'
+              : 'border-destructive/40 bg-destructive/5',
           )}
           role="status"
         >
-          {currentAnswer.is_correct
-            ? `🎉 Parabéns! Resposta correta.`
-            : `❌ Resposta certa: ${correctLetter}. Você marcou ${currentAnswer.selected}.`}
+          <span
+            aria-hidden="true"
+            className={cn(
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-2xl font-bold',
+              currentAnswer.is_correct
+                ? 'bg-success/15 text-success'
+                : 'bg-destructive/15 text-destructive',
+            )}
+          >
+            {currentAnswer.is_correct ? '✓' : '✕'}
+          </span>
+          <div className="flex flex-col gap-0.5">
+            <h3
+              className={cn(
+                'text-base font-semibold',
+                currentAnswer.is_correct ? 'text-success' : 'text-destructive',
+              )}
+            >
+              {currentAnswer.is_correct ? 'Resposta correta' : 'Resposta incorreta'}
+            </h3>
+            {!currentAnswer.is_correct ? (
+              <p className="text-sm text-muted-foreground">
+                Gabarito:{' '}
+                <strong className="text-foreground">{correctLetter}</strong>
+                {' · '}
+                Você marcou{' '}
+                <strong className="text-foreground">{currentAnswer.selected}</strong>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Mandou bem! Continue na sequência.
+              </p>
+            )}
+          </div>
         </div>
       ) : null}
 
