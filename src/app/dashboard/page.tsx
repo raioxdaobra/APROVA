@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Flame } from 'lucide-react';
 import { Card, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserMenu } from '@/components/user-menu';
@@ -9,6 +8,7 @@ import { PomodoroRestModal } from '@/components/pomodoro-rest-modal';
 import { HeroGreeting } from '@/components/dashboard/hero-greeting';
 import { ContinueSessionCard } from '@/components/dashboard/continue-session-card';
 import { StudyModeCards } from '@/components/dashboard/study-mode-cards';
+import { TopBarStats } from '@/components/dashboard/top-bar-stats';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -158,7 +158,19 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-2xl items-start justify-between gap-3 px-4 py-6">
+      {/* Top bar fixa com gamificacao visivel — inspirado no respostaCerta.
+          Streak + XP semanal sempre na cara, ThemeToggle + UserMenu à direita. */}
+      <div className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3 px-4 py-2.5">
+          <TopBarStats userId={user.id} />
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
+          </div>
+        </div>
+      </div>
+
+      <header className="mx-auto w-full max-w-2xl px-4 py-6">
         <HeroGreeting
           userId={user.id}
           displayName={displayName}
@@ -166,25 +178,12 @@ export default async function DashboardPage() {
           hadHigherStreak={hadHigherStreak}
           questionsToday={attemptsToday}
         />
-        <div className="flex shrink-0 items-center gap-2">
-          <ThemeToggle />
-          <UserMenu displayName={displayName} isAdmin={profile?.is_admin === true} />
-        </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 pb-10">
-        {/* Linha de chips: streak + rank + atividade hoje */}
+        {/* Linha de chips: rank + atividade hoje. Streak migrou pro top bar
+            mas mantemos rank + "hoje" aqui pra não perder o contexto do dia. */}
         <div className="flex flex-wrap items-center gap-2">
-          {currentStreak > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-bg px-2.5 py-1 text-xs font-semibold text-warning">
-              <Flame className="h-3.5 w-3.5" aria-hidden="true" />
-              {currentStreak} {currentStreak === 1 ? 'dia seguido' : 'dias seguidos'}
-            </span>
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-              Comece sua sequência hoje
-            </span>
-          )}
           <RankBadge xp={weeklyXpVal} />
           <span className="text-xs text-muted-foreground">
             {attemptsToday > 0
