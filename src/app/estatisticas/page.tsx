@@ -414,17 +414,69 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
           </Link>
         </nav>
 
-        {/* Cards grid */}
-        <section aria-labelledby="stats-cards" className="grid grid-cols-2 gap-3 md:grid-cols-6">
+        {/* Big stats — inspirado no respostaCerta. Em vez de 6 cards
+            pequenos uniformes, 4 cards grandes com emoji + numero
+            destacado + contexto. Cada um tem sua cor accent. */}
+        <section aria-labelledby="stats-cards" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <h2 id="stats-cards" className="sr-only">
             Resumo
           </h2>
-          <StatCard label="Acertos" value={formatNumber(totalCorrect)} />
-          <StatCard label="Erros" value={formatNumber(totalWrong)} />
-          <StatCard label="Sequência atual" value={formatNumber(streakRow?.current_streak ?? 0)} />
-          <StatCard label="Maior sequência" value={formatNumber(streakRow?.longest_streak ?? 0)} />
-          <StatCard label="XP total" value={formatNumber(totalXp)} />
-          <StatCard label="Ranking" value={rankingPosition} />
+          {(() => {
+            const totalAttempted = totalCorrect + totalWrong;
+            const accuracyPct =
+              totalAttempted === 0 ? 0 : Math.round((totalCorrect / totalAttempted) * 100);
+            // Vestibular Unifor tem ~60 questoes por prova. Equivalencia
+            // didatica: "voce ja resolveu o equivalente a X.X provas".
+            const provasEquivalentes = (totalAttempted / 60).toFixed(1);
+            const currentStreak = streakRow?.current_streak ?? 0;
+            const longestStreak = streakRow?.longest_streak ?? 0;
+            return (
+              <>
+                <BigStatCard
+                  emoji="📚"
+                  label="Questões Feitas"
+                  description="Total de questões respondidas"
+                  value={formatNumber(totalAttempted)}
+                  subtitle={
+                    totalAttempted >= 60
+                      ? `Equivale a ${provasEquivalentes} provas oficiais`
+                      : 'Continue praticando'
+                  }
+                  accentVar="--accent-quiz"
+                />
+                <BigStatCard
+                  emoji="⭐"
+                  label="Taxa de Acertos"
+                  description="Porcentagem de questões acertadas"
+                  value={totalAttempted === 0 ? '—' : `${accuracyPct}%`}
+                  progress={totalAttempted === 0 ? null : accuracyPct}
+                  accentVar="--primary"
+                />
+                <BigStatCard
+                  emoji="🔥"
+                  label="Sequência Atual"
+                  description="Dias seguidos estudando"
+                  value={formatNumber(currentStreak)}
+                  subtitle={
+                    longestStreak > currentStreak
+                      ? `Maior: ${longestStreak} ${longestStreak === 1 ? 'dia' : 'dias'}`
+                      : currentStreak > 0
+                      ? 'Recorde pessoal'
+                      : 'Comece hoje'
+                  }
+                  accentVar="--warning"
+                />
+                <BigStatCard
+                  emoji="🏆"
+                  label="XP Total"
+                  description="Pontos acumulados em todas as semanas"
+                  value={formatNumber(totalXp)}
+                  subtitle={rankingPosition === '—' ? 'Sem ranking ainda' : `Ranking ${rankingPosition} esta semana`}
+                  accentVar="--accent-ranking"
+                />
+              </>
+            );
+          })()}
         </section>
 
         {(streakRow?.current_streak ?? 0) > 0 ? (
@@ -660,15 +712,72 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+/**
+ * Big stat card inspirado no respostaCerta: emoji decorativo + label + numero
+ * grande tipografico + descricao curta. Pode incluir uma barra de progresso
+ * (taxa de acerto) ou uma linha de subtitle (contexto adicional).
+ *
+ * O accentVar define a cor do numero e da barra (ex: --accent-quiz, --primary,
+ * --warning, --accent-ranking).
+ */
+function BigStatCard({
+  emoji,
+  label,
+  description,
+  value,
+  subtitle,
+  progress,
+  accentVar,
+}: {
+  emoji: string;
+  label: string;
+  description: string;
+  value: string;
+  subtitle?: string;
+  progress?: number | null;
+  accentVar: string;
+}) {
   return (
-    <Card className="flex flex-col gap-1 p-4">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-2xl font-semibold tabular-nums text-foreground">
+    <Card
+      className="flex flex-col gap-2 border-l-4 p-5"
+      style={{
+        borderLeftColor: `hsl(var(${accentVar}))`,
+        backgroundColor: `hsl(var(${accentVar}) / 0.04)`,
+      }}
+    >
+      <div className="flex items-baseline gap-2">
+        <span aria-hidden="true" className="text-xl">
+          {emoji}
+        </span>
+        <span className="text-base font-semibold text-foreground">{label}</span>
+      </div>
+      <p className="text-xs text-muted-foreground">{description}</p>
+      <span
+        className="mt-1 text-4xl font-bold tabular-nums leading-none"
+        style={{ color: `hsl(var(${accentVar}))` }}
+      >
         {value}
       </span>
+      {progress !== undefined && progress !== null ? (
+        <div
+          role="progressbar"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted"
+        >
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${Math.min(100, Math.max(0, progress))}%`,
+              backgroundColor: `hsl(var(${accentVar}))`,
+            }}
+          />
+        </div>
+      ) : null}
+      {subtitle ? (
+        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+      ) : null}
     </Card>
   );
 }
