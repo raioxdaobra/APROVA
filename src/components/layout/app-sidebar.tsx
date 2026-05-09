@@ -32,10 +32,17 @@ interface NavItem {
 
 const ITEMS: NavItem[] = [
   {
-    href: '/dashboard',
+    href: '/inicio',
     label: 'Início',
     Icon: Home,
-    match: (p) => p === '/dashboard' || p.startsWith('/dashboard/'),
+    // Marca como ativo tanto em /inicio (cards de provas) quanto /dashboard
+    // (estudo da prova ativa) — pra user não ficar "perdido" sobre qual
+    // item da sidebar destaca enquanto navega entre os dois.
+    match: (p) =>
+      p === '/inicio' ||
+      p.startsWith('/inicio/') ||
+      p === '/dashboard' ||
+      p.startsWith('/dashboard/'),
     accentVar: '--primary',
   },
   {

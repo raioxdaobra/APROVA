@@ -101,6 +101,7 @@ export interface Database {
           trial_ends_at: string | null;
           questions_used_count: number;
           simulados_used_count: number;
+          active_exam: string;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -121,6 +122,7 @@ export interface Database {
           trial_ends_at?: string | null;
           questions_used_count?: number;
           simulados_used_count?: number;
+          active_exam?: string;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -141,8 +143,30 @@ export interface Database {
           trial_ends_at?: string | null;
           questions_used_count?: number;
           simulados_used_count?: number;
+          active_exam?: string;
           created_at?: string | null;
           updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      exam_interest: {
+        Row: {
+          id: string;
+          user_id: string;
+          exam: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          exam: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          exam?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
