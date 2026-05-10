@@ -34,6 +34,10 @@ const args = process.argv.slice(2);
 const limitArg = args.find((a) => a.startsWith('--limit='));
 const LIMIT = limitArg ? Math.max(0, Number(limitArg.split('=')[1])) : 0;
 const DRY_RUN = args.includes('--dry-run');
+// Modo regen: pega as resolucoes que NAO tem "Análise das alternativas" e
+// regenera (UPDATE em vez de INSERT). Usado pra atualizar resolucoes antigas
+// pro novo formato item-a-item, sem perder as ja boas.
+const REGEN_OLD = args.includes('--regen-old');
 
 interface QuestionRow {
   id: string;
@@ -157,13 +161,14 @@ async function loadGeminiClient(apiKey: string): Promise<GeminiClient | null> {
 async function generateOne(
   q: QuestionRow,
   gemini: GeminiClient | null
-): Promise<{ result: GenerationResult; reviewed: boolean }> {
+): Promise<{ result: GenerationResult; reviewed: boolean } | null> {
   if (!gemini) {
     return { result: buildStub(q), reviewed: false };
   }
 
   let lastContent = '';
   let lastConclusion: 'A' | 'B' | 'C' | 'D' | 'E' | null = null;
+  let lastErrorWasRateLimit = false;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const content = await gemini.call(buildPrompt(q), q.image_url);
@@ -180,19 +185,33 @@ async function generateOne(
         `[gen:solutions] ${q.id} tentativa ${attempt}: conclusão=${conclusion} esperada=${q.correct_answer}`
       );
     } catch (err) {
-      console.warn(`[gen:solutions] ${q.id} tentativa ${attempt} erro:`, err);
+      const msg = (err as Error).message ?? String(err);
+      lastErrorWasRateLimit = msg.includes('429') || msg.toLowerCase().includes('quota');
+      console.warn(`[gen:solutions] ${q.id} tentativa ${attempt} erro:`, msg.slice(0, 200));
+      if (lastErrorWasRateLimit) {
+        // Rate limit: espera 65s antes de tentar de novo. Free-tier
+        // do Gemini-2.5-flash e 20 req/dia, entao normalmente nao vale
+        // a pena retry — mas damos uma chance.
+        await new Promise((r) => setTimeout(r, 65000));
+      }
     }
   }
 
-  // Esgotou retries — salva com reviewed=false. Se a regex não casou,
-  // força o conclusion ser igual ao gabarito (constraint exige A-E).
+  // CRITICAL: quando TODAS as tentativas deram erro (lastContent vazio),
+  // NAO grava stub — retorna null pra o caller PULAR a questao. Isso
+  // protege o regen-old de sobrescrever conteudo bom com stub quando
+  // o quota da API estourar. Antes desse fix, o script sobrescrevia 28
+  // resolucoes boas com "[stub] Geração falhou..." quando o quota free
+  // do Gemini foi atingido.
+  if (!lastContent) {
+    return null;
+  }
+
+  // Tem conteudo mas a conclusao nao bate. Salva mesmo assim (reviewed=false).
   const fallbackConclusion = lastConclusion ?? q.correct_answer ?? 'A';
-  const fallbackContent =
-    lastContent ||
-    `[stub] Geração falhou após ${MAX_RETRIES} tentativas. Gabarito: ${q.correct_answer ?? '?'}.`;
   return {
     result: {
-      content: fallbackContent,
+      content: lastContent,
       conclusion: fallbackConclusion,
       generatedBy: gemini.modelName,
     },
@@ -249,20 +268,36 @@ async function main(): Promise<void> {
   }
 
   const filterLimit = LIMIT > 0 ? `limit ${LIMIT}` : '';
+
+  // Filtro varia por modo:
+  // - default (gerar novas): so questoes SEM resolucao
+  // - --regen-old: so questoes COM resolucao no formato antigo (sem
+  //   header "Análise das alternativas")
+  const existsClause = REGEN_OLD
+    ? `and exists (
+         select 1 from public.question_solutions s
+          where s.question_id = q.id
+            and s.content_md not ilike '%Análise das alternativas%'
+            and s.content_md not ilike '%Analise das alternativas%'
+       )`
+    : `and not exists (
+         select 1 from public.question_solutions s where s.question_id = q.id
+       )`;
+
   const res = await client.query<QuestionRow>(`
     select q.id, q.discipline, q.subtopic, q.correct_answer, q.image_url, q.annulled
       from public.questions q
      where q.exam = 'unifor-medicina'
        and coalesce(q.annulled, false) = false
        and q.correct_answer is not null
-       and not exists (
-         select 1 from public.question_solutions s where s.question_id = q.id
-       )
+       ${existsClause}
      order by q.id
      ${filterLimit}
   `);
 
-  console.log(`[gen:solutions] candidatas=${res.rowCount}`);
+  console.log(
+    `[gen:solutions] modo=${REGEN_OLD ? 'regen-old' : 'gerar-novas'} candidatas=${res.rowCount}`
+  );
   if (DRY_RUN) {
     console.log('[gen:solutions] --dry-run; não escreve.');
     await client.end();
@@ -270,25 +305,51 @@ async function main(): Promise<void> {
   }
 
   let okCount = 0;
+  let skipCount = 0;
   let reviewFlag = 0;
   for (const q of res.rows) {
-    const { result, reviewed } = await generateOne(q, gemini);
-    await client.query(
-      `insert into public.question_solutions
-         (question_id, content_md, conclusion, generated_by, reviewed)
-       values ($1, $2, $3, $4, $5)
-       on conflict (question_id) do nothing`,
-      [q.id, result.content, result.conclusion, result.generatedBy, reviewed]
-    );
+    const out = await generateOne(q, gemini);
+
+    if (!out) {
+      skipCount++;
+      console.log(`[gen:solutions] ${q.id}: PULADA (LLM falhou em todas as tentativas)`);
+      // Em modo regen-old, isso e o comportamento desejado (preserva o
+      // conteudo antigo). Em modo gerar-novas, simplesmente nao insere.
+      continue;
+    }
+
+    const { result, reviewed } = out;
+
+    if (REGEN_OLD) {
+      await client.query(
+        `update public.question_solutions
+            set content_md = $2,
+                conclusion = $3,
+                generated_by = $4,
+                reviewed = $5
+          where question_id = $1`,
+        [q.id, result.content, result.conclusion, result.generatedBy, reviewed]
+      );
+    } else {
+      await client.query(
+        `insert into public.question_solutions
+           (question_id, content_md, conclusion, generated_by, reviewed)
+         values ($1, $2, $3, $4, $5)
+         on conflict (question_id) do nothing`,
+        [q.id, result.content, result.conclusion, result.generatedBy, reviewed]
+      );
+    }
     okCount++;
     if (!reviewed) reviewFlag++;
-    if (okCount % 25 === 0) {
-      console.log(`[gen:solutions] progresso ${okCount}/${res.rowCount}`);
+    if ((okCount + skipCount) % 5 === 0 || okCount + skipCount === res.rowCount) {
+      console.log(
+        `[gen:solutions] progresso ${okCount + skipCount}/${res.rowCount} (ok=${okCount} skip=${skipCount})`
+      );
     }
   }
 
   console.log(
-    `[gen:solutions] done. inseridos=${okCount} reviewed=false=${reviewFlag}`
+    `[gen:solutions] done. ${REGEN_OLD ? 'atualizados' : 'inseridos'}=${okCount} skip=${skipCount} reviewed=false=${reviewFlag}`
   );
   await client.end();
 }

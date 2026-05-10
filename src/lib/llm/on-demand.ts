@@ -33,15 +33,46 @@ interface QuestionContext {
 
 function resolucaoPrompt(ctx: QuestionContext): string {
   const letter = ctx.correctAnswer ?? '?';
+  // Estrutura em 3 secoes (Abordagem / Resolucao / Analise das alternativas).
+  // O <SolutionMarkdown> renderiza headers H2 com emoji + linha colorida
+  // automaticamente. User pediu pra cada alternativa ser explicada
+  // individualmente — nao basta resolver a questao, tem que justificar
+  // por que cada item esta certo ou errado.
   return [
     'Você é tutor de vestibular Unifor Medicina. Resolva a questão abaixo',
-    'explicando passo-a-passo o raciocínio. Seja conciso e didático,',
-    'no máximo 300 palavras.',
+    'explicando passo-a-passo o raciocínio E justificando cada uma das 5',
+    'alternativas. Seja conciso e didático.',
+    '',
+    'ESTRUTURA OBRIGATÓRIA (use exatamente esses headers H2):',
+    '',
+    '## Abordagem',
+    'Em 2-4 frases, explique qual conceito está sendo cobrado e qual',
+    'estratégia usar. Foque na "ideia" — sem cálculos ainda.',
+    '',
+    '## Resolução',
+    'Passo a passo do raciocínio até chegar na alternativa correta.',
+    'Use sub-headers `### Passo 1`, `### Passo 2` etc. quando o problema',
+    'tiver mais de uma etapa. Use blocos $$...$$ pra equações.',
+    '',
+    '## Análise das alternativas',
+    'Liste TODAS as 5 alternativas (A, B, C, D, E) — uma linha por',
+    'alternativa, em formato de lista markdown. Para cada incorreta,',
+    'aponte o erro conceitual ou de cálculo (não só "está errado").',
+    'Marque a correta com **CORRETA**:',
+    '',
+    '- **A)** breve descrição — Errada porque [motivo conciso].',
+    '- **B)** breve descrição — Errada porque [motivo conciso].',
+    '- **C)** breve descrição — Errada porque [motivo conciso].',
+    '- **D)** breve descrição — Errada porque [motivo conciso].',
+    '- **E)** breve descrição — Errada porque [motivo conciso].',
+    '',
+    `(A alternativa CORRETA é a ${letter} — substitua a linha correspondente`,
+    'por **CORRETA** com o motivo positivo.)',
     '',
     'FORMATO:',
-    '- Use Markdown com listas curtas e headings ##.',
-    '- Use LaTeX inline ($...$) e display ($$...$$) para fórmulas.',
-    '- Termine SEMPRE com a frase: "Portanto, a alternativa correta é a letra ' +
+    '- Markdown com headings ## e listas.',
+    '- LaTeX inline ($...$) e display ($$...$$) para fórmulas.',
+    '- Termine SEMPRE com a frase EXATA: "Portanto, a alternativa correta é a letra ' +
       letter +
       '."',
     '',
@@ -51,7 +82,9 @@ function resolucaoPrompt(ctx: QuestionContext): string {
     '',
     'Como você não vê o enunciado, baseie a explicação no subtópico e na',
     'alternativa correta acima — descreva o raciocínio típico para esse',
-    'tipo de questão de vestibular, citando fórmulas e conceitos chave.',
+    'tipo de questão e infira plausivelmente o que cada alternativa diria',
+    '(distratores comuns pra esse subtópico). Cite fórmulas e conceitos',
+    'chave.',
   ].join('\n');
 }
 
