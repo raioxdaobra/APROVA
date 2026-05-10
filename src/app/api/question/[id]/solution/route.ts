@@ -32,10 +32,11 @@ export async function GET(
 
   const questionId = context.params.id;
 
-  // Carrega contexto da questão (necessário pra prompt + gabarito)
+  // Carrega contexto da questão (necessário pra prompt + gabarito + imagem
+  // pra Gemini multimodal poder ler o enunciado e as 5 alternativas)
   const { data: question } = await (supabase as AnyDb)
     .from('questions')
-    .select('discipline, subtopic, correct_answer')
+    .select('discipline, subtopic, correct_answer, image_url')
     .eq('id', questionId)
     .maybeSingle();
 
@@ -45,6 +46,8 @@ export async function GET(
     subtopic: (question as { subtopic?: string | null } | null)?.subtopic ?? null,
     correctAnswer:
       (question as { correct_answer?: string | null } | null)?.correct_answer ?? null,
+    imageUrl:
+      (question as { image_url?: string | null } | null)?.image_url ?? null,
   };
 
   const solution = await getOrGenerateResolucao(supabase, ctx);

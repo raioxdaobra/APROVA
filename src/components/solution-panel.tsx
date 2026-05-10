@@ -16,10 +16,11 @@ interface Props {
 export async function SolutionPanel({ questionId }: Props) {
   const supabase = await createClient();
 
-  // Pega contexto da questão (gabarito + subtópico) pra alimentar o prompt
+  // Pega contexto da questão (gabarito + subtópico + imagem) pra alimentar
+  // o prompt. image_url e usado pelo Gemini multimodal pra ver o enunciado.
   const { data: question } = await (supabase as AnyDb)
     .from('questions')
-    .select('discipline, subtopic, correct_answer')
+    .select('discipline, subtopic, correct_answer, image_url')
     .eq('id', questionId)
     .maybeSingle();
 
@@ -32,6 +33,8 @@ export async function SolutionPanel({ questionId }: Props) {
     correctAnswer:
       (question as { correct_answer?: string | null } | null)?.correct_answer ??
       null,
+    imageUrl:
+      (question as { image_url?: string | null } | null)?.image_url ?? null,
   };
 
   const row = await getOrGenerateResolucao(supabase, ctx);

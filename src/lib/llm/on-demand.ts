@@ -29,16 +29,67 @@ interface QuestionContext {
   discipline: string | null;
   subtopic: string | null;
   correctAnswer: string | null;
+  /** URL da imagem da questao — quando presente, tentamos Gemini multimodal
+   * pra que o LLM VEJA o enunciado real e possa analisar cada alternativa. */
+  imageUrl: string | null;
 }
 
-function resolucaoPrompt(ctx: QuestionContext): string {
+/**
+ * Prompt MULTIMODAL — usado quando o LLM VE a imagem da questao (Gemini
+ * direto, bypass da chain text-only). Pode pedir analise item-a-item das
+ * 5 alternativas porque elas estao na imagem.
+ */
+function resolucaoPromptMultimodal(ctx: QuestionContext): string {
   const letter = ctx.correctAnswer ?? '?';
-  // Prompt HONESTO + CONCISO: como nao vemos o enunciado nem as alternativas
-  // nesse caminho (text-only LLM), NAO inventamos a questao nem listamos as 5
-  // alternativas A-E (isso gera resolucao que "nao corresponde a questao",
-  // como o user reclamou). Em vez disso, o LLM faz uma revisao conceitual
-  // focada no subtopico + dica direcionada a alternativa correta. Curto e
-  // util — quando o user quer mais profundidade, abre o chat na tela.
+  return [
+    'Você é tutor de vestibular Unifor Medicina. A imagem acima mostra',
+    'uma questão real da prova. Resolva-a explicando o raciocínio E',
+    'analisando CADA UMA das 5 alternativas (A, B, C, D, E) que aparecem',
+    'na imagem. Seja conciso (máximo 350 palavras) e didático.',
+    '',
+    `A resposta CORRETA (gabarito oficial) é a letra ${letter}.`,
+    'Sua resolução DEVE convergir para essa letra.',
+    '',
+    'ESTRUTURA OBRIGATÓRIA (use exatamente esses headers H2):',
+    '',
+    '## Abordagem',
+    'Em 2-4 frases, identifique o que a questão está cobrando e qual',
+    'estratégia usar. Sem cálculos ainda.',
+    '',
+    '## Resolução',
+    'Passo a passo do raciocínio até chegar na resposta. Use sub-headers',
+    '`### Passo 1`, `### Passo 2` quando o problema tiver mais de uma',
+    'etapa. Use LaTeX ($...$ inline, $$...$$ display) para fórmulas.',
+    '',
+    '## Análise das alternativas',
+    'Liste TODAS as 5 alternativas (na ordem A, B, C, D, E que estão',
+    'na imagem) — uma linha por alternativa, em formato de lista markdown.',
+    'Para cada incorreta, aponte o erro conceitual ou de cálculo (não',
+    'apenas "está errado"). Marque a correta com **CORRETA**:',
+    '',
+    '- **A)** [transcreva ou resuma a alternativa] — Errada porque [motivo].',
+    '- **B)** [...] — Errada porque [motivo].',
+    '- **C)** [...] — Errada porque [motivo].',
+    '- **D)** [...] — Errada porque [motivo].',
+    '- **E)** [...] — Errada porque [motivo].',
+    '',
+    `(A correta é a letra ${letter} — substitua a linha correspondente`,
+    'por **CORRETA**: [motivo positivo].)',
+    '',
+    'OBRIGATÓRIO: termine com a frase EXATA:',
+    '"Portanto, a alternativa correta é a letra ' + letter + '."',
+    '',
+    `Disciplina: ${ctx.discipline ?? 'desconhecida'}`,
+    `Subtópico: ${ctx.subtopic ?? 'desconhecido'}`,
+  ].join('\n');
+}
+
+/**
+ * Prompt TEXT-ONLY (fallback) — usado quando o LLM nao ve a imagem.
+ * NAO inventa enunciado nem analisa as 5 alternativas. Foco em conceito.
+ */
+function resolucaoPromptTextOnly(ctx: QuestionContext): string {
+  const letter = ctx.correctAnswer ?? '?';
   return [
     'Você é tutor de vestibular Unifor Medicina. Não temos o texto da',
     'questão aqui — apenas a disciplina, subtópico e letra do gabarito.',
@@ -50,27 +101,71 @@ function resolucaoPrompt(ctx: QuestionContext): string {
     'ESTRUTURA OBRIGATÓRIA (use exatamente esses headers H2):',
     '',
     '## Conceito',
-    'Em 2-3 frases, explique a ideia central do subtópico — sem inventar',
-    'detalhes da questão.',
+    'Em 2-3 frases, explique a ideia central do subtópico.',
     '',
     '## Caminho da resolução',
     'Em 3-5 passos curtos (use sub-bullets), descreva como tipicamente',
-    'se resolve uma questão desse subtópico. Use LaTeX ($...$ inline,',
-    '$$...$$ display) só se houver fórmula essencial.',
+    'se resolve uma questão desse subtópico. Use LaTeX só se houver',
+    'fórmula essencial.',
     '',
     '## Por que a resposta é ' + letter,
     'Em 1-2 frases, justifique conceitualmente por que a letra ' + letter,
-    'corresponde a esse tipo de questão (sem afirmar conteúdo específico',
-    'das outras alternativas que você não viu).',
+    'corresponde a esse tipo de questão.',
     '',
     'TERMINE SEMPRE com: "Portanto, a alternativa correta é a letra ' +
-      letter +
-      '."',
+      letter + '."',
     '',
     `Disciplina: ${ctx.discipline ?? 'desconhecida'}`,
     `Subtópico: ${ctx.subtopic ?? 'desconhecido'}`,
     `Resposta correta (gabarito oficial): ${letter}`,
   ].join('\n');
+}
+
+/**
+ * Tenta gerar resolucao usando Gemini MULTIMODAL (passa a imagem da questao).
+ * Retorna null em qualquer falha (rate limit, sem chave, sem imagem) pra que
+ * o caller faca fallback pra chain text-only.
+ */
+async function tryGeminiMultimodal(ctx: QuestionContext): Promise<{
+  content: string;
+  provider: string;
+} | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  if (!ctx.imageUrl || ctx.imageUrl.trim().length === 0) return null;
+
+  try {
+    const mod = (await import('@google/generative-ai')) as typeof import('@google/generative-ai');
+    const genAI = new mod.GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    // Baixa a imagem como base64 pra passar como inlineData (multimodal).
+    const res = await fetch(ctx.imageUrl);
+    if (!res.ok) {
+      console.warn(
+        `[on-demand multimodal] fetch image ${ctx.imageUrl} status ${res.status}`,
+      );
+      return null;
+    }
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const mimeType = res.headers.get('content-type') ?? 'image/jpeg';
+
+    const result = await model.generateContent([
+      { inlineData: { data: buffer.toString('base64'), mimeType } },
+      { text: resolucaoPromptMultimodal(ctx) },
+    ]);
+    const content = result.response.text().trim();
+    if (!content) return null;
+
+    return { content, provider: 'gemini-2.5-flash-multimodal' };
+  } catch (err) {
+    const msg = (err as Error).message ?? String(err);
+    console.warn(
+      '[on-demand multimodal] falhou:',
+      msg.slice(0, 200),
+    );
+    return null;
+  }
 }
 
 function teoriaPrompt(discipline: string, subtopic: string): string {
@@ -131,19 +226,32 @@ export async function getOrGenerateResolucao(
     return generateEphemeralResolucao(ctx);
   }
 
+  // 2a. PRIMEIRO TENTA MULTIMODAL: Gemini com a imagem da questao. Sucesso
+  // aqui = LLM ve enunciado + 5 alternativas e analisa item-a-item de verdade.
   let content: string;
   let provider: string;
-  try {
-    const res = await completeChat({
-      system: resolucaoPrompt(ctx),
-      history: [],
-      userMessage: 'Por favor, gere a resolução agora.',
-    });
-    content = res.content.trim();
-    provider = res.provider;
-  } catch (err) {
-    console.warn('[on-demand resolucao] LLM falhou:', (err as Error).message);
-    return null;
+  const multimodal = await tryGeminiMultimodal(ctx);
+  if (multimodal) {
+    content = multimodal.content;
+    provider = multimodal.provider;
+  } else {
+    // 2b. FALLBACK text-only: chain Gemini-text → Groq → Cerebras → Mistral
+    // com prompt CONSERVADOR (nao inventa enunciado nem alternativas).
+    try {
+      const res = await completeChat({
+        system: resolucaoPromptTextOnly(ctx),
+        history: [],
+        userMessage: 'Por favor, gere a resolução agora.',
+      });
+      content = res.content.trim();
+      provider = res.provider + ' (text-only)';
+    } catch (err) {
+      console.warn(
+        '[on-demand resolucao] LLM falhou:',
+        (err as Error).message,
+      );
+      return null;
+    }
   }
 
   if (!content) return null;
@@ -176,7 +284,7 @@ export async function getOrGenerateResolucao(
   };
 }
 
-/** Geração sem cache (sem service role). */
+/** Geração sem cache (sem service role). Tenta multimodal e cai pra text-only. */
 async function generateEphemeralResolucao(
   ctx: QuestionContext,
 ): Promise<{
@@ -185,9 +293,18 @@ async function generateEphemeralResolucao(
   generated_by: string;
   reviewed: boolean;
 } | null> {
+  const multimodal = await tryGeminiMultimodal(ctx);
+  if (multimodal) {
+    return {
+      content_md: multimodal.content,
+      conclusion: ctx.correctAnswer ?? 'A',
+      generated_by: multimodal.provider + ' (uncached)',
+      reviewed: false,
+    };
+  }
   try {
     const res = await completeChat({
-      system: resolucaoPrompt(ctx),
+      system: resolucaoPromptTextOnly(ctx),
       history: [],
       userMessage: 'Por favor, gere a resolução agora.',
     });
@@ -196,7 +313,7 @@ async function generateEphemeralResolucao(
     return {
       content_md: content,
       conclusion: ctx.correctAnswer ?? 'A',
-      generated_by: res.provider + ' (uncached)',
+      generated_by: res.provider + ' (text-only, uncached)',
       reviewed: false,
     };
   } catch {
