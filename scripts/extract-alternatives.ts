@@ -254,14 +254,24 @@ async function main() {
   const projectRef = url.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/)![1];
   const poolerHost =
     process.env.SUPABASE_POOLER_HOST ?? 'aws-1-us-east-2.pooler.supabase.com';
-  const client = new Client({
-    host: poolerHost,
-    port: 5432,
-    database: 'postgres',
-    user: `postgres.${projectRef}`,
-    password: decodeURIComponent(url.password),
-    ssl: { rejectUnauthorized: false },
-  });
+
+  function makeClient(): Client {
+    const c = new Client({
+      host: poolerHost,
+      port: 5432,
+      database: 'postgres',
+      user: `postgres.${projectRef}`,
+      password: decodeURIComponent(url.password),
+      ssl: { rejectUnauthorized: false },
+      keepAlive: true,
+    });
+    c.on('error', (err) => {
+      console.warn(`\n  pg client error: ${err.message.slice(0, 80)}`);
+    });
+    return c;
+  }
+
+  let client = makeClient();
   await client.connect();
 
   const filterPending = REDO ? '' : 'and alternatives is null';
@@ -301,17 +311,38 @@ async function main() {
       continue;
     }
 
-    try {
-      await client.query(
-        `update public.questions set alternatives = $2::jsonb where id = $1`,
-        [q.id, JSON.stringify(result)],
-      );
-    } catch (err) {
-      // Conexao pg caiu — script idempotente, basta re-rodar.
-      console.warn(
-        `\n  pg falhou: ${(err as Error).message.slice(0, 100)}\n  Re-rode o script: alternatives is null filtra os pendentes.`,
-      );
-      break;
+    // Update com retry: pooler dropa conexoes idle em batches longos
+    let updated = false;
+    for (let upAttempt = 1; upAttempt <= 3; upAttempt++) {
+      try {
+        await client.query(
+          `update public.questions set alternatives = $2::jsonb where id = $1`,
+          [q.id, JSON.stringify(result)],
+        );
+        updated = true;
+        break;
+      } catch (err) {
+        console.warn(
+          `\n  pg falhou (tentativa ${upAttempt}/3): ${(err as Error).message.slice(0, 80)}`,
+        );
+        try {
+          await client.end();
+        } catch {
+          /* ignora */
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        client = makeClient();
+        try {
+          await client.connect();
+          console.warn(`  reconectado`);
+        } catch (e) {
+          console.warn(`  reconnect falhou: ${(e as Error).message.slice(0, 60)}`);
+        }
+      }
+    }
+    if (!updated) {
+      console.warn(`  ${q.id}: nao foi possivel salvar, pulando`);
+      continue;
     }
     console.log(
       `✓ A=${(result.a ?? '').slice(0, 30)}... E=${(result.e ?? '').slice(0, 25)}...`,
