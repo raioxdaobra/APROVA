@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/server';
 import { approveUser, blockUser, unblockUser } from './actions';
 import { InviteForm } from './_components/invite-form';
+import { ResetStatsButton } from './_components/reset-stats-button';
 
 export const metadata = {
   title: 'Admin · Usuários — APROVA',
@@ -69,6 +70,31 @@ export default async function AdminUsersPage() {
   const { data: users, error } = await supabase.rpc('admin_list_users');
   const list = ((users ?? []) as AdminUserRow[]) ?? [];
 
+  // Estatisticas agregadas por user_id — duas queries leves (count com
+  // index em user_id e baratas). Permite mostrar #attempts e #sessions
+  // por linha sem N+1.
+  const attemptsByUser = new Map<string, number>();
+  const sessionsByUser = new Map<string, number>();
+  if (list.length > 0) {
+    const userIds = list.map((u) => u.id);
+
+    const { data: attemptsAgg } = await supabase
+      .from('attempts')
+      .select('user_id')
+      .in('user_id', userIds);
+    for (const row of (attemptsAgg ?? []) as Array<{ user_id: string }>) {
+      attemptsByUser.set(row.user_id, (attemptsByUser.get(row.user_id) ?? 0) + 1);
+    }
+
+    const { data: sessionsAgg } = await supabase
+      .from('study_sessions')
+      .select('user_id')
+      .in('user_id', userIds);
+    for (const row of (sessionsAgg ?? []) as Array<{ user_id: string }>) {
+      sessionsByUser.set(row.user_id, (sessionsByUser.get(row.user_id) ?? 0) + 1);
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-6">
@@ -103,6 +129,7 @@ export default async function AdminUsersPage() {
                 <th className="px-3 py-2">Username</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Admin?</th>
+                <th className="px-3 py-2">Stats</th>
                 <th className="px-3 py-2">Criado em</th>
                 <th className="px-3 py-2">Ações</th>
               </tr>
@@ -110,7 +137,7 @@ export default async function AdminUsersPage() {
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
                     Nenhum usuário encontrado.
                   </td>
                 </tr>
@@ -135,6 +162,22 @@ export default async function AdminUsersPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2">{u.is_admin ? 'Sim' : '—'}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-col text-xs leading-tight">
+                          <span>
+                            <strong className="tabular-nums text-foreground">
+                              {attemptsByUser.get(u.id) ?? 0}
+                            </strong>{' '}
+                            <span className="text-muted-foreground">tentativas</span>
+                          </span>
+                          <span>
+                            <strong className="tabular-nums text-foreground">
+                              {sessionsByUser.get(u.id) ?? 0}
+                            </strong>{' '}
+                            <span className="text-muted-foreground">sessões</span>
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-3 py-2">{formatDate(u.created_at)}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-2">
@@ -174,6 +217,10 @@ export default async function AdminUsersPage() {
                               </Button>
                             </form>
                           ) : null}
+                          <ResetStatsButton
+                            userId={u.id}
+                            userLabel={u.display_name || u.username || u.email}
+                          />
                         </div>
                       </td>
                     </tr>

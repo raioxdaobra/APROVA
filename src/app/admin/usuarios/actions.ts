@@ -53,6 +53,59 @@ const inviteSchema = z.object({
   email: z.string().trim().email('Email inválido.'),
 });
 
+/**
+ * Zera todas as estatisticas de um usuario qualquer (admin only).
+ * Reusa a mesma lista de tabelas do deleteAllProgress (estatisticas/actions.ts)
+ * — manter as duas listas em sync se adicionar nova tabela de stats.
+ */
+export async function resetUserStats(targetUserId: string) {
+  const guard = await ensureAdmin();
+  if (!guard.ok) return { ok: false, error: guard.error };
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    return { ok: false, error: 'Service role nao configurado.' };
+  }
+  const admin = createAdminClient(url, serviceKey, {
+    auth: { persistSession: false },
+  });
+
+  const tables = [
+    'attempts',
+    'study_sessions',
+    'user_question_status',
+    'weekly_xp',
+    'streaks',
+    'subtopic_mastery',
+    'simulado_bonuses',
+    'daily_xp',
+    'flashcard_reviews',
+  ] as const;
+
+  const deleted: Record<string, number> = {};
+  for (const table of tables) {
+    const { error, count } = await admin
+      .from(table)
+      .delete({ count: 'exact' })
+      .eq('user_id', targetUserId);
+    if (error) {
+      const msg = error.message ?? '';
+      if (msg.includes('does not exist') || msg.includes('relation')) {
+        deleted[table] = 0;
+        continue;
+      }
+      return { ok: false, error: `Falha em ${table}: ${msg}` };
+    }
+    deleted[table] = count ?? 0;
+  }
+
+  revalidatePath('/admin/usuarios');
+  revalidatePath('/ranking');
+  return { ok: true, deleted };
+}
+
 export async function inviteUser(_prev: { error?: string; ok?: boolean } | null, formData: FormData) {
   const guard = await ensureAdmin();
   if (!guard.ok) return { error: guard.error };
