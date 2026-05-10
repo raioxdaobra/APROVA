@@ -4,7 +4,7 @@
  */
 import { createClient } from '@/lib/supabase/server';
 import { getOrGenerateResolucao } from '@/lib/llm/on-demand';
-import { MarkdownKatex } from './markdown-katex';
+import { SolutionMarkdown } from './solution-markdown';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type AnyDb = SupabaseClient;
@@ -49,7 +49,7 @@ export async function SolutionPanel({ questionId }: Props) {
 
   return (
     <div className="space-y-3">
-      <MarkdownKatex>{row.content_md}</MarkdownKatex>
+      <SolutionMarkdown>{row.content_md}</SolutionMarkdown>
       {row.reviewed === false ? (
         <p className="text-xs text-muted-foreground">
           Resolução gerada por IA — pode conter imprecisões. Trate como apoio,

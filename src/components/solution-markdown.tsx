@@ -28,21 +28,34 @@ interface HeadingStyle {
 function getHeadingStyle(text: string): HeadingStyle {
   const t = text.toLowerCase();
   // Ordem importa: matches mais específicos primeiro.
+  // Headers do template oficial (definido pelo user): Feedback da Questão,
+  // Resumo Final + Alternativa A/B/C/D/E.
+  if (t.includes('feedback da questão') || t.includes('feedback da questao')) {
+    return { emoji: '💬', color: '#f59e0b' }; // amarelo — intro da resolucao
+  }
+  if (
+    t.includes('resumo final') ||
+    t.includes('conclus') ||
+    t.includes('resposta final') ||
+    t.includes('gabarito')
+  ) {
+    return { emoji: '🎯', color: '#10b981' }; // verde — fechamento
+  }
+  // Headers legados ainda suportados (compat com resolucoes antigas):
   if (
     t.includes('análise das alternativas') ||
-    t.includes('analise das alternativas') ||
-    t.includes('alternativas')
+    t.includes('analise das alternativas')
   ) {
-    return { emoji: '📋', color: '#8b5cf6' }; // roxo — analise por alternativa
+    return { emoji: '📋', color: '#8b5cf6' }; // roxo
   }
   if (t.includes('abordagem') || t.includes('estratégia') || t.includes('estrategia')) {
-    return { emoji: '🤔', color: '#f59e0b' }; // amarelo
+    return { emoji: '🤔', color: '#f59e0b' };
   }
   if (t.startsWith('por que a resposta') || t.startsWith('por que') || t.includes('por que a letra')) {
-    return { emoji: '✅', color: '#10b981' }; // verde — justificativa do gabarito
+    return { emoji: '✅', color: '#10b981' };
   }
   if (t.includes('conceito') || t.includes('teoria') || t.includes('ideia central')) {
-    return { emoji: '💡', color: '#f59e0b' }; // amarelo — revisao conceitual
+    return { emoji: '💡', color: '#f59e0b' };
   }
   if (
     t.includes('caminho') ||
@@ -52,16 +65,13 @@ function getHeadingStyle(text: string): HeadingStyle {
     t.includes('cálculo') ||
     t.includes('calculo')
   ) {
-    return { emoji: '➡️', color: '#3b82f6' }; // azul
-  }
-  if (t.includes('conclus') || t.includes('resposta final') || t.includes('gabarito')) {
-    return { emoji: '✅', color: '#10b981' }; // verde
+    return { emoji: '➡️', color: '#3b82f6' };
   }
   if (t.includes('passo') || t.includes('etapa')) {
-    return { emoji: '📌', color: '#0ea5e9' }; // azul claro (passos)
+    return { emoji: '📌', color: '#0ea5e9' };
   }
   if (t.includes('atenç') || t.includes('cuidado') || t.includes('observ')) {
-    return { emoji: '⚠️', color: '#ef4444' }; // vermelho
+    return { emoji: '⚠️', color: '#ef4444' };
   }
   // Default: cor primary do tema, sem emoji decorativo.
   return { emoji: '', color: 'hsl(var(--primary))' };
