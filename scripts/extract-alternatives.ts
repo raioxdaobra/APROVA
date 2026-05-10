@@ -66,87 +66,110 @@ async function fetchImageBase64(
   }
 }
 
+async function callGroqOnce(
+  model: string,
+  dataUrl: string,
+  apiKey: string,
+): Promise<{ ok: true; content: string } | { ok: false; status: number; err: string }> {
+  try {
+    const res = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: PROMPT },
+                { type: 'image_url', image_url: { url: dataUrl } },
+              ],
+            },
+          ],
+          temperature: 0.1,
+          max_tokens: 800,
+          response_format: { type: 'json_object' },
+        }),
+      },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return { ok: false, status: res.status, err: errText.slice(0, 200) };
+    }
+
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = json.choices?.[0]?.message?.content?.trim() ?? '';
+    return { ok: true, content };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      err: ((err as Error).message ?? String(err)).slice(0, 200),
+    };
+  }
+}
+
 async function extractViaGroq(
   imageUrl: string,
   apiKey: string,
 ): Promise<AlternativesJson | null> {
   const image = await fetchImageBase64(imageUrl);
   if (!image) return null;
-
   const dataUrl = `data:${image.mimeType};base64,${image.data}`;
-  const models = [
-    'meta-llama/llama-4-scout-17b-16e-instruct',
-    'meta-llama/llama-4-maverick-17b-128e-instruct',
-  ];
+
+  // Modelos em ordem de preferencia. Se um nao existir / tiver rate
+  // limit persistente, cai pro proximo.
+  const models = ['meta-llama/llama-4-scout-17b-16e-instruct'];
 
   for (const model of models) {
-    try {
-      const res = await fetch(
-        'https://api.groq.com/openai/v1/chat/completions',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: PROMPT },
-                  { type: 'image_url', image_url: { url: dataUrl } },
-                ],
-              },
-            ],
-            temperature: 0.1,
-            max_tokens: 800,
-            response_format: { type: 'json_object' },
-          }),
-        },
-      );
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        if (res.status === 429) {
-          // Rate limit — espera 30s e tenta proximo modelo
-          await new Promise((r) => setTimeout(r, 30000));
+    // Ate 2 retries por modelo. Em 429, espera 65s e tenta de novo
+    // (rate limit do Groq reseta por minuto). Outros erros: pula.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const out = await callGroqOnce(model, dataUrl, apiKey);
+      if (out.ok) {
+        const cleaned = out.content
+          .replace(/^```(?:json)?\s*/i, '')
+          .replace(/\s*```\s*$/i, '')
+          .trim();
+        try {
+          const parsed = JSON.parse(cleaned) as AlternativesJson;
+          const filled = ['a', 'b', 'c', 'd', 'e'].filter(
+            (k) =>
+              typeof parsed[k as 'a'] === 'string' &&
+              (parsed[k as 'a'] ?? '').length > 0,
+          ).length;
+          if (filled < 3) {
+            console.warn(`  ${model}: so ${filled}/5`);
+            break; // pula esse modelo, tenta proximo
+          }
+          return parsed;
+        } catch (err) {
+          console.warn(
+            `  ${model}: JSON invalido — ${(err as Error).message.slice(0, 80)}`,
+          );
+          break;
         }
-        console.warn(`  ${model}: ${res.status} ${errText.slice(0, 100)}`);
-        continue;
-      }
-
-      const json = (await res.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-      const content = json.choices?.[0]?.message?.content?.trim();
-      if (!content) continue;
-
-      // Remove possiveis markdown code fences
-      const cleaned = content
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```\s*$/i, '')
-        .trim();
-
-      try {
-        const parsed = JSON.parse(cleaned) as AlternativesJson;
-        // Sanity check: precisa ter pelo menos 3 das 5 alternativas
-        const filled = ['a', 'b', 'c', 'd', 'e'].filter(
-          (k) => typeof parsed[k as 'a'] === 'string' && (parsed[k as 'a'] ?? '').length > 0,
-        ).length;
-        if (filled < 3) {
-          console.warn(`  ${model}: so ${filled}/5 alternativas extraidas`);
+      } else if (out.status === 429) {
+        // Rate limit — espera + retry mesmo modelo
+        if (attempt < 2) {
+          process.stdout.write(`  rate limit (espera 65s) `);
+          await new Promise((r) => setTimeout(r, 65000));
           continue;
         }
-        return parsed;
-      } catch (err) {
-        console.warn(`  ${model}: JSON invalido — ${(err as Error).message.slice(0, 80)}`);
-        continue;
+        console.warn(`  ${model}: 429 persistente, pulando`);
+        break;
+      } else {
+        console.warn(`  ${model}: ${out.status} ${out.err.slice(0, 100)}`);
+        break;
       }
-    } catch (err) {
-      console.warn(`  ${model}: ${((err as Error).message ?? '').slice(0, 100)}`);
-      continue;
     }
   }
 
@@ -210,17 +233,26 @@ async function main() {
       continue;
     }
 
-    await client.query(
-      `update public.questions set alternatives = $2::jsonb where id = $1`,
-      [q.id, JSON.stringify(result)],
-    );
+    try {
+      await client.query(
+        `update public.questions set alternatives = $2::jsonb where id = $1`,
+        [q.id, JSON.stringify(result)],
+      );
+    } catch (err) {
+      // Conexao pg caiu — script idempotente, basta re-rodar.
+      console.warn(
+        `\n  pg falhou: ${(err as Error).message.slice(0, 100)}\n  Re-rode o script: alternatives is null filtra os pendentes.`,
+      );
+      break;
+    }
     console.log(
       `✓ A=${(result.a ?? '').slice(0, 30)}... E=${(result.e ?? '').slice(0, 25)}...`,
     );
     ok++;
 
-    // Rate limit cooperative pause (Groq aceita ~30 req/min em multimodal)
-    await new Promise((r) => setTimeout(r, 200));
+    // Rate limit cooperative pause: 2.5s = 24 RPM (limite Groq e ~30 RPM
+    // em multimodal). Margem de seguranca pra nao bater no 429.
+    await new Promise((r) => setTimeout(r, 2500));
   }
 
   const elapsed = ((Date.now() - startMs) / 1000).toFixed(0);
