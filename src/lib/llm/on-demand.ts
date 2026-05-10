@@ -33,58 +33,43 @@ interface QuestionContext {
 
 function resolucaoPrompt(ctx: QuestionContext): string {
   const letter = ctx.correctAnswer ?? '?';
-  // Estrutura em 3 secoes (Abordagem / Resolucao / Analise das alternativas).
-  // O <SolutionMarkdown> renderiza headers H2 com emoji + linha colorida
-  // automaticamente. User pediu pra cada alternativa ser explicada
-  // individualmente — nao basta resolver a questao, tem que justificar
-  // por que cada item esta certo ou errado.
+  // Prompt HONESTO + CONCISO: como nao vemos o enunciado nem as alternativas
+  // nesse caminho (text-only LLM), NAO inventamos a questao nem listamos as 5
+  // alternativas A-E (isso gera resolucao que "nao corresponde a questao",
+  // como o user reclamou). Em vez disso, o LLM faz uma revisao conceitual
+  // focada no subtopico + dica direcionada a alternativa correta. Curto e
+  // util — quando o user quer mais profundidade, abre o chat na tela.
   return [
-    'Você é tutor de vestibular Unifor Medicina. Resolva a questão abaixo',
-    'explicando passo-a-passo o raciocínio E justificando cada uma das 5',
-    'alternativas. Seja conciso e didático.',
+    'Você é tutor de vestibular Unifor Medicina. Não temos o texto da',
+    'questão aqui — apenas a disciplina, subtópico e letra do gabarito.',
+    'Por isso, NÃO invente o enunciado nem liste as 5 alternativas',
+    '(A/B/C/D/E). Faça uma EXPLICAÇÃO CONCEITUAL CURTA do tema, focando',
+    'no que normalmente é cobrado nesse subtópico e por que a resposta',
+    `oficial é a letra ${letter}. Máximo 200 palavras.`,
     '',
     'ESTRUTURA OBRIGATÓRIA (use exatamente esses headers H2):',
     '',
-    '## Abordagem',
-    'Em 2-4 frases, explique qual conceito está sendo cobrado e qual',
-    'estratégia usar. Foque na "ideia" — sem cálculos ainda.',
+    '## Conceito',
+    'Em 2-3 frases, explique a ideia central do subtópico — sem inventar',
+    'detalhes da questão.',
     '',
-    '## Resolução',
-    'Passo a passo do raciocínio até chegar na alternativa correta.',
-    'Use sub-headers `### Passo 1`, `### Passo 2` etc. quando o problema',
-    'tiver mais de uma etapa. Use blocos $$...$$ pra equações.',
+    '## Caminho da resolução',
+    'Em 3-5 passos curtos (use sub-bullets), descreva como tipicamente',
+    'se resolve uma questão desse subtópico. Use LaTeX ($...$ inline,',
+    '$$...$$ display) só se houver fórmula essencial.',
     '',
-    '## Análise das alternativas',
-    'Liste TODAS as 5 alternativas (A, B, C, D, E) — uma linha por',
-    'alternativa, em formato de lista markdown. Para cada incorreta,',
-    'aponte o erro conceitual ou de cálculo (não só "está errado").',
-    'Marque a correta com **CORRETA**:',
+    '## Por que a resposta é ' + letter,
+    'Em 1-2 frases, justifique conceitualmente por que a letra ' + letter,
+    'corresponde a esse tipo de questão (sem afirmar conteúdo específico',
+    'das outras alternativas que você não viu).',
     '',
-    '- **A)** breve descrição — Errada porque [motivo conciso].',
-    '- **B)** breve descrição — Errada porque [motivo conciso].',
-    '- **C)** breve descrição — Errada porque [motivo conciso].',
-    '- **D)** breve descrição — Errada porque [motivo conciso].',
-    '- **E)** breve descrição — Errada porque [motivo conciso].',
-    '',
-    `(A alternativa CORRETA é a ${letter} — substitua a linha correspondente`,
-    'por **CORRETA** com o motivo positivo.)',
-    '',
-    'FORMATO:',
-    '- Markdown com headings ## e listas.',
-    '- LaTeX inline ($...$) e display ($$...$$) para fórmulas.',
-    '- Termine SEMPRE com a frase EXATA: "Portanto, a alternativa correta é a letra ' +
+    'TERMINE SEMPRE com: "Portanto, a alternativa correta é a letra ' +
       letter +
       '."',
     '',
     `Disciplina: ${ctx.discipline ?? 'desconhecida'}`,
     `Subtópico: ${ctx.subtopic ?? 'desconhecido'}`,
     `Resposta correta (gabarito oficial): ${letter}`,
-    '',
-    'Como você não vê o enunciado, baseie a explicação no subtópico e na',
-    'alternativa correta acima — descreva o raciocínio típico para esse',
-    'tipo de questão e infira plausivelmente o que cada alternativa diria',
-    '(distratores comuns pra esse subtópico). Cite fórmulas e conceitos',
-    'chave.',
   ].join('\n');
 }
 

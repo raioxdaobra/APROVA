@@ -38,7 +38,14 @@ function getHeadingStyle(text: string): HeadingStyle {
   if (t.includes('abordagem') || t.includes('estratégia') || t.includes('estrategia')) {
     return { emoji: '🤔', color: '#f59e0b' }; // amarelo
   }
+  if (t.startsWith('por que a resposta') || t.startsWith('por que') || t.includes('por que a letra')) {
+    return { emoji: '✅', color: '#10b981' }; // verde — justificativa do gabarito
+  }
+  if (t.includes('conceito') || t.includes('teoria') || t.includes('ideia central')) {
+    return { emoji: '💡', color: '#f59e0b' }; // amarelo — revisao conceitual
+  }
   if (
+    t.includes('caminho') ||
     t.includes('resoluç') ||
     t.includes('resoluc') ||
     t.includes('passo a passo') ||

@@ -36,13 +36,11 @@ async function main() {
   );
   console.log(`Antes: ${before.rows[0]?.count} resolucoes`);
 
-  // Deleta todas as que NAO tem o header novo (Análise das alternativas).
-  // Isso cobre: stubs, formato antigo, e qualquer corrupcao parcial.
-  const del = await client.query(`
-    delete from public.question_solutions
-     where content_md not ilike '%Análise das alternativas%'
-       and content_md not ilike '%Analise das alternativas%'
-  `);
+  // Deleta TODAS as resolucoes em cache. Motivo: o prompt anterior pedia
+  // pro LLM analisar 5 alternativas que ele nao via — gerava resolucao
+  // que nao correspondia a questao. Prompt agora e curto, conceitual e
+  // honesto. Wipe + lazy regen com novo prompt.
+  const del = await client.query(`delete from public.question_solutions`);
 
   console.log(`Deletadas: ${del.rowCount}`);
 

@@ -56,46 +56,33 @@ interface GenerationResult {
 
 function buildPrompt(q: QuestionRow): string {
   const letter = q.correct_answer ?? 'A';
-  // Prompt estruturado em 3 secoes (Abordagem / Resolucao / Analise das
-  // alternativas). O <SolutionMarkdown> renderiza headers H2 com emoji +
-  // linha colorida automatic-amente (ex: 🤔 Abordagem em amarelo,
-  // ➡️ Resolucao em azul). User pediu (opcao γ) que resolucoes novas
-  // explicassem cada alternativa correta/erradas — e e isso que a secao
-  // "## Análise das alternativas" cobre.
+  // Prompt CURTO + alinhado ao on-demand (3 secoes: Conceito / Caminho da
+  // resolucao / Por que a resposta e LETRA). Aqui temos a IMAGEM da questao
+  // (multimodal Gemini), entao o LLM PODE referenciar o enunciado real.
+  // Pedimos pra ele basear na questao real, nao inventar.
   return [
-    'Você é um professor universitário. Resolva esta questão de vestibular',
-    'Unifor Medicina mostrando o raciocínio passo a passo. A resposta CORRETA',
-    'é a alternativa ' + letter + '. Sua resolução DEVE convergir para esta',
-    'alternativa. Use Markdown e LaTeX KaTeX para fórmulas. Cite fontes',
-    'confiáveis quando aplicável.',
+    'Você é um professor universitário. Você está vendo a imagem da questão',
+    'de vestibular Unifor Medicina abaixo. Resolva-a de forma CONCISA',
+    `(máximo 250 palavras). A resposta correta é a letra ${letter}.`,
     '',
     'Disciplina: ' + q.discipline,
     'Subtópico: ' + q.subtopic,
     '',
     'ESTRUTURA OBRIGATÓRIA (use exatamente esses headers H2):',
     '',
-    '## Abordagem',
-    'Em 2-4 frases, explique qual conceito cobrado e qual estratégia usar.',
-    'Foque na "ideia" — sem cálculos ainda.',
+    '## Conceito',
+    'Em 2-3 frases, identifique o que a questão está testando.',
     '',
-    '## Resolução',
-    'Passo a passo do raciocínio até chegar na alternativa correta.',
-    'Use sub-headers `### Passo 1`, `### Passo 2` etc. quando o problema',
-    'tiver mais de uma etapa. Use blocos $$...$$ pra equações.',
+    '## Caminho da resolução',
+    'Em 3-5 passos curtos (use sub-bullets ou sub-headers `### Passo X`),',
+    'mostre o raciocínio essencial pra chegar na resposta. Use LaTeX',
+    '($...$ inline, $$...$$ display) para fórmulas.',
     '',
-    '## Análise das alternativas',
-    'Liste as 5 alternativas (A, B, C, D, E) — uma linha por alternativa,',
-    'em formato de lista markdown:',
-    '',
-    '- **A)** breve descrição da alternativa — Errada porque [motivo conciso].',
-    '- **B)** breve descrição — Errada porque [motivo conciso].',
-    '- **' + letter + ')** descrição da alternativa — **CORRETA**: [motivo].',
-    '- **D)** breve descrição — Errada porque [motivo conciso].',
-    '- **E)** breve descrição — Errada porque [motivo conciso].',
-    '',
-    '(Substitua A/B/C/D/E na ordem real e marque a correta com **CORRETA**.',
-    'Os motivos das erradas devem ser pedagogicamente úteis — apontem o',
-    'erro conceitual ou de cálculo, não só "está errado".)',
+    `## Por que a resposta é ${letter}`,
+    'Em 2-3 frases, explique pontualmente por que a alternativa ' + letter,
+    'é a correta com base no que a questão pede. Você PODE mencionar 1-2',
+    'distratores principais (a/b/c/d/e que vê na imagem) e o erro',
+    'conceitual de cada um — mas seja BREVE. Não liste todas as 5.',
     '',
     'OBRIGATÓRIO: termine com a frase EXATA:',
     '"Portanto, a alternativa correta é a letra ' + letter + '."',
@@ -271,14 +258,13 @@ async function main(): Promise<void> {
 
   // Filtro varia por modo:
   // - default (gerar novas): so questoes SEM resolucao
-  // - --regen-old: so questoes COM resolucao no formato antigo (sem
-  //   header "Análise das alternativas")
+  // - --regen-old: so questoes COM resolucao no formato antigo (sem o
+  //   header "## Por que a resposta é" — marca distintiva do prompt novo)
   const existsClause = REGEN_OLD
     ? `and exists (
          select 1 from public.question_solutions s
           where s.question_id = q.id
-            and s.content_md not ilike '%Análise das alternativas%'
-            and s.content_md not ilike '%Analise das alternativas%'
+            and s.content_md not ilike '%Por que a resposta%'
        )`
     : `and not exists (
          select 1 from public.question_solutions s where s.question_id = q.id
