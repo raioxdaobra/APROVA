@@ -206,50 +206,225 @@ function resolucaoPromptTextOnly(ctx: QuestionContext): string {
 }
 
 /**
- * Tenta gerar resolucao usando Gemini MULTIMODAL (passa a imagem da questao).
- * Retorna null em qualquer falha (rate limit, sem chave, sem imagem) pra que
- * o caller faca fallback pra chain text-only.
+ * Baixa a imagem da questao como base64 — usado por todos os provedores
+ * multimodais. Retorna null se URL invalida/inacessivel.
  */
-async function tryGeminiMultimodal(ctx: QuestionContext): Promise<{
-  content: string;
-  provider: string;
-} | null> {
+async function fetchImageBase64(
+  imageUrl: string,
+): Promise<{ data: string; mimeType: string } | null> {
+  try {
+    const res = await fetch(imageUrl);
+    if (!res.ok) {
+      console.warn(`[multimodal] fetch image ${imageUrl} status ${res.status}`);
+      return null;
+    }
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const mimeType = res.headers.get('content-type') ?? 'image/jpeg';
+    return { data: buffer.toString('base64'), mimeType };
+  } catch (err) {
+    console.warn('[multimodal] fetch image falhou:', (err as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Tenta Gemini 2.5 Flash multimodal — primeira opcao da chain.
+ * Free-tier 20 req/dia.
+ */
+async function tryGeminiMultimodal(
+  ctx: QuestionContext,
+  image: { data: string; mimeType: string },
+): Promise<{ content: string; provider: string } | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
-  if (!ctx.imageUrl || ctx.imageUrl.trim().length === 0) return null;
 
   try {
     const mod = (await import('@google/generative-ai')) as typeof import('@google/generative-ai');
     const genAI = new mod.GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // Baixa a imagem como base64 pra passar como inlineData (multimodal).
-    const res = await fetch(ctx.imageUrl);
-    if (!res.ok) {
-      console.warn(
-        `[on-demand multimodal] fetch image ${ctx.imageUrl} status ${res.status}`,
-      );
-      return null;
-    }
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const mimeType = res.headers.get('content-type') ?? 'image/jpeg';
-
     const result = await model.generateContent([
-      { inlineData: { data: buffer.toString('base64'), mimeType } },
+      { inlineData: { data: image.data, mimeType: image.mimeType } },
       { text: resolucaoPromptMultimodal(ctx) },
     ]);
     const content = result.response.text().trim();
     if (!content) return null;
-
     return { content, provider: 'gemini-2.5-flash-multimodal' };
   } catch (err) {
-    const msg = (err as Error).message ?? String(err);
     console.warn(
-      '[on-demand multimodal] falhou:',
-      msg.slice(0, 200),
+      '[multimodal gemini] falhou:',
+      ((err as Error).message ?? String(err)).slice(0, 200),
     );
     return null;
   }
+}
+
+/**
+ * Tenta Groq com modelo Llama 4 Scout (multimodal). Free-tier generoso.
+ * Usa a API OpenAI-compatible do Groq.
+ */
+async function tryGroqMultimodal(
+  ctx: QuestionContext,
+  image: { data: string; mimeType: string },
+): Promise<{ content: string; provider: string } | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  // Modelos multimodais do Groq, em ordem de preferencia. Se um nao
+  // existir mais no catalogo, o proximo e tentado.
+  const models = [
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'meta-llama/llama-4-maverick-17b-128e-instruct',
+    'llama-3.2-90b-vision-preview',
+    'llama-3.2-11b-vision-preview',
+  ];
+
+  for (const model of models) {
+    try {
+      const dataUrl = `data:${image.mimeType};base64,${image.data}`;
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: resolucaoPromptMultimodal(ctx) },
+                { type: 'image_url', image_url: { url: dataUrl } },
+              ],
+            },
+          ],
+          temperature: 0.3,
+          max_tokens: 2000,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.warn(
+          `[multimodal groq:${model}] status ${res.status}: ${errText.slice(0, 200)}`,
+        );
+        continue; // tenta o proximo modelo
+      }
+
+      const json = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const content = json.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        continue;
+      }
+      return { content, provider: `groq-${model}` };
+    } catch (err) {
+      console.warn(
+        `[multimodal groq:${model}] falhou:`,
+        ((err as Error).message ?? String(err)).slice(0, 200),
+      );
+      continue;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Tenta Mistral Pixtral (multimodal). Free-tier disponivel.
+ */
+async function tryMistralMultimodal(
+  ctx: QuestionContext,
+  image: { data: string; mimeType: string },
+): Promise<{ content: string; provider: string } | null> {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) return null;
+
+  // Pixtral e o modelo multimodal da Mistral. 12b e o free-tier; large
+  // pode requerer pagamento dependendo da chave.
+  const models = ['pixtral-12b-2409', 'pixtral-large-latest'];
+
+  for (const model of models) {
+    try {
+      const dataUrl = `data:${image.mimeType};base64,${image.data}`;
+      const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: resolucaoPromptMultimodal(ctx) },
+                { type: 'image_url', image_url: dataUrl },
+              ],
+            },
+          ],
+          temperature: 0.3,
+          max_tokens: 2000,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.warn(
+          `[multimodal mistral:${model}] status ${res.status}: ${errText.slice(0, 200)}`,
+        );
+        continue;
+      }
+
+      const json = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const content = json.choices?.[0]?.message?.content?.trim();
+      if (!content) continue;
+      return { content, provider: `mistral-${model}` };
+    } catch (err) {
+      console.warn(
+        `[multimodal mistral:${model}] falhou:`,
+        ((err as Error).message ?? String(err)).slice(0, 200),
+      );
+      continue;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * CHAIN multimodal — tenta Gemini, Groq e Mistral em sequencia. Cada um
+ * tem rate limit separado, entao quando o primeiro estoura, os outros
+ * provavelmente ainda funcionam. So retorna null se TODOS falharem (ai
+ * o caller cai pro text-only sem imagem).
+ */
+async function tryMultimodalChain(
+  ctx: QuestionContext,
+): Promise<{ content: string; provider: string } | null> {
+  if (!ctx.imageUrl || ctx.imageUrl.trim().length === 0) return null;
+
+  const image = await fetchImageBase64(ctx.imageUrl);
+  if (!image) return null;
+
+  // Gemini primeiro (qualidade alta, mas free-tier 20/dia).
+  const gemini = await tryGeminiMultimodal(ctx, image);
+  if (gemini) return gemini;
+
+  // Groq Llama 4 Scout (rapido + free-tier generoso).
+  const groq = await tryGroqMultimodal(ctx, image);
+  if (groq) return groq;
+
+  // Mistral Pixtral (free-tier disponivel).
+  const mistral = await tryMistralMultimodal(ctx, image);
+  if (mistral) return mistral;
+
+  console.warn('[multimodal chain] TODOS os providers falharam, caindo pro text-only');
+  return null;
 }
 
 function teoriaPrompt(discipline: string, subtopic: string): string {
@@ -314,7 +489,7 @@ export async function getOrGenerateResolucao(
   // aqui = LLM ve enunciado + 5 alternativas e analisa item-a-item de verdade.
   let content: string;
   let provider: string;
-  const multimodal = await tryGeminiMultimodal(ctx);
+  const multimodal = await tryMultimodalChain(ctx);
   if (multimodal) {
     content = multimodal.content;
     provider = multimodal.provider;
@@ -377,7 +552,7 @@ async function generateEphemeralResolucao(
   generated_by: string;
   reviewed: boolean;
 } | null> {
-  const multimodal = await tryGeminiMultimodal(ctx);
+  const multimodal = await tryMultimodalChain(ctx);
   if (multimodal) {
     return {
       content_md: multimodal.content,
