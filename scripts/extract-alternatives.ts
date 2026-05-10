@@ -117,6 +117,72 @@ async function callGroqOnce(
   }
 }
 
+async function callMistralPixtralOnce(
+  dataUrl: string,
+  apiKey: string,
+): Promise<{ ok: true; content: string } | { ok: false; status: number; err: string }> {
+  try {
+    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'pixtral-12b-2409',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: PROMPT },
+              { type: 'image_url', image_url: dataUrl },
+            ],
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 800,
+        response_format: { type: 'json_object' },
+      }),
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        err: (await res.text().catch(() => '')).slice(0, 200),
+      };
+    }
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return { ok: true, content: json.choices?.[0]?.message?.content?.trim() ?? '' };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      err: ((err as Error).message ?? String(err)).slice(0, 200),
+    };
+  }
+}
+
+function parseAlts(content: string): AlternativesJson | null {
+  const cleaned = content
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
+  try {
+    const parsed = JSON.parse(cleaned) as AlternativesJson;
+    const filled = ['a', 'b', 'c', 'd', 'e'].filter(
+      (k) =>
+        typeof parsed[k as 'a'] === 'string' &&
+        (parsed[k as 'a'] ?? '').length > 0,
+    ).length;
+    if (filled < 3) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 async function extractViaGroq(
   imageUrl: string,
   apiKey: string,
@@ -125,54 +191,56 @@ async function extractViaGroq(
   if (!image) return null;
   const dataUrl = `data:${image.mimeType};base64,${image.data}`;
 
-  // Modelos em ordem de preferencia. Se um nao existir / tiver rate
-  // limit persistente, cai pro proximo.
-  const models = ['meta-llama/llama-4-scout-17b-16e-instruct'];
-
-  for (const model of models) {
-    // Ate 2 retries por modelo. Em 429, espera 65s e tenta de novo
-    // (rate limit do Groq reseta por minuto). Outros erros: pula.
+  // PROVIDER CHAIN INVERTIDA: Groq Llama 4 Scout daily quota esgotou hoje,
+  // entao Mistral Pixtral 12b VAI PRIMEIRO (resposta rapida, ~3s/req).
+  // Se Mistral falhar, tenta Groq (que pode ter resetado em janela mais
+  // recente, ou esta pendurado em 429 — descobrimos chamando).
+  const mistralKey = process.env.MISTRAL_API_KEY;
+  if (mistralKey) {
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const out = await callGroqOnce(model, dataUrl, apiKey);
+      const out = await callMistralPixtralOnce(dataUrl, mistralKey);
       if (out.ok) {
-        const cleaned = out.content
-          .replace(/^```(?:json)?\s*/i, '')
-          .replace(/\s*```\s*$/i, '')
-          .trim();
-        try {
-          const parsed = JSON.parse(cleaned) as AlternativesJson;
-          const filled = ['a', 'b', 'c', 'd', 'e'].filter(
-            (k) =>
-              typeof parsed[k as 'a'] === 'string' &&
-              (parsed[k as 'a'] ?? '').length > 0,
-          ).length;
-          if (filled < 3) {
-            console.warn(`  ${model}: so ${filled}/5`);
-            break; // pula esse modelo, tenta proximo
-          }
-          return parsed;
-        } catch (err) {
-          console.warn(
-            `  ${model}: JSON invalido — ${(err as Error).message.slice(0, 80)}`,
-          );
-          break;
-        }
+        const parsed = parseAlts(out.content);
+        if (parsed) return parsed;
+        console.warn(`  mistral: parse falhou`);
+        break;
       } else if (out.status === 429) {
-        // Rate limit — espera + retry mesmo modelo
         if (attempt < 2) {
-          process.stdout.write(`  rate limit (espera 65s) `);
-          await new Promise((r) => setTimeout(r, 65000));
+          process.stdout.write(`  rate limit mistral (espera 30s) `);
+          await new Promise((r) => setTimeout(r, 30000));
           continue;
         }
-        console.warn(`  ${model}: 429 persistente, pulando`);
+        process.stdout.write(`  mistral 429 -> groq `);
         break;
       } else {
-        console.warn(`  ${model}: ${out.status} ${out.err.slice(0, 100)}`);
+        console.warn(`  mistral: ${out.status} ${out.err.slice(0, 60)}`);
         break;
       }
     }
   }
 
+  // Fallback: Groq Llama 4 Scout (pode ter cota disponivel se Mistral falhou)
+  const groqModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const out = await callGroqOnce(groqModel, dataUrl, apiKey);
+    if (out.ok) {
+      const parsed = parseAlts(out.content);
+      if (parsed) return parsed;
+      console.warn(`  groq: parse falhou`);
+      return null;
+    } else if (out.status === 429) {
+      if (attempt < 2) {
+        process.stdout.write(`  rate limit groq (espera 65s) `);
+        await new Promise((r) => setTimeout(r, 65000));
+        continue;
+      }
+      console.warn(`  groq 429 persistente`);
+      return null;
+    } else {
+      console.warn(`  groq: ${out.status} ${out.err.slice(0, 60)}`);
+      return null;
+    }
+  }
   return null;
 }
 

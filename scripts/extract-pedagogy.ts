@@ -199,6 +199,71 @@ function validate(parsed: PedagogyJson): boolean {
   return true;
 }
 
+async function callMistralPixtral(
+  dataUrl: string,
+  apiKey: string,
+): Promise<{ ok: true; content: string } | { ok: false; status: number; err: string }> {
+  try {
+    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'pixtral-12b-2409',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: PROMPT },
+              { type: 'image_url', image_url: dataUrl },
+            ],
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 400,
+        response_format: { type: 'json_object' },
+      }),
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        err: (await res.text().catch(() => '')).slice(0, 200),
+      };
+    }
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return { ok: true, content: json.choices?.[0]?.message?.content?.trim() ?? '' };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      err: ((err as Error).message ?? String(err)).slice(0, 200),
+    };
+  }
+}
+
+function tryParsePedagogy(content: string): PedagogyJson | null {
+  const cleaned = content
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
+  try {
+    const parsed = JSON.parse(cleaned) as PedagogyJson;
+    if (!validate(parsed)) return null;
+    if (parsed.palavra_chave_enunciado) {
+      parsed.palavra_chave_enunciado =
+        parsed.palavra_chave_enunciado.toLowerCase().trim();
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 async function extractPedagogy(
   imageUrl: string,
   apiKey: string,
@@ -206,41 +271,47 @@ async function extractPedagogy(
   const image = await fetchImageBase64(imageUrl);
   if (!image) return null;
   const dataUrl = `data:${image.mimeType};base64,${image.data}`;
-  const model = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const out = await callGroq(model, dataUrl, apiKey);
-    if (out.ok) {
-      const cleaned = out.content
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```\s*$/i, '')
-        .trim();
-      try {
-        const parsed = JSON.parse(cleaned) as PedagogyJson;
-        if (!validate(parsed)) {
-          console.warn(`  schema invalido — ${JSON.stringify(parsed).slice(0, 100)}`);
-          return null;
+  // Mistral primeiro (Groq daily quota esgotou), Groq como fallback.
+  const mistralKey = process.env.MISTRAL_API_KEY;
+  if (mistralKey) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const out = await callMistralPixtral(dataUrl, mistralKey);
+      if (out.ok) {
+        const parsed = tryParsePedagogy(out.content);
+        if (parsed) return parsed;
+        break;
+      } else if (out.status === 429) {
+        if (attempt < 2) {
+          process.stdout.write(`  mistral 429 (espera 30s) `);
+          await new Promise((r) => setTimeout(r, 30000));
+          continue;
         }
-        // Normaliza palavra_chave (remove pontuacao, lowercase)
-        if (parsed.palavra_chave_enunciado) {
-          parsed.palavra_chave_enunciado =
-            parsed.palavra_chave_enunciado.toLowerCase().trim();
-        }
-        return parsed;
-      } catch (err) {
-        console.warn(`  JSON invalido — ${(err as Error).message.slice(0, 80)}`);
-        return null;
+        process.stdout.write(`  mistral 429 -> groq `);
+        break;
+      } else {
+        console.warn(`  mistral: ${out.status} ${out.err.slice(0, 60)}`);
+        break;
       }
+    }
+  }
+
+  const groqModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const out = await callGroq(groqModel, dataUrl, apiKey);
+    if (out.ok) {
+      const parsed = tryParsePedagogy(out.content);
+      if (parsed) return parsed;
+      return null;
     } else if (out.status === 429) {
       if (attempt < 2) {
-        process.stdout.write(`  rate limit (espera 65s) `);
+        process.stdout.write(`  groq 429 (espera 65s) `);
         await new Promise((r) => setTimeout(r, 65000));
         continue;
       }
-      console.warn(`  429 persistente, pulando`);
       return null;
     } else {
-      console.warn(`  ${out.status} ${out.err.slice(0, 100)}`);
+      console.warn(`  groq: ${out.status} ${out.err.slice(0, 100)}`);
       return null;
     }
   }
