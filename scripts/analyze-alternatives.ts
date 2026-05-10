@@ -100,6 +100,14 @@ interface AltsRow {
   subtopic: string;
   correct_answer: 'A' | 'B' | 'C' | 'D' | 'E';
   alternatives: { a?: string; b?: string; c?: string; d?: string; e?: string };
+  pedagogy: {
+    bloom?: string;
+    tipo?: string;
+    formato?: string;
+    estrategia_distratores?: string;
+    complexidade?: number;
+    palavra_chave_enunciado?: string;
+  } | null;
 }
 
 const LETTERS = ['a', 'b', 'c', 'd', 'e'] as const;
@@ -240,7 +248,7 @@ async function main() {
   await client.connect();
 
   const { rows } = await client.query<AltsRow>(`
-    select id, discipline, subtopic, correct_answer, alternatives
+    select id, discipline, subtopic, correct_answer, alternatives, pedagogy
       from public.questions
      where exam = 'unifor-medicina'
        and coalesce(annulled, false) = false
@@ -248,7 +256,10 @@ async function main() {
        and correct_answer is not null
   `);
 
-  console.log(`Analisando ${rows.length} questoes com alternatives...`);
+  const withPedagogy = rows.filter((r) => r.pedagogy !== null).length;
+  console.log(
+    `Analisando ${rows.length} questoes (com alternatives) — ${withPedagogy} tambem com pedagogy.`,
+  );
 
   const overall = emptyStats();
   const byDiscipline = new Map<string, Stats>();
@@ -381,7 +392,156 @@ async function main() {
     );
   }
 
-  // 8. Conclusão prática
+  // 8. ANALISE PEDAGOGICA — so renderiza se houver dados pedagogy
+  const pedagogyRows = rows.filter((r) => r.pedagogy !== null);
+  if (pedagogyRows.length > 0) {
+    md.push('\n## 8. Análise pedagógica\n');
+    md.push(
+      `> Baseado em ${pedagogyRows.length} questões com classificação pedagógica.\n`,
+    );
+
+    // Bloom: distribuição
+    const bloomCount = new Map<string, number>();
+    const tipoCount = new Map<string, number>();
+    const formatoCount = new Map<string, number>();
+    const estrategiaCount = new Map<string, number>();
+    const complexCount = [0, 0, 0, 0, 0]; // 1..5
+    // Bloom × letra correta
+    const bloomXLetter = new Map<string, Record<string, number>>();
+    // Estratégia × letra correta
+    const estrategiaXLetter = new Map<string, Record<string, number>>();
+    // Complexidade × disciplina (média)
+    const complexByDiscipline = new Map<string, number[]>();
+
+    for (const r of pedagogyRows) {
+      const p = r.pedagogy!;
+      const bloom = p.bloom ?? '?';
+      const tipo = p.tipo ?? '?';
+      const formato = p.formato ?? '?';
+      const estrategia = p.estrategia_distratores ?? '?';
+      const cx = typeof p.complexidade === 'number' ? p.complexidade : 0;
+
+      bloomCount.set(bloom, (bloomCount.get(bloom) ?? 0) + 1);
+      tipoCount.set(tipo, (tipoCount.get(tipo) ?? 0) + 1);
+      formatoCount.set(formato, (formatoCount.get(formato) ?? 0) + 1);
+      estrategiaCount.set(estrategia, (estrategiaCount.get(estrategia) ?? 0) + 1);
+      if (cx >= 1 && cx <= 5) complexCount[cx - 1]!++;
+
+      if (!bloomXLetter.has(bloom)) {
+        bloomXLetter.set(bloom, { A: 0, B: 0, C: 0, D: 0, E: 0 });
+      }
+      bloomXLetter.get(bloom)![r.correct_answer]!++;
+
+      if (!estrategiaXLetter.has(estrategia)) {
+        estrategiaXLetter.set(estrategia, { A: 0, B: 0, C: 0, D: 0, E: 0 });
+      }
+      estrategiaXLetter.get(estrategia)![r.correct_answer]!++;
+
+      if (!complexByDiscipline.has(r.discipline)) {
+        complexByDiscipline.set(r.discipline, []);
+      }
+      if (cx > 0) complexByDiscipline.get(r.discipline)!.push(cx);
+    }
+
+    // 8.1 Distribuição Bloom
+    md.push('\n### 8.1 Distribuição por nível de Bloom\n');
+    md.push('| Nível | Contagem | % |');
+    md.push('|---|---|---|');
+    const bloomOrder = ['lembrar', 'compreender', 'aplicar', 'analisar', 'avaliar', 'criar'];
+    for (const b of bloomOrder) {
+      const n = bloomCount.get(b) ?? 0;
+      md.push(`| ${b} | ${n} | ${pct(n, pedagogyRows.length)} |`);
+    }
+    const dominantBloom = [...bloomCount.entries()].sort((a, b) => b[1] - a[1])[0];
+    md.push(`\n**Dominante:** ${dominantBloom?.[0] ?? '?'} (${pct(dominantBloom?.[1] ?? 0, pedagogyRows.length)})`);
+
+    // 8.2 Tipo
+    md.push('\n### 8.2 Tipo de questão\n');
+    md.push('| Tipo | Contagem | % |');
+    md.push('|---|---|---|');
+    for (const [k, n] of [...tipoCount.entries()].sort((a, b) => b[1] - a[1])) {
+      md.push(`| ${k} | ${n} | ${pct(n, pedagogyRows.length)} |`);
+    }
+
+    // 8.3 Formato
+    md.push('\n### 8.3 Formato\n');
+    md.push('| Formato | Contagem | % |');
+    md.push('|---|---|---|');
+    for (const [k, n] of [...formatoCount.entries()].sort((a, b) => b[1] - a[1])) {
+      md.push(`| ${k} | ${n} | ${pct(n, pedagogyRows.length)} |`);
+    }
+
+    // 8.4 Estratégia de distratores
+    md.push('\n### 8.4 Estratégia mais comum dos distratores\n');
+    md.push('| Estratégia | Contagem | % |');
+    md.push('|---|---|---|');
+    for (const [k, n] of [...estrategiaCount.entries()].sort((a, b) => b[1] - a[1])) {
+      md.push(`| ${k} | ${n} | ${pct(n, pedagogyRows.length)} |`);
+    }
+
+    // 8.5 Complexidade
+    md.push('\n### 8.5 Complexidade (carga cognitiva)\n');
+    md.push('| Nível | Contagem | % |');
+    md.push('|---|---|---|');
+    for (let i = 0; i < 5; i++) {
+      const n = complexCount[i] ?? 0;
+      md.push(`| ${i + 1} | ${n} | ${pct(n, pedagogyRows.length)} |`);
+    }
+    const avgComplex =
+      complexCount.reduce((s, n, i) => s + n * (i + 1), 0) /
+      Math.max(1, complexCount.reduce((s, n) => s + n, 0));
+    md.push(`\n**Média geral:** ${avgComplex.toFixed(2)} / 5`);
+
+    // 8.6 Complexidade por disciplina
+    md.push('\n### 8.6 Complexidade média por disciplina\n');
+    md.push('| Disciplina | n | Média |');
+    md.push('|---|---|---|');
+    const disciplineComplex: Array<{ d: string; m: number; n: number }> = [];
+    for (const [d, vals] of complexByDiscipline.entries()) {
+      const m = vals.reduce((s, n) => s + n, 0) / Math.max(1, vals.length);
+      disciplineComplex.push({ d, m, n: vals.length });
+    }
+    for (const { d, m, n } of disciplineComplex.sort((a, b) => b.m - a.m)) {
+      md.push(`| ${d} | ${n} | ${m.toFixed(2)} |`);
+    }
+
+    // 8.7 Bloom × Letra correta
+    md.push('\n### 8.7 Letra correta por nível de Bloom\n');
+    md.push('| Bloom | n | A | B | C | D | E | Líder |');
+    md.push('|---|---|---|---|---|---|---|---|');
+    for (const b of bloomOrder) {
+      const dist = bloomXLetter.get(b);
+      if (!dist) continue;
+      const total = Object.values(dist).reduce((s, n) => s + n, 0);
+      if (total === 0) continue;
+      const leader = Object.entries(dist).sort((a, b) => b[1] - a[1])[0]![0];
+      md.push(
+        `| ${b} | ${total} | ${pct(dist.A!, total)} | ${pct(dist.B!, total)} | ${pct(dist.C!, total)} | ${pct(dist.D!, total)} | ${pct(dist.E!, total)} | **${leader}** |`,
+      );
+    }
+
+    // 8.8 Estratégia × Letra correta (insight: distratores que adotam
+    // certa estratégia tendem a deixar qual letra como correta?)
+    md.push('\n### 8.8 Letra correta por estratégia de distrator\n');
+    md.push(
+      '> Quando os distratores são todos do mesmo tipo, qual letra costuma ser a correta?\n',
+    );
+    md.push('| Estratégia | n | Letra mais comum |');
+    md.push('|---|---|---|');
+    for (const [estr, dist] of [...estrategiaXLetter.entries()].sort(
+      (a, b) =>
+        Object.values(b[1]).reduce((s, n) => s + n, 0) -
+        Object.values(a[1]).reduce((s, n) => s + n, 0),
+    )) {
+      const total = Object.values(dist).reduce((s, n) => s + n, 0);
+      const leader = Object.entries(dist).sort((a, b) => b[1] - a[1])[0]!;
+      md.push(
+        `| ${estr} | ${total} | **${leader[0]}** (${pct(leader[1], total)}) |`,
+      );
+    }
+  }
+
+  // 9. Conclusão prática
   md.push('\n## 🎯 Cheat sheet final\n');
   md.push('Se precisar chutar, em ordem de prioridade:');
   md.push('');
