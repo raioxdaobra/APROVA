@@ -5,7 +5,7 @@
  * autenticadas. Substitui a sidebar lateral (removida do AppShell)
  * conforme pedido do user "excluir o menu lateral".
  *
- * Itens: Início, Trilha, Revisão, Missões, Jogos, Configurações.
+ * Itens: Início, Trilha, Missões, Configurações.
  *
  * Estatísticas e Ranking NÃO aparecem aqui — viraram icones grandes
  * coloridos no card "Resolver questões" do dashboard. Regra: o que esta
@@ -22,7 +22,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Gamepad2,
   Home,
   ListChecks,
   Map as MapIcon,
@@ -40,6 +39,9 @@ interface NavItem {
 
 // Revisão saiu daqui — virou icone grande no card "Resolver questões" do
 // dashboard (regra: o que esta no card nao duplica na barra horizontal).
+// Jogos saiu daqui — funcionalidade ainda em refinamento, user pediu pra
+// remover ate ele finalizar a melhoria. Reabilitar e simples: re-adicionar
+// o entry abaixo + restaurar import { Gamepad2 }.
 const ITEMS: NavItem[] = [
   {
     href: '/dashboard',
@@ -61,13 +63,6 @@ const ITEMS: NavItem[] = [
     Icon: ListChecks,
     match: (p) => p === '/missoes' || p.startsWith('/missoes/'),
     accentVar: '--primary',
-  },
-  {
-    href: '/jogos',
-    label: 'Jogos',
-    Icon: Gamepad2,
-    match: (p) => p === '/jogos' || p.startsWith('/jogos/'),
-    accentVar: '--accent-jogos',
   },
   {
     href: '/configuracoes',
@@ -127,7 +122,7 @@ export function MobileBottomNav(): JSX.Element | null {
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto grid max-w-2xl grid-cols-5">
+      <ul className="mx-auto grid max-w-2xl grid-cols-4">
         {ITEMS.map(({ href, label, Icon, match, accentVar }) => {
           const active = match(pathname);
           return (

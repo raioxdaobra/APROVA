@@ -224,6 +224,57 @@ export default async function RankingPage() {
           </div>
         )}
 
+        {/* Card "Você" — sempre renderizado, mostra o usuario no topo
+            independente de status (publico/privado, com/sem XP, no/fora
+            top 50). User pediu pra pessoa SEMPRE se enxergar no ranking
+            com o proprio nome. Os 4 estados:
+              1. Esta no top 50 publico → so destaca a linha na tabela
+                 (este card NAO renderiza pra evitar duplicidade)
+              2. Publico + fora top 50 + tem XP → mostra posicao real #N
+              3. Privado + tem XP → mostra XP + aviso "outros nao veem"
+              4. Sem XP esta semana → CTA "comece a resolver" */}
+        {!userInTop50 && (
+          <Card className="border-l-4 border-l-primary p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base font-bold text-primary">
+                {(displayName[0] ?? '?').toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  Você — {displayName}
+                </p>
+                {(myRow?.xp ?? 0) > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {isPublic && myPosition
+                      ? `Posição #${myPosition} · `
+                      : isPublic
+                        ? 'Calculando posição… · '
+                        : 'Perfil oculto pra outros · '}
+                    {formatNumber(myRow?.questions_answered ?? 0)}{' '}
+                    {(myRow?.questions_answered ?? 0) === 1 ? 'questão' : 'questões'}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Você ainda não pontuou esta semana — resolva questões pra
+                    entrar no ranking
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                <p
+                  className="text-xl font-bold tabular-nums text-primary"
+                  aria-label={`${myRow?.xp ?? 0} XP`}
+                >
+                  {formatNumber(myRow?.xp ?? 0)}
+                </p>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  XP
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {top50Rows.length === 0 ? (
           <Card className="p-6 text-center">
             <p className="text-sm text-muted-foreground">
@@ -233,27 +284,6 @@ export default async function RankingPage() {
           </Card>
         ) : (
           <Card className="overflow-hidden p-0">
-            {!userInTop50 && isPublic && myPosition && username && (
-              <div
-                className={cn(
-                  'sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-primary/5 px-4 py-3 backdrop-blur',
-                  'border-l-2 border-l-primary',
-                )}
-              >
-                <span className="w-12 text-sm font-semibold tabular-nums text-foreground">
-                  #{myPosition}
-                </span>
-                <span className="flex-1 text-sm font-semibold text-foreground">
-                  Você — {displayName}
-                </span>
-                <span className="w-20 text-right text-sm tabular-nums text-foreground">
-                  {formatNumber(myRow?.xp ?? 0)} XP
-                </span>
-                <span className="hidden w-24 text-right text-sm tabular-nums text-muted-foreground sm:inline-block">
-                  {formatNumber(myRow?.questions_answered ?? 0)} q
-                </span>
-              </div>
-            )}
 
             <table className="w-full text-sm">
               <thead>
