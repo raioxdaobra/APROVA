@@ -720,6 +720,8 @@ export function QuizRunner({
         body={bodySlot}
         imageUrl={current.image_url}
         imageAlt={imageAlt}
+        enableLightbox={false}
+        enableFullscreen={false}
       />
 
       {xpToast !== null ? (

@@ -80,6 +80,7 @@ export function QuestionResultExpander({
           {imageUrl ? (
             <QuestionLayout
               enableFullscreen={false}
+              enableLightbox={false}
               image={
                 <Card className="overflow-hidden p-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -356,6 +356,8 @@ export function SimuladoRunner({
           body={bodySlot}
           imageUrl={current.image_url}
           imageAlt={imageAlt}
+          enableLightbox={false}
+          enableFullscreen={false}
         />
       </section>
 
