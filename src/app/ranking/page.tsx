@@ -139,25 +139,38 @@ export default async function RankingPage() {
 
   const currentWeekStart = weekStartInFortaleza(new Date().toISOString());
 
-  const [{ data: profile }, { data: top50 }, { data: myRow }] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('username, display_name, is_public_in_leaderboard, is_admin')
-      .eq('id', user.id)
-      .maybeSingle(),
-    supabase
-      .from('weekly_leaderboard')
-      .select('username, display_name, position, xp, questions_answered, week_start')
-      .eq('week_start', currentWeekStart)
-      .order('position', { ascending: true })
-      .limit(50),
-    supabase
-      .from('weekly_xp')
-      .select('xp, questions_answered')
-      .eq('user_id', user.id)
-      .eq('week_start', currentWeekStart)
-      .maybeSingle(),
-  ]);
+  // Calcula semana passada (currentWeekStart - 7 dias) pra mostrar como
+  // referencia quando a semana atual estiver vazia/quase vazia.
+  const prevWeekDate = new Date(`${currentWeekStart}T00:00:00Z`);
+  prevWeekDate.setUTCDate(prevWeekDate.getUTCDate() - 7);
+  const prevWeekStart = prevWeekDate.toISOString().slice(0, 10);
+
+  const [{ data: profile }, { data: top50 }, { data: myRow }, { data: prevWeekTop }] =
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .select('username, display_name, is_public_in_leaderboard, is_admin')
+        .eq('id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('weekly_leaderboard')
+        .select('username, display_name, position, xp, questions_answered, week_start')
+        .eq('week_start', currentWeekStart)
+        .order('position', { ascending: true })
+        .limit(50),
+      supabase
+        .from('weekly_xp')
+        .select('xp, questions_answered')
+        .eq('user_id', user.id)
+        .eq('week_start', currentWeekStart)
+        .maybeSingle(),
+      supabase
+        .from('weekly_leaderboard')
+        .select('username, display_name, position, xp, questions_answered')
+        .eq('week_start', prevWeekStart)
+        .order('position', { ascending: true })
+        .limit(10),
+    ]);
 
   const username = profile?.username ?? '';
   const displayName = profile?.display_name ?? username ?? 'estudante';
@@ -336,6 +349,78 @@ export default async function RankingPage() {
             </table>
           </Card>
         )}
+
+        {/* Ranking da semana passada — mostra como referencia quando a
+            semana atual tem poucos competidores. Toda segunda-feira o
+            ranking reseta; sem isso, a tela parece "vazia" no inicio
+            de cada semana. Anonimiza igual (codinome animal), proprio
+            user destacado em azul. */}
+        {top50Rows.length <= 1 && (prevWeekTop ?? []).length > 0 ? (
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">
+                Semana passada
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                referência — top 10
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Toda segunda-feira o ranking começa zerado. Conforme outros
+              vestibulandos estudarem essa semana, eles aparecem no ranking
+              atual acima.
+            </p>
+            <Card className="overflow-hidden p-0 opacity-90">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="w-16 px-4 py-2 font-semibold">Pos.</th>
+                    <th className="px-4 py-2 font-semibold">Estudante</th>
+                    <th className="w-24 px-4 py-2 text-right font-semibold">XP</th>
+                    <th className="hidden w-28 px-4 py-2 text-right font-semibold sm:table-cell">
+                      Questões
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(prevWeekTop ?? []).map((row) => {
+                    const isMe = row.username === username;
+                    const displayLabel = isMe
+                      ? row.display_name
+                      : codinomeFor(row.username);
+                    return (
+                      <tr
+                        key={`prev-${row.username}-${row.position}`}
+                        className={cn(
+                          'border-b border-border last:border-0',
+                          isMe && 'border-l-2 border-l-primary bg-primary/5',
+                        )}
+                      >
+                        <td className="px-4 py-2.5 text-muted-foreground">
+                          <span className="tabular-nums">#{row.position}</span>
+                        </td>
+                        <td className="px-4 py-2.5 font-medium text-foreground">
+                          {displayLabel}
+                          {isMe ? (
+                            <span className="ml-2 text-xs font-normal text-primary">
+                              você
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                          {formatNumber(row.xp ?? 0)}
+                        </td>
+                        <td className="hidden px-4 py-2.5 text-right tabular-nums text-muted-foreground sm:table-cell">
+                          {formatNumber(row.questions_answered ?? 0)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Card>
+          </section>
+        ) : null}
 
         <BackButton fallbackHref="/dashboard" className="self-start" />
       </main>
