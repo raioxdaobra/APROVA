@@ -201,15 +201,30 @@ export function SimuladoRunner({
 
   const hasImage = Boolean(current.image_url && current.image_url.trim().length > 0);
   const imageSlot = hasImage ? (
-    <Card className="overflow-hidden p-0">
+    <Card
+      className="overflow-hidden p-0"
+      style={{
+        touchAction: 'pan-y',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+      }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={current.image_url}
         alt={imageAlt}
         width={1200}
         height={800}
-        className="h-auto w-full"
+        className="h-auto w-full pointer-events-none select-none"
         loading={currentIndex === 0 ? 'eager' : 'lazy'}
+        draggable={false}
+        style={
+          {
+            WebkitUserDrag: 'none',
+            WebkitTouchCallout: 'none',
+          } as React.CSSProperties
+        }
       />
     </Card>
   ) : (

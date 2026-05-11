@@ -385,16 +385,31 @@ export function QuizRunner({
   const hasImage = Boolean(current.image_url && current.image_url.trim().length > 0);
   const imageSlot = hasImage ? (
     <Card className="overflow-hidden p-0">
-      <div className="relative w-full bg-stone-100">
+      {/* Container com TODAS as protecoes pra imagem nao reagir a gestos
+          de toque no mobile (long-press menu, double-tap zoom, pinch). */}
+      <div
+        className="relative w-full bg-stone-100"
+        style={{
+          touchAction: 'pan-y',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }}
+      >
         <Image
           src={current.image_url}
           alt={imageAlt}
           width={1200}
           height={800}
           sizes="(max-width: 1024px) 100vw, 60vw"
-          className="h-auto w-full rounded-lg"
+          className="h-auto w-full rounded-lg pointer-events-none select-none"
           priority={currentIndex === 0}
           unoptimized
+          draggable={false}
+          style={{
+            WebkitUserDrag: 'none',
+            WebkitTouchCallout: 'none',
+          } as React.CSSProperties}
         />
       </div>
     </Card>
