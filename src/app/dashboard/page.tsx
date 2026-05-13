@@ -170,6 +170,20 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Botão evidente pra voltar à seleção de prova (/inicio). User estava
+          confuso porque o "Início" do bottom nav antes apontava pra /dashboard
+          (mesma tela) — agora aponta certo, mas mantemos esse link explícito
+          no dashboard pra reforçar a saída pra trocar de prova. */}
+      <div className="mx-auto w-full max-w-2xl px-4 pt-3">
+        <a
+          href="/inicio"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <span aria-hidden="true">←</span>
+          Trocar prova
+        </a>
+      </div>
+
       <header className="mx-auto w-full max-w-2xl px-4 py-6">
         <HeroGreeting
           userId={user.id}
