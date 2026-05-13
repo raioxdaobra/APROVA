@@ -90,17 +90,54 @@ export function QuizRunner({
   sessionId,
   questions,
   initialReviewMarked,
+  initialAnswers,
   initialWeeklyXp = 0,
 }: {
   sessionId: string;
   questions: QuizQuestion[];
   initialReviewMarked: Record<string, boolean>;
+  /**
+   * Respostas já submetidas na sessão (mapeadas por question_id). Quando
+   * presente, o runner pré-popula `answers` e pula pro primeiro índice sem
+   * resposta — evita repetir questões já feitas ao retomar a sessão.
+   */
+  initialAnswers?: Record<string, { answer: string | null; is_correct: boolean | null }>;
   initialWeeklyXp?: number;
 }) {
   const router = useRouter();
-  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Calcula o primeiro índice de questão ainda não-respondida.
+  const firstUnansweredIndex = (() => {
+    if (!initialAnswers) return 0;
+    for (let i = 0; i < questions.length; i += 1) {
+      const q = questions[i];
+      if (!q) continue;
+      if (!initialAnswers[q.id]) return i;
+    }
+    // Tudo respondido — fica na última.
+    return Math.max(0, questions.length - 1);
+  })();
+
+  const [currentIndex, setCurrentIndex] = useState(firstUnansweredIndex);
   const [answers, setAnswers] = useState<AnswerState[]>(() =>
-    questions.map((q) => ({ ...emptyAnswer, annulled: q.annulled })),
+    questions.map((q) => {
+      const prior = initialAnswers?.[q.id];
+      if (prior) {
+        const selected = (prior.answer as AnswerLetter | null) ?? null;
+        return {
+          selected,
+          // Se acertou, "correct" é o próprio selected; se errou, não sabemos qual
+          // era o correto a partir do attempt isolado (a session ainda não terminou).
+          // Deixamos null aqui — o feedback visual completo só aparece com a chamada
+          // de submit do quiz-runner.
+          correct: prior.is_correct === true ? selected : null,
+          is_correct: prior.is_correct,
+          annulled: q.annulled,
+          submitting: false,
+        };
+      }
+      return { ...emptyAnswer, annulled: q.annulled };
+    }),
   );
   const [reviewMarked, setReviewMarked] = useState<Record<string, boolean>>(
     () => initialReviewMarked,
@@ -457,7 +494,7 @@ export function QuizRunner({
   // respostaCerta). Click submete a resposta IMEDIATAMENTE — user pediu
   // pra remover o passo "Responder questão" (era desnecessario).
   const alternativesSlot = (
-    <div className="flex flex-col gap-2.5">
+    <div className="grid grid-cols-5 gap-2">
       {ANSWER_LETTERS.map((letter) => {
         const isSubmitted = currentAnswer.selected === letter;
         const isCorrect = correctLetter === letter;
@@ -487,14 +524,14 @@ export function QuizRunner({
             disabled={current.annulled || currentAnswer.submitting || showFeedback}
             onClick={() => handleAnswer(letter)}
             className={cn(
-              'flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-all',
+              'flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-center transition-all',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               !showFeedback && !current.annulled && 'hover:-translate-y-0.5 hover:shadow-sm hover:border-primary/40',
               cardClass,
             )}
+            aria-label={`Marcar alternativa ${letter}`}
             aria-pressed={isSubmitted}
           >
-            {/* Letra em quadrado destacado (igual respostaCerta) */}
             <span
               aria-hidden="true"
               className={cn(
@@ -503,9 +540,6 @@ export function QuizRunner({
               )}
             >
               {letter}
-            </span>
-            <span className="text-base font-medium text-foreground">
-              Alternativa {letter}
             </span>
           </button>
         );
