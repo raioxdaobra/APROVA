@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { SimuladoRunner, type SimuladoQuestion } from '@/components/simulado-runner';
+import type { AnswerLetter } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -102,13 +103,28 @@ export default async function SimuladoSessionPage({
 
   const startedAtIso = session.started_at ?? new Date().toISOString();
 
+  // Carrega respostas já dadas na sessão pra que o runner retome do
+  // primeiro item sem resposta (sem perder os marcados anteriores).
+  const { data: attemptRows } = await supabase
+    .from('attempts')
+    .select('question_id, answer')
+    .eq('user_id', user.id)
+    .eq('session_id', params.id);
+  const initialAnswers: Record<string, AnswerLetter | null> = {};
+  for (const row of attemptRows ?? []) {
+    if (typeof row.question_id === 'string') {
+      initialAnswers[row.question_id] = (row.answer as AnswerLetter | null) ?? null;
+    }
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col">
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col lg:max-w-5xl xl:max-w-6xl">
       <SimuladoRunner
         sessionId={session.id}
         questions={ordered}
         timeLimitSec={timeLimitSec}
         startedAtIso={startedAtIso}
+        initialAnswers={initialAnswers}
       />
     </main>
   );

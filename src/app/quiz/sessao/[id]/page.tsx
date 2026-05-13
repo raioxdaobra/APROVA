@@ -114,6 +114,27 @@ export default async function QuizSessionPage({ params }: PageProps) {
     }
   }
 
+  // Tentativas já feitas nesta sessão — pré-popula respostas no runner pra que
+  // o usuário não precise responder de novo questões que já completou e cai
+  // direto na próxima questão não-respondida ao retomar a sessão.
+  const { data: attemptRows } = await supabase
+    .from('attempts')
+    .select('question_id, answer, is_correct')
+    .eq('user_id', user.id)
+    .eq('session_id', params.id);
+  const initialAnswers: Record<
+    string,
+    { answer: string | null; is_correct: boolean | null }
+  > = {};
+  for (const row of attemptRows ?? []) {
+    if (typeof row.question_id === 'string') {
+      initialAnswers[row.question_id] = {
+        answer: (row.answer as string | null) ?? null,
+        is_correct: row.is_correct ?? null,
+      };
+    }
+  }
+
   // XP semanal inicial — para detectar rank-up no client.
   const TZ = 'America/Fortaleza';
   const todayIso = new Intl.DateTimeFormat('en-CA', {
@@ -139,11 +160,12 @@ export default async function QuizSessionPage({ params }: PageProps) {
   const initialWeeklyXp = weeklyXpRow?.xp ?? 0;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6">
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6 lg:max-w-5xl xl:max-w-6xl">
       <QuizRunner
         sessionId={session.id}
         questions={ordered}
         initialReviewMarked={initialReviewMarked}
+        initialAnswers={initialAnswers}
         initialWeeklyXp={initialWeeklyXp}
       />
     </main>
