@@ -25,7 +25,40 @@ import { getAudioPlayer } from '@/lib/audio/player';
 import { rankFromXp } from '@/lib/achievements/ranks';
 import { showAchievementToast } from '@/components/achievement-toast';
 import { RankUpModal } from '@/components/rank-up-modal';
+import { normalizeQuestionText } from '@/lib/text/normalize-question-text';
 import type { AnswerLetter, Discipline } from '@/lib/supabase/types';
+
+function QuestionTextFallback({ description }: { description: string | null }) {
+  const paragraphs = normalizeQuestionText(description);
+  if (paragraphs.length === 0) {
+    return (
+      <div className="prose prose-invert prose-sm max-w-none text-foreground sm:prose-base">
+        (Enunciado indisponível.)
+      </div>
+    );
+  }
+  return (
+    <div className="prose prose-invert prose-sm max-w-none text-foreground sm:prose-base">
+      {paragraphs.map((para, i) => {
+        const isTitle =
+          para.length <= 60 &&
+          /^[A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9][A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9\s\d.,!?:'"()\-–—]+$/.test(para);
+        if (isTitle) {
+          return (
+            <h3 key={i} className="text-base font-semibold uppercase tracking-wide text-foreground">
+              {para}
+            </h3>
+          );
+        }
+        return (
+          <p key={i} className="mb-3 last:mb-0 leading-relaxed">
+            {para}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 
 export interface QuizQuestion {
   id: string;
@@ -452,9 +485,7 @@ export function QuizRunner({
     </Card>
   ) : (
     <Card className="overflow-hidden">
-      <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap text-foreground sm:prose-base">
-        {current.description ?? '(Enunciado indisponível.)'}
-      </div>
+      <QuestionTextFallback description={current.description ?? null} />
     </Card>
   );
 
