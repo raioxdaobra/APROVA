@@ -335,6 +335,112 @@ export async function startMultiTopicSimuladoAndRedirect(
   redirect(`/simulado/sessao/${created.id}`);
 }
 
+// -----------------------------------------------------------------------------
+// Distribuição customizada por disciplina:
+// User informa exatamente N questões por área (Mat=15, Fís=10, etc).
+// Diferente de startSimulado balanceado (proporção fixa) e do multi-topic
+// (escolha por subtópico). Aqui o user controla a quantidade direta por disciplina.
+// -----------------------------------------------------------------------------
+
+const customDistributionSchema = z.object({
+  distribution: z
+    .array(
+      z.object({
+        discipline: MULTI_TOPIC_DISCIPLINE,
+        count: z.number().int().min(0).max(120),
+      }),
+    )
+    .min(1)
+    .max(6),
+  time_limit_min: z.number().int().min(15).max(360).optional(),
+});
+
+export type StartCustomDistributionInput = z.infer<typeof customDistributionSchema>;
+
+export async function startCustomDistributionSimuladoAndRedirect(
+  input: StartCustomDistributionInput,
+): Promise<void> {
+  const parsed = customDistributionSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error('Distribuição inválida.');
+  }
+  const { distribution, time_limit_min } = parsed.data;
+
+  const totalRequested = distribution.reduce((acc, d) => acc + d.count, 0);
+  if (totalRequested < SIMULADO_MIN) {
+    throw new Error(`Mínimo de ${SIMULADO_MIN} questões no total.`);
+  }
+  if (totalRequested > SIMULADO_MAX) {
+    throw new Error(`Máximo de ${SIMULADO_MAX} questões no total.`);
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/');
+  }
+
+  const cap = await checkSimuladoCap(supabase, user.id);
+  if (!cap.allowed) {
+    throw new Error('Limite de simulados grátis atingido. Assine o Pro.');
+  }
+
+  // Pool por disciplina — uma round-trip por slot com count > 0.
+  const collected: string[] = [];
+  for (const slot of distribution) {
+    if (slot.count <= 0) continue;
+    const rows = await fetchAll<{ id: string }>(({ from, to }) =>
+      supabase
+        .from('questions')
+        .select('id')
+        .eq('exam', 'unifor-medicina')
+        .eq('discipline', slot.discipline)
+        .or('annulled.is.null,annulled.eq.false')
+        .range(from, to),
+    );
+    if (rows.length === 0) continue;
+    const pickedIds = shuffle(rows.map((r) => r.id)).slice(0, slot.count);
+    collected.push(...pickedIds);
+  }
+
+  if (collected.length === 0) {
+    throw new Error('Nenhuma questão encontrada nas disciplinas escolhidas.');
+  }
+
+  const questionIds = shuffle(collected);
+  const total = questionIds.length;
+
+  // Default de tempo: 2.5 min/q, capado entre 15-360.
+  const computedTime =
+    time_limit_min ?? Math.min(360, Math.max(15, Math.round(total * 2.5)));
+
+  const filters: Json = {
+    total,
+    time_limit_sec: computedTime * 60,
+    question_ids: questionIds,
+    discipline_filter: 'custom',
+    custom_distribution: distribution,
+  };
+
+  const { data: created, error: insertErr } = await supabase
+    .from('study_sessions')
+    .insert({
+      user_id: user.id,
+      type: 'simulado',
+      filters,
+    })
+    .select('id')
+    .single();
+  if (insertErr || !created) {
+    throw new Error('Falha ao iniciar simulado.');
+  }
+
+  await incrementUsageCounter(supabase, user.id, 'simulados_used_count');
+  redirect(`/simulado/sessao/${created.id}`);
+}
+
 export async function checkSimuladoCapAction(
   options: { previewFreeMode?: boolean } = {},
 ): Promise<SimuladoCapResult> {
