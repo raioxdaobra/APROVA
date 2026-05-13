@@ -28,34 +28,70 @@ import { RankUpModal } from '@/components/rank-up-modal';
 import { normalizeQuestionText } from '@/lib/text/normalize-question-text';
 import type { AnswerLetter, Discipline } from '@/lib/supabase/types';
 
-function QuestionTextFallback({ description }: { description: string | null }) {
+/**
+ * Renderiza questões em texto puro (image_url vazio) como se fosse o scan
+ * de uma página de PDF: fundo claro (papel), texto escuro, header com
+ * "Questão XX" e footer "UNIFOR — Processo Seletivo YYYY.X - MEDICINA".
+ * Mantém o mesmo padrão visual das questões com scan (image-based).
+ */
+function QuestionTextFallback({
+  description,
+  questionNum,
+  year,
+  semester,
+}: {
+  description: string | null;
+  questionNum: number;
+  year: number;
+  semester: number;
+}) {
   const paragraphs = normalizeQuestionText(description);
-  if (paragraphs.length === 0) {
-    return (
-      <div className="prose prose-invert prose-sm max-w-none text-foreground sm:prose-base">
-        (Enunciado indisponível.)
-      </div>
-    );
-  }
   return (
-    <div className="prose prose-invert prose-sm max-w-none text-foreground sm:prose-base">
-      {paragraphs.map((para, i) => {
-        const isTitle =
-          para.length <= 60 &&
-          /^[A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9][A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9\s\d.,!?:'"()\-–—]+$/.test(para);
-        if (isTitle) {
-          return (
-            <h3 key={i} className="text-base font-semibold uppercase tracking-wide text-foreground">
-              {para}
-            </h3>
-          );
-        }
-        return (
-          <p key={i} className="mb-3 last:mb-0 leading-relaxed">
-            {para}
-          </p>
-        );
-      })}
+    <div className="overflow-hidden rounded-lg bg-stone-50 text-stone-900">
+      <div className="px-5 py-4 sm:px-7 sm:py-6">
+        {/* Header: "Questão XX" igual ao scan */}
+        <div className="mb-4 border-b border-stone-300 pb-2">
+          <span className="inline-block bg-stone-900 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-stone-50">
+            Questão {questionNum}
+          </span>
+        </div>
+
+        {/* Corpo */}
+        {paragraphs.length === 0 ? (
+          <p className="italic text-stone-500">(Enunciado indisponível.)</p>
+        ) : (
+          <div className="text-[15px] leading-relaxed text-stone-900 sm:text-base">
+            {paragraphs.map((para, i) => {
+              const isTitle =
+                para.length <= 60 &&
+                /^[A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9][A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9\s\d.,!?:'"()\-–—]+$/.test(para);
+              if (isTitle) {
+                return (
+                  <h3
+                    key={i}
+                    className="mb-3 mt-1 text-base font-semibold uppercase tracking-wide text-stone-900"
+                  >
+                    {para}
+                  </h3>
+                );
+              }
+              return (
+                <p key={i} className="mb-3 last:mb-0">
+                  {para}
+                </p>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Footer no rodapé da página */}
+        <div className="mt-6 flex items-center justify-between border-t border-stone-300 pt-2 text-[11px] text-stone-600">
+          <span>&nbsp;</span>
+          <span className="font-medium">
+            UNIFOR — Processo Seletivo {year}.{semester} - MEDICINA
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -129,17 +165,11 @@ export function QuizRunner({
   sessionId: string;
   questions: QuizQuestion[];
   initialReviewMarked: Record<string, boolean>;
-  /**
-   * Respostas já submetidas na sessão (mapeadas por question_id). Quando
-   * presente, o runner pré-popula `answers` e pula pro primeiro índice sem
-   * resposta — evita repetir questões já feitas ao retomar a sessão.
-   */
   initialAnswers?: Record<string, { answer: string | null; is_correct: boolean | null }>;
   initialWeeklyXp?: number;
 }) {
   const router = useRouter();
 
-  // Calcula o primeiro índice de questão ainda não-respondida.
   const firstUnansweredIndex = (() => {
     if (!initialAnswers) return 0;
     for (let i = 0; i < questions.length; i += 1) {
@@ -147,7 +177,6 @@ export function QuizRunner({
       if (!q) continue;
       if (!initialAnswers[q.id]) return i;
     }
-    // Tudo respondido — fica na última.
     return Math.max(0, questions.length - 1);
   })();
 
@@ -159,10 +188,6 @@ export function QuizRunner({
         const selected = (prior.answer as AnswerLetter | null) ?? null;
         return {
           selected,
-          // Se acertou, "correct" é o próprio selected; se errou, não sabemos qual
-          // era o correto a partir do attempt isolado (a session ainda não terminou).
-          // Deixamos null aqui — o feedback visual completo só aparece com a chamada
-          // de submit do quiz-runner.
           correct: prior.is_correct === true ? selected : null,
           is_correct: prior.is_correct,
           annulled: q.annulled,
@@ -183,23 +208,17 @@ export function QuizRunner({
   const [rankUpOpen, setRankUpOpen] = useState(false);
   const lastRankIdRef = useRef<string>(rankFromXp(initialWeeklyXp).id);
 
-  // Estado do banner "Bora entender?" que aparece ao errar.
-  // Map por questionId pra resetar quando o user navega.
   const [reviewBannerDismissed, setReviewBannerDismissed] = useState<Set<string>>(
     () => new Set(),
   );
   const helpPanelRef = useRef<HelpPanelHandle | null>(null);
 
-  // Draft selection foi REMOVIDO a pedido do user — click numa alternativa
-  // ja submete direto (comportamento original). selectedDraft mantido como
-  // const sempre null pra nao precisar refatorar referencias visuais ainda.
   const selectedDraft: AnswerLetter | null = null;
 
   const startedAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
     track('quiz_session_started', { total: questions.length });
-    // Telemetria de visualização da primeira questão
     if (questions[0]) {
       track('question_viewed', {
         question_id: questions[0].id,
@@ -208,7 +227,6 @@ export function QuizRunner({
     }
   }, [questions]);
 
-  // Reset cronômetro ao trocar de questão
   useEffect(() => {
     startedAtRef.current = Date.now();
     if (questions[currentIndex]) {
@@ -219,7 +237,6 @@ export function QuizRunner({
     }
   }, [currentIndex, questions]);
 
-  // Prefetch da próxima imagem (só quando tem imagem)
   useEffect(() => {
     const next = questions[currentIndex + 1];
     if (!next || !next.image_url || next.image_url.trim().length === 0) return;
@@ -227,7 +244,6 @@ export function QuizRunner({
     img.src = next.image_url;
   }, [currentIndex, questions]);
 
-  // Toast de XP — auto-hide
   useEffect(() => {
     if (xpToast === null) return;
     const t = setTimeout(() => setXpToast(null), 1500);
@@ -241,16 +257,10 @@ export function QuizRunner({
   const isLast = currentIndex === total - 1;
   const isFirst = currentIndex === 0;
 
-  // Refs para handlers — atualizados em cada render. Permite registrar atalhos
-  // de teclado antes do early return sem violar ordem de hooks.
   const handleAnswerRef = useRef<(letter: AnswerLetter) => void>(() => {});
   const handleNextRef = useRef<() => void>(() => {});
   const handlePrevRef = useRef<() => void>(() => {});
 
-  // Atalhos de teclado:
-  //   A-E: responde direto a alternativa (sem confirmar)
-  //   Enter / Espaco: vai pra proxima (apos ja ter respondido)
-  //   ArrowLeft/Right: navega entre questoes
   const shortcuts = useMemo(
     () => ({
       a: () => handleAnswerRef.current('A'),
@@ -333,21 +343,17 @@ export function QuizRunner({
         return next;
       });
 
-      // Refletir status pessoal local (acertou/errou) — mas não mexer em 'toreview'
       if (!res.annulled) {
         setReviewMarked((prev) => {
-          if (prev[current.id]) return prev; // mantém toreview
-          // remove flag se não tiver — não precisamos refletir correct/wrong aqui
+          if (prev[current.id]) return prev;
           return prev;
         });
       }
 
-      // Vibração háptica
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(50);
       }
 
-      // Som — acerto/erro (respeita prefers-reduced-motion + localStorage)
       try {
         if (!res.annulled) {
           getAudioPlayer().play(res.is_correct ? 'correct' : 'wrong');
@@ -356,7 +362,6 @@ export function QuizRunner({
         /* noop */
       }
 
-      // XP indicativo (10 base + 5 por acerto). DB calcula o real via trigger.
       const xp = res.is_correct ? 15 : 10;
       setXpToast(xp);
 
@@ -367,8 +372,6 @@ export function QuizRunner({
         annulled: res.annulled,
       });
 
-      // Gamificação: avalia badges + missões + atualiza XP semanal.
-      // Fail-soft — se algo der errado, não bloqueia o fluxo.
       void evaluateAfterAttemptAction({
         question_id: current.id,
         is_correct: res.is_correct,
@@ -387,8 +390,6 @@ export function QuizRunner({
           const newRankId = rankFromXp(g.weeklyXp).id;
           if (newRankId !== lastRankIdRef.current) {
             lastRankIdRef.current = newRankId;
-            // Só celebra com confete/modal se a resposta foi CERTA.
-            // Errar e ganhar XP base não merece comemoração.
             if (res.is_correct) {
               setRankUpOpen(true);
             }
@@ -408,7 +409,6 @@ export function QuizRunner({
         toreview: nextValue,
       });
       if (!res.ok) {
-        // Reverte em erro
         setReviewMarked((prev) => ({ ...prev, [current.id]: !nextValue }));
         setErrorMsg(res.error);
       }
@@ -425,7 +425,6 @@ export function QuizRunner({
       setCurrentIndex(currentIndex + 1);
       return;
     }
-    // Finalizar
     setErrorMsg(null);
     startFinishTransition(async () => {
       const res = await finishQuizSession(sessionId);
@@ -444,8 +443,6 @@ export function QuizRunner({
   const showFeedback = currentAnswer.selected !== null && !current.annulled;
   const correctLetter = currentAnswer.correct;
 
-  // Atualiza refs (declarados antes do early return) com os handlers atuais —
-  // assim os atalhos de teclado sempre disparam a versão mais recente.
   handleAnswerRef.current = handleAnswer;
   handleNextRef.current = handleNext;
   handlePrevRef.current = handlePrev;
@@ -455,8 +452,6 @@ export function QuizRunner({
   const hasImage = Boolean(current.image_url && current.image_url.trim().length > 0);
   const imageSlot = hasImage ? (
     <Card className="overflow-hidden p-0">
-      {/* Container com TODAS as protecoes pra imagem nao reagir a gestos
-          de toque no mobile (long-press menu, double-tap zoom, pinch). */}
       <div
         className="relative w-full bg-stone-100"
         style={{
@@ -484,15 +479,18 @@ export function QuizRunner({
       </div>
     </Card>
   ) : (
-    <Card className="overflow-hidden">
-      <QuestionTextFallback description={current.description ?? null} />
+    <Card className="overflow-hidden p-0">
+      <QuestionTextFallback
+        description={current.description ?? null}
+        questionNum={current.question_num}
+        year={current.year}
+        semester={current.semester}
+      />
     </Card>
   );
 
   const headerSlot = (
     <header className="flex flex-col gap-2">
-      {/* Chips de metadados da questao (disciplina, ano, etc.).
-          Botao "Sair" foi promovido pra um sticky page-level, abaixo. */}
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(
@@ -521,16 +519,12 @@ export function QuizRunner({
     </header>
   );
 
-  // Alternativas como cards com letra em quadrado destacado (estilo
-  // respostaCerta). Click submete a resposta IMEDIATAMENTE — user pediu
-  // pra remover o passo "Responder questão" (era desnecessario).
   const alternativesSlot = (
     <div className="grid grid-cols-5 gap-2">
       {ANSWER_LETTERS.map((letter) => {
         const isSubmitted = currentAnswer.selected === letter;
         const isCorrect = correctLetter === letter;
 
-        // Classes do CARD inteiro
         let cardClass = 'border-border bg-background';
         if (showFeedback) {
           if (isCorrect) cardClass = 'border-success/60 bg-success-bg/30';
@@ -539,7 +533,6 @@ export function QuizRunner({
           else cardClass = 'border-border bg-background opacity-60';
         }
 
-        // Classes do BOX da letra (quadradinho A/B/C/D/E)
         let letterBoxClass = 'border-border bg-card text-foreground';
         if (showFeedback) {
           if (isCorrect)
@@ -578,10 +571,6 @@ export function QuizRunner({
     </div>
   );
 
-  // Footer reorganizado: stack vertical SEMPRE (estrela em cima, navegacao
-  // embaixo) — porque no desktop o body column fica estreito (~40% da tela)
-  // e o sm:flex-row de antes brigava com o pouco espaço, gerando os botoes
-  // espremidos da v anterior. Agora tudo respira em qualquer largura.
   const footerSlot = (
     <div className="flex flex-col gap-3 border-t border-border pt-4">
       <button
@@ -609,7 +598,6 @@ export function QuizRunner({
         >
           Anterior
         </Button>
-        {/* "Proxima"/"Finalizar": maior peso visual no fim do flow. */}
         <Button
           type="button"
           size="lg"
@@ -627,19 +615,12 @@ export function QuizRunner({
     <>
       {headerSlot}
 
-      {/* Dica de UX dispensavel — mostra atalho de teclado A-E. Persiste
-          em localStorage; user fecha uma vez e nao volta. */}
       {!showFeedback ? (
         <DidYouKnowTip
           id="quiz-keyboard-shortcut"
           text="Pressione A, B, C, D ou E pra responder pelo teclado. ← e → navegam entre questões."
         />
       ) : null}
-
-      {/* Enunciado em texto + marca-texto removidos a pedido do user.
-          A questao e exibida via imagem escaneada (image_url) — quando
-          nao houver imagem, o fallback no imageSlot mostra o description
-          em formato simples. */}
 
       {alternativesSlot}
 
@@ -652,9 +633,6 @@ export function QuizRunner({
       {showFeedback && correctLetter ? (
         <div
           className={cn(
-            // Card prominente inspirado no respostaCerta. Border-2 + padding
-            // generoso + emoji grande + titulo bold pra dar peso visual ao
-            // resultado. Detalhes (gabarito, sua resposta) em linha menor.
             'flex items-start gap-3 rounded-xl border-2 p-4',
             currentAnswer.is_correct
               ? 'border-success/40 bg-success-bg/40'
@@ -699,7 +677,6 @@ export function QuizRunner({
         </div>
       ) : null}
 
-      {/* Banner "Bora entender?" — só ao errar e se ainda não dispensado */}
       {showFeedback &&
       !currentAnswer.is_correct &&
       !current.annulled &&
@@ -772,14 +749,7 @@ export function QuizRunner({
 
   return (
     <>
-      {/* Sticky bar fixa no topo — Sair (esquerda) + contador (direita).
-          User pediu pra ter saida bem visivel a qualquer momento durante
-          a sessao. Sticky garante que aparece mesmo quando rola pra baixo
-          do conteudo da questao. */}
       <div className="sticky top-0 z-30 -mx-4 mb-4 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6">
-        {/* Sair vai pra /dashboard (tela com os cards da prova) — user
-            pediu pra voltar pro "menu da prova" e nao pra /quiz que e a
-            tela de selecao de disciplinas/topicos. */}
         <button
           type="button"
           onClick={() => router.push('/dashboard')}
