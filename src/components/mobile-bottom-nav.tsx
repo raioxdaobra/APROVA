@@ -44,10 +44,18 @@ interface NavItem {
 // o entry abaixo + restaurar import { Gamepad2 }.
 const ITEMS: NavItem[] = [
   {
-    href: '/dashboard',
+    // Casinha leva pra /inicio (seleção de prova: Unifor / ENEM / UECE).
+    // /dashboard é a tela do "estudo da prova ativa" — alcançável clicando
+    // num card de /inicio. Antes apontava pra /dashboard e parecia "lenta"
+    // porque o user já estava lá e o click não causava navegação.
+    href: '/inicio',
     label: 'Início',
     Icon: Home,
-    match: (p) => p === '/dashboard' || p.startsWith('/dashboard/'),
+    match: (p) =>
+      p === '/inicio' ||
+      p.startsWith('/inicio/') ||
+      p === '/dashboard' ||
+      p.startsWith('/dashboard/'),
     accentVar: '--primary',
   },
   {
