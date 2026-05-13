@@ -43,19 +43,41 @@ export function SimuladoRunner({
   questions,
   timeLimitSec,
   startedAtIso,
+  initialAnswers,
 }: {
   sessionId: string;
   questions: SimuladoQuestion[];
   timeLimitSec: number;
   startedAtIso: string;
+  /** Map question_id → letra marcada anteriormente, pra retomar sem perder progresso. */
+  initialAnswers?: Record<string, AnswerLetter | null>;
 }) {
   const router = useRouter();
   const total = questions.length;
   const startMs = useMemo(() => new Date(startedAtIso).getTime(), [startedAtIso]);
   const deadlineMs = useMemo(() => startMs + timeLimitSec * 1000, [startMs, timeLimitSec]);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Map<string, AnswerLetter>>(() => new Map());
+  const firstUnansweredIndex = useMemo(() => {
+    if (!initialAnswers) return 0;
+    for (let i = 0; i < questions.length; i += 1) {
+      const q = questions[i];
+      if (!q) continue;
+      const v = initialAnswers[q.id];
+      if (v == null) return i;
+    }
+    return Math.max(0, questions.length - 1);
+  }, [questions, initialAnswers]);
+
+  const [currentIndex, setCurrentIndex] = useState(firstUnansweredIndex);
+  const [answers, setAnswers] = useState<Map<string, AnswerLetter>>(() => {
+    const m = new Map<string, AnswerLetter>();
+    if (initialAnswers) {
+      for (const [qid, letter] of Object.entries(initialAnswers)) {
+        if (letter) m.set(qid, letter);
+      }
+    }
+    return m;
+  });
   const [remainingSec, setRemainingSec] = useState<number>(() =>
     Math.max(0, Math.round((deadlineMs - Date.now()) / 1000)),
   );
@@ -252,7 +274,7 @@ export function SimuladoRunner({
   );
 
   const alternativesSlot = (
-    <div className="flex flex-col gap-2">
+    <div className="grid grid-cols-5 gap-2">
       {ANSWER_LETTERS.map((letter) => {
         const isSelected = selectedLetter === letter;
         return (
@@ -262,8 +284,9 @@ export function SimuladoRunner({
             disabled={submitted}
             onClick={() => handleSelect(letter)}
             aria-pressed={isSelected}
+            aria-label={`Marcar alternativa ${letter}`}
             className={cn(
-              'flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left text-base font-medium transition-colors duration-motion-base disabled:opacity-40',
+              'flex items-center justify-center rounded-md border px-3 py-3 text-base font-medium transition-colors duration-motion-base disabled:opacity-40',
               isSelected
                 ? 'border-primary bg-primary/10 text-foreground'
                 : 'border-border bg-card text-foreground hover:bg-muted',
@@ -271,7 +294,7 @@ export function SimuladoRunner({
           >
             <span
               className={cn(
-                'inline-flex h-8 w-8 items-center justify-center rounded-full border font-semibold',
+                'inline-flex h-10 w-10 items-center justify-center rounded-full border font-bold',
                 isSelected
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border',
@@ -279,7 +302,6 @@ export function SimuladoRunner({
             >
               {letter}
             </span>
-            <span>Alternativa {letter}</span>
           </button>
         );
       })}
