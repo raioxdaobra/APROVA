@@ -13,34 +13,64 @@ import { disciplineBg, disciplineLabel } from '@/app/simulado/config';
 import { normalizeQuestionText } from '@/lib/text/normalize-question-text';
 import type { AnswerLetter } from '@/lib/supabase/types';
 
-function QuestionTextFallback({ description }: { description: string | null }) {
+/**
+ * Renderiza questões em texto puro (image_url vazio) como se fosse o scan
+ * de uma página de PDF: fundo claro (papel), texto escuro, header com
+ * "Questão XX" e footer "UNIFOR — Processo Seletivo YYYY.X - MEDICINA".
+ */
+function QuestionTextFallback({
+  description,
+  questionNum,
+  year,
+  semester,
+}: {
+  description: string | null;
+  questionNum: number;
+  year: number;
+  semester: number;
+}) {
   const paragraphs = normalizeQuestionText(description);
-  if (paragraphs.length === 0) {
-    return (
-      <div className="prose prose-invert prose-sm max-w-none text-foreground sm:prose-base">
-        (Enunciado indisponível.)
-      </div>
-    );
-  }
   return (
-    <div className="prose prose-invert prose-sm max-w-none text-foreground sm:prose-base">
-      {paragraphs.map((para, i) => {
-        const isTitle =
-          para.length <= 60 &&
-          /^[A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9][A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9\s\d.,!?:'"()\-–—]+$/.test(para);
-        if (isTitle) {
-          return (
-            <h3 key={i} className="text-base font-semibold uppercase tracking-wide text-foreground">
-              {para}
-            </h3>
-          );
-        }
-        return (
-          <p key={i} className="mb-3 last:mb-0 leading-relaxed">
-            {para}
-          </p>
-        );
-      })}
+    <div className="overflow-hidden rounded-lg bg-stone-50 text-stone-900">
+      <div className="px-5 py-4 sm:px-7 sm:py-6">
+        <div className="mb-4 border-b border-stone-300 pb-2">
+          <span className="inline-block bg-stone-900 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-stone-50">
+            Questão {questionNum}
+          </span>
+        </div>
+        {paragraphs.length === 0 ? (
+          <p className="italic text-stone-500">(Enunciado indisponível.)</p>
+        ) : (
+          <div className="text-[15px] leading-relaxed text-stone-900 sm:text-base">
+            {paragraphs.map((para, i) => {
+              const isTitle =
+                para.length <= 60 &&
+                /^[A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9][A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇ0-9\s\d.,!?:'"()\-–—]+$/.test(para);
+              if (isTitle) {
+                return (
+                  <h3
+                    key={i}
+                    className="mb-3 mt-1 text-base font-semibold uppercase tracking-wide text-stone-900"
+                  >
+                    {para}
+                  </h3>
+                );
+              }
+              return (
+                <p key={i} className="mb-3 last:mb-0">
+                  {para}
+                </p>
+              );
+            })}
+          </div>
+        )}
+        <div className="mt-6 flex items-center justify-between border-t border-stone-300 pt-2 text-[11px] text-stone-600">
+          <span>&nbsp;</span>
+          <span className="font-medium">
+            UNIFOR — Processo Seletivo {year}.{semester} - MEDICINA
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -139,8 +169,6 @@ export function SimuladoRunner({
       answer: answers.get(q.id) ?? null,
     }));
 
-    // O cliente não conhece o gabarito durante o simulado; o resultado real
-    // (correct_count) sai do servidor e é exibido na tela de resultado.
     const answeredCount = payload.filter((a) => a.answer !== null).length;
 
     startTransition(async () => {
@@ -163,7 +191,6 @@ export function SimuladoRunner({
     });
   }, [answers, questions, sessionId, total, router]);
 
-  // Cronômetro
   useEffect(() => {
     if (submitted) return;
     const tick = () => {
@@ -200,8 +227,6 @@ export function SimuladoRunner({
   const goNext = () => setCurrentIndex((i) => Math.min(total - 1, i + 1));
   const jumpTo = (idx: number) => setCurrentIndex(Math.max(0, Math.min(total - 1, idx)));
 
-  // Atalhos de teclado — desabilitados quando dialog de confirmação aberto
-  // (o dialog já tem seu próprio handler de ESC).
   const shortcutsEnabled = !submitted && !confirmOpen;
   const handleSelectRef = useRef(handleSelect);
   handleSelectRef.current = handleSelect;
@@ -283,8 +308,13 @@ export function SimuladoRunner({
       />
     </Card>
   ) : (
-    <Card className="overflow-hidden">
-      <QuestionTextFallback description={current.description ?? null} />
+    <Card className="overflow-hidden p-0">
+      <QuestionTextFallback
+        description={current.description ?? null}
+        questionNum={current.question_num}
+        year={current.year}
+        semester={current.semester}
+      />
     </Card>
   );
 
@@ -387,9 +417,6 @@ export function SimuladoRunner({
   return (
     <>
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
-        {/* Botao Sair com confirm — abandonar simulado perde tempo cronometrado.
-            User pediu pra ter saida visivel; confirm() evita saida acidental.
-            Volta pro /dashboard (menu da prova) ao confirmar. */}
         <button
           type="button"
           onClick={() => {
