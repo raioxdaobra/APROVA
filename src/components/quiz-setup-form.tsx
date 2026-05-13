@@ -64,8 +64,9 @@ const DISCIPLINE_VALUES: Discipline[] = [
   'linguagens',
 ];
 
-const STATUS_OPTIONS: Array<{ value: 'todas' | 'correct' | 'wrong' | 'toreview'; label: string }> = [
+const STATUS_OPTIONS: Array<{ value: 'todas' | 'correct' | 'wrong' | 'toreview' | 'novas'; label: string }> = [
   { value: 'todas', label: 'Todas' },
+  { value: 'novas', label: 'Só novas (nunca respondi)' },
   { value: 'correct', label: 'Acertei antes' },
   { value: 'wrong', label: 'Errei antes' },
   { value: 'toreview', label: 'Marcadas p/ revisar' },
@@ -75,7 +76,7 @@ type FormState = {
   discipline: Discipline | '';
   subtopic: string;
   year: string;
-  status: 'todas' | 'correct' | 'wrong' | 'toreview';
+  status: 'todas' | 'correct' | 'wrong' | 'toreview' | 'novas';
   hide_annulled: boolean;
   language: Language | 'tudo';
   subject: HumanasSubject | 'tudo';
@@ -428,7 +429,7 @@ export function QuizSetupForm({
             id={statusId}
             value={state.status}
             onChange={(e) =>
-              update('status', e.target.value as 'todas' | 'correct' | 'wrong' | 'toreview')
+              update('status', e.target.value as 'todas' | 'correct' | 'wrong' | 'toreview' | 'novas')
             }
             className="h-11 w-full rounded border border-input bg-card px-3 text-base text-foreground transition-colors duration-motion-fast focus-visible:border-primary focus-visible:outline-none"
           >
