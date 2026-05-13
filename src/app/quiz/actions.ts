@@ -26,7 +26,7 @@ const disciplineSchema = z.enum([
   'linguagens',
 ]);
 
-const statusSchema = z.enum(['todas', 'correct', 'wrong', 'toreview']);
+const statusSchema = z.enum(['todas', 'correct', 'wrong', 'toreview', 'novas']);
 const languageSchema = z.enum(['portugues', 'ingles', 'espanhol']);
 const subjectSchema = z.enum(['historia', 'geografia', 'filosofia', 'sociologia']);
 
@@ -48,7 +48,7 @@ interface NormalizedFilters {
   discipline: string | null;
   subtopic: string | null;
   year: number | null;
-  status: 'todas' | 'correct' | 'wrong' | 'toreview';
+  status: 'todas' | 'correct' | 'wrong' | 'toreview' | 'novas';
   hide_annulled: boolean;
   language: 'portugues' | 'ingles' | 'espanhol' | null;
   subject: 'historia' | 'geografia' | 'filosofia' | 'sociologia' | null;
@@ -116,7 +116,26 @@ async function loadCandidateQuestionIds(
   let ids = filteredRows.map((q) => q.id);
   if (ids.length === 0) return [];
 
-  if (f.status !== 'todas') {
+  if (f.status === 'novas') {
+    // Só questões que o user NUNCA respondeu (nenhum attempt registrado).
+    // Não toca em user_question_status — só conta attempts reais.
+    const attemptedIds = new Set<string>();
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data: rows } = await supabase
+        .from('attempts')
+        .select('question_id')
+        .eq('user_id', userId)
+        .in('question_id', ids)
+        .range(from, from + PAGE - 1);
+      if (!rows || rows.length === 0) break;
+      for (const r of rows) {
+        if (typeof r.question_id === 'string') attemptedIds.add(r.question_id);
+      }
+      if (rows.length < PAGE) break;
+    }
+    ids = ids.filter((id) => !attemptedIds.has(id));
+  } else if (f.status !== 'todas') {
     const { data: statusRows } = await supabase
       .from('user_question_status')
       .select('question_id, status')
@@ -281,7 +300,26 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
   // Sub-filtro de Linguagens/Humanas (mesma regex que a view 0024).
   const subFiltered = filterBySubFilter(rows, f);
   let pool = subFiltered;
-  if (f.status !== 'todas') {
+  if (f.status === 'novas') {
+    // Filtro "só novas": exclui IDs com attempt previo do user.
+    const subIds = subFiltered.map((r) => r.id);
+    const attemptedIds = new Set<string>();
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data: rows2 } = await supabase
+        .from('attempts')
+        .select('question_id')
+        .eq('user_id', user.id)
+        .in('question_id', subIds)
+        .range(from, from + PAGE - 1);
+      if (!rows2 || rows2.length === 0) break;
+      for (const r of rows2) {
+        if (typeof r.question_id === 'string') attemptedIds.add(r.question_id);
+      }
+      if (rows2.length < PAGE) break;
+    }
+    pool = subFiltered.filter((r) => !attemptedIds.has(r.id));
+  } else if (f.status !== 'todas') {
     const { data: statusRows } = await supabase
       .from('user_question_status')
       .select('question_id')
