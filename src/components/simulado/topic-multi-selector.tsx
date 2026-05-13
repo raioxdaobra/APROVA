@@ -131,6 +131,8 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
   // Templates
   const [templates, setTemplates] = useState<SimuladoTemplate[]>([]);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
+  // null = "todas as do pool" (até SIMULADO_MAX); número = quantidade alvo
+  const [targetTotal, setTargetTotal] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -256,13 +258,15 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
           setPaywallOpen(true);
           return;
         }
-        await startMultiTopicSimuladoAndRedirect({ topics });
+        await startMultiTopicSimuladoAndRedirect(
+          targetTotal !== null ? { topics, total: targetTotal } : { topics },
+        );
       } catch (err) {
         if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) return;
         setErrorMsg(err instanceof Error ? err.message : 'Falha ao iniciar simulado.');
       }
     });
-  }, [canStart, isPending, selected, previewFreeMode]);
+  }, [canStart, isPending, selected, previewFreeMode, targetTotal]);
 
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_320px] lg:items-start lg:gap-8">
@@ -416,6 +420,40 @@ export function TopicMultiSelector({ data }: TopicMultiSelectorProps) {
                   ))}
                 </select>
               ) : null}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Quantidade de questões
+              </span>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([30, 60, 90, null] as const).map((opt) => {
+                  const isActive = targetTotal === opt;
+                  const label = opt === null ? 'Todas' : String(opt);
+                  return (
+                    <button
+                      key={opt ?? 'todas'}
+                      type="button"
+                      onClick={() => setTargetTotal(opt)}
+                      aria-pressed={isActive}
+                      className={
+                        isActive
+                          ? 'inline-flex min-h-[36px] items-center justify-center rounded-md border border-primary bg-primary text-xs font-semibold text-primary-foreground'
+                          : 'inline-flex min-h-[36px] items-center justify-center rounded-md border border-border bg-background text-xs font-medium text-foreground hover:border-primary/50'
+                      }
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {targetTotal === null
+                  ? `Vai usar todas do pool (até 90)`
+                  : totalQuestions < targetTotal
+                  ? `Pool tem só ${totalQuestions} — vai usar todas`
+                  : `Sorteia ${targetTotal} aleatórias do pool de ${totalQuestions}`}
+              </span>
             </div>
 
             {errorMsg ? (
