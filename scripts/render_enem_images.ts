@@ -613,7 +613,12 @@ async function downloadIfMissing(url: string, dest: string): Promise<void> {
   }
   console.log(`[download] ${url}`);
   try {
-    const res: any = await (globalThis as any).fetch(url);
+    const res: any = await (globalThis as any).fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      },
+    });
     if (!res || !res.ok) {
       console.warn(`  [warn] download falhou (HTTP ${res?.status ?? '?'})`);
       return;
