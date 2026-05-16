@@ -10,6 +10,7 @@ import {
   checkSimuladoCap,
   incrementUsageCounter,
 } from '@/lib/billing/caps';
+import { getActiveExam } from '@/lib/exam/active-exam';
 import { classifyLanguage, classifySubject } from '@/lib/stats/sub-filters';
 
 const startSchema = z.object({
@@ -103,11 +104,14 @@ export async function startSimulado(input: StartSimuladoInput): Promise<void> {
     throw new Error('Limite de simulados grátis atingido. Assine o Pro.');
   }
 
+  const exam = await getActiveExam(supabase, user.id);
+
   // Carrega pool de questões não anuladas (apenas id + discipline). Pagina pra cap 1000.
   const pool = await fetchAll<{ id: string; discipline: string }>(({ from, to }) => {
     let q = supabase
       .from('questions')
       .select('id, discipline')
+      .eq('exam', exam)
       .or('annulled.is.null,annulled.eq.false');
     if (discipline !== 'todas') {
       q = q.eq('discipline', discipline);
@@ -245,6 +249,8 @@ export async function startMultiTopicSimuladoAndRedirect(
     throw new Error('Limite de simulados grátis atingido. Assine o Pro.');
   }
 
+  const exam = await getActiveExam(supabase, user.id);
+
   // Agrupa subtópicos por disciplina (1 round-trip por disciplina)
   const byDiscipline = new Map<string, string[]>();
   for (const p of topics) {
@@ -260,7 +266,7 @@ export async function startMultiTopicSimuladoAndRedirect(
         supabase
           .from('questions')
           .select('id, discipline, subtopic, annulled')
-          .eq('exam', 'unifor-medicina')
+          .eq('exam', exam)
           .eq('discipline', discipline)
           .in('subtopic', subs)
           .or('annulled.is.null,annulled.eq.false')
@@ -387,6 +393,8 @@ export async function startCustomDistributionSimuladoAndRedirect(
     throw new Error('Limite de simulados grátis atingido. Assine o Pro.');
   }
 
+  const exam = await getActiveExam(supabase, user.id);
+
   // Pool por disciplina — uma round-trip por slot com count > 0.
   const collected: string[] = [];
   for (const slot of distribution) {
@@ -395,7 +403,7 @@ export async function startCustomDistributionSimuladoAndRedirect(
       supabase
         .from('questions')
         .select('id')
-        .eq('exam', 'unifor-medicina')
+        .eq('exam', exam)
         .eq('discipline', slot.discipline)
         .or('annulled.is.null,annulled.eq.false')
         .range(from, to),
