@@ -1,0 +1,74 @@
+name: ENEM — importar questões
+
+# Roda o pipeline de render das questões do ENEM nos servidores do GitHub.
+# Disparo MANUAL (aba Actions -> "ENEM — importar questões" -> Run workflow).
+#
+# Modos:
+#   dry-run  -> só recorta as questões e publica os recortes como artefato
+#               pra download. NÃO precisa de senha nenhuma.
+#   upload   -> recorta E sobe pro Supabase. Precisa dos secrets abaixo
+#               configurados em Settings -> Secrets and variables -> Actions:
+#                 NEXT_PUBLIC_SUPABASE_URL
+#                 SUPABASE_SECRET_KEY
+#                 SUPABASE_DB_URL
+#               (e o gabarito preenchido em scripts/enem-config/{ano}.json)
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'Ano do ENEM (ex: 2023)'
+        required: true
+        default: '2023'
+      mode:
+        description: 'dry-run (só testa o recorte) ou upload (sobe pro banco)'
+        required: true
+        default: 'dry-run'
+        type: choice
+        options:
+          - dry-run
+          - upload
+
+jobs:
+  enem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (branch da Fase 2 / ENEM)
+        uses: actions/checkout@v4
+        with:
+          ref: claude/enem-multi-vestibular-fase2
+
+      - name: Libs do sistema para o node-canvas
+        run: sudo apt-get update && sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      - name: Render das questões do ENEM
+        env:
+          YEAR: ${{ inputs.year }}
+          MODE: ${{ inputs.mode }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_POOLER_HOST: ${{ secrets.SUPABASE_POOLER_HOST }}
+        run: |
+          if [ "$MODE" = upload ]; then
+            npx tsx scripts/render_enem_images.ts --year="$YEAR"
+          else
+            npx tsx scripts/render_enem_images.ts --year="$YEAR" --dry-run --debug
+          fi
+
+      - name: Publicar os recortes para download (modo dry-run)
+        if: ${{ inputs.mode == 'dry-run' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: enem-recortes-${{ inputs.year }}
+          path: scripts/enem-debug/
+          if-no-files-found: warn
