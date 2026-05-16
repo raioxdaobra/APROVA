@@ -33,10 +33,8 @@ jobs:
   enem:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (branch da Fase 2 / ENEM)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: claude/enem-multi-vestibular-fase2
 
       - name: Libs do sistema para o node-canvas
         run: sudo apt-get update && sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
