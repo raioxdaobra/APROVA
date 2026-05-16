@@ -42,10 +42,18 @@
  *   PROVAS ENEM/{ano}/dia1.pdf   (questões 1..90)
  *   PROVAS ENEM/{ano}/dia2.pdf   (questões 91..180)
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  statSync,
+  rmSync,
+} from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
@@ -706,9 +714,10 @@ async function processPdf(
 }
 
 /**
- * Baixa o PDF do INEP se ainda não estiver em disco. Roda na máquina do
- * usuário (internet liberada). Best-effort: se falhar, segue e o usuário
- * pode colocar o arquivo manualmente.
+ * Baixa um PDF do INEP via `curl` (User-Agent de navegador, redirects,
+ * retries) — bem mais tolerante que o `fetch` do Node, que o WAF do INEP
+ * derruba na conexão ("fetch failed"). Best-effort: se falhar, segue e o
+ * PDF pode ser colocado à mão em PROVAS ENEM/{ano}/.
  */
 async function downloadIfMissing(url: string, dest: string): Promise<void> {
   if (existsSync(dest)) {
@@ -716,19 +725,40 @@ async function downloadIfMissing(url: string, dest: string): Promise<void> {
     return;
   }
   console.log(`[download] ${url}`);
-  try {
-    const res: any = await (globalThis as any).fetch(url);
-    if (!res || !res.ok) {
-      console.warn(`  [warn] download falhou (HTTP ${res?.status ?? '?'})`);
-      return;
-    }
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (!existsSync(dirname(dest))) mkdirSync(dirname(dest), { recursive: true });
-    writeFileSync(dest, buf);
-    console.log(`  salvo: ${dest} (${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
-  } catch (err) {
-    console.warn(`  [warn] download falhou: ${(err as Error).message}`);
+  if (!existsSync(dirname(dest))) mkdirSync(dirname(dest), { recursive: true });
+  const res = spawnSync(
+    'curl',
+    [
+      '-fsSL',
+      '--retry', '4',
+      '--retry-delay', '3',
+      '--retry-all-errors',
+      '--connect-timeout', '30',
+      '--max-time', '600',
+      '-A',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+        '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      '-H',
+      'Accept: application/pdf,application/octet-stream,*/*',
+      '-o', dest,
+      url,
+    ],
+    { stdio: ['ignore', 'ignore', 'inherit'] },
+  );
+  if (res.status !== 0 || !existsSync(dest)) {
+    console.warn(`  [warn] download falhou (curl exit ${res.status ?? '?'})`);
+    rmSync(dest, { force: true });
+    return;
   }
+  // O WAF do INEP às vezes responde 200 com uma página HTML de bloqueio.
+  const head = readFileSync(dest).subarray(0, 5).toString('latin1');
+  if (!head.startsWith('%PDF')) {
+    console.warn(`  [warn] resposta não é PDF (começa com "${head.trim()}")`);
+    rmSync(dest, { force: true });
+    return;
+  }
+  const mb = (statSync(dest).size / 1024 / 1024).toFixed(1);
+  console.log(`  salvo: ${dest} (${mb} MB)`);
 }
 
 async function main() {
