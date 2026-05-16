@@ -15,8 +15,7 @@
 import type { Discipline } from '@/lib/supabase/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/types';
-
-const EXAM = 'unifor-medicina';
+import { getActiveExam } from '@/lib/exam/active-exam';
 
 export const MIN_ANSWERS_FOR_GAP = 3;
 export const WEAK_THRESHOLD = 0.6;
@@ -83,13 +82,14 @@ export async function fetchWeakPoints(
   const minAnswers = opts.minAnswers ?? MIN_ANSWERS_FOR_GAP;
   const threshold = opts.threshold ?? WEAK_THRESHOLD;
   const topLimit = opts.topLimit ?? TOP_WEAK_LIMIT;
+  const exam = await getActiveExam(supabase, userId);
 
   // 1) Carrega catálogo (questions não-anuladas) — fonte da verdade pra
   //    discipline/subtopic e frequência global.
   const { data: questionsRows } = await supabase
     .from('questions')
     .select('id, discipline, subtopic, subtopic_short, annulled')
-    .eq('exam', EXAM);
+    .eq('exam', exam);
 
   const validQuestions = (questionsRows ?? []).filter((q) => !q.annulled);
   const questionsById = new Map<

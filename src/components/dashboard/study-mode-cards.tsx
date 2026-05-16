@@ -19,15 +19,17 @@
 import Link from 'next/link';
 import { BarChart3, Brain, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { getActiveExam } from '@/lib/exam/active-exam';
 import { fetchAll } from '@/lib/supabase/fetch-all';
 import { ResolverQuestoesCard } from './resolver-questoes-card';
 import { SimuladoCard } from './simulado-card';
 
 export async function StudyModeCards({ userId }: { userId: string }) {
   const supabase = await createClient();
+  const exam = await getActiveExam(supabase, userId);
 
   // Stats por card — query em paralelo:
-  // 1. Total de questões nao-anuladas (Unifor)
+  // 1. Total de questões nao-anuladas (da prova ativa)
   // 2. Tentativas do user com context pra split por modo (excluindo diagnostico)
   // 3. Sessoes de simulado finalizadas pelo user (count)
   const [allQuestions, attemptsRes, simuladoCountRes] = await Promise.all([
@@ -35,7 +37,7 @@ export async function StudyModeCards({ userId }: { userId: string }) {
       supabase
         .from('questions')
         .select('id')
-        .eq('exam', 'unifor-medicina')
+        .eq('exam', exam)
         .eq('annulled', false)
         .range(from, to),
     ),

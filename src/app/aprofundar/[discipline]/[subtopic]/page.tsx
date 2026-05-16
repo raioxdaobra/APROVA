@@ -6,6 +6,7 @@ import { UserMenu } from '@/components/user-menu';
 import { Card } from '@/components/ui/card';
 import { MarkdownKatex } from '@/components/markdown-katex';
 import { createClient } from '@/lib/supabase/server';
+import { getActiveExam } from '@/lib/exam/active-exam';
 import { slugify } from '@/lib/slug';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { startSubtopicQuiz } from './start-action';
@@ -72,11 +73,13 @@ export default async function AprofundarPage({ params }: PageProps) {
     redirect('/');
   }
 
+  const exam = await getActiveExam(supabase, user.id);
+
   // Carrega todas as questões da disciplina; descobre o subtópico cujo slug bate.
   const { data: questionRows } = await supabase
     .from('questions')
     .select('id, discipline, subtopic, subtopic_short, year, semester, question_num, annulled')
-    .eq('exam', 'unifor-medicina')
+    .eq('exam', exam)
     .eq('discipline', discipline);
 
   const subtopicMap = new Map<

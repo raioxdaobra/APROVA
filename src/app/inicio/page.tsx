@@ -46,6 +46,17 @@ export default async function InicioPage() {
     .eq('annulled', false);
   const uniforCount = uniforCountRaw ?? 0;
 
+  // Total de questões do ENEM. O card do ENEM só vira clicável quando há
+  // questões no banco (count-gate): enquanto enemCount === 0 ele renderiza
+  // "em breve" — comportamento idêntico ao de antes desta mudança. Quando o
+  // seed importar as questões, o card ativa sozinho, sem novo deploy.
+  const { count: enemCountRaw } = await supabase
+    .from('questions')
+    .select('id', { count: 'exact', head: true })
+    .eq('exam', 'enem')
+    .eq('annulled', false);
+  const enemCount = enemCountRaw ?? 0;
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-6">
@@ -131,13 +142,24 @@ export default async function InicioPage() {
             </button>
           </form>
 
-          {/* ENEM — EM BREVE (Fase 1: card desabilitado, Fase 3 vai abrir tela /inicio/[exam]) */}
-          <ExamComingSoonCard
-            label="ENEM"
-            description="Questões oficiais dos últimos 10 anos, simulado cronometrado e trilha — em preparação."
-            icon={<BarChart3 className="h-5 w-5" />}
-            accentVar="--accent-simulado"
-          />
+          {/* ENEM — count-gated: ativo quando há questões no banco, senão "em breve". */}
+          {enemCount > 0 ? (
+            <ExamActiveCard
+              formAction={setActiveExamEnem}
+              label="ENEM"
+              questionCount={enemCount}
+              description="Questões oficiais, simulado cronometrado e trilha gamificada."
+              icon={<BarChart3 className="h-5 w-5" />}
+              accentVar="--accent-simulado"
+            />
+          ) : (
+            <ExamComingSoonCard
+              label="ENEM"
+              description="Questões oficiais dos últimos 10 anos, simulado cronometrado e trilha — em preparação."
+              icon={<BarChart3 className="h-5 w-5" />}
+              accentVar="--accent-simulado"
+            />
+          )}
 
           {/* UECE — EM BREVE */}
           <ExamComingSoonCard
@@ -165,6 +187,89 @@ export default async function InicioPage() {
 async function setActiveExamUnifor() {
   'use server';
   await setActiveExam('unifor-medicina');
+}
+
+/** Mesmo wrapper de setActiveExamUnifor, fechado no argumento "enem". */
+async function setActiveExamEnem() {
+  'use server';
+  await setActiveExam('enem');
+}
+
+interface ActiveCardProps {
+  formAction: () => Promise<void>;
+  label: string;
+  questionCount: number;
+  description: string;
+  icon: React.ReactNode;
+  accentVar: string;
+}
+
+/**
+ * Card de prova ATIVA genérico. Usado por provas que não o Unifor (que tem
+ * seu próprio bloco inline pra não ser alterado). Visualmente idêntico ao
+ * card do Unifor: borda colorida, badge "Disponível", contagem de questões
+ * e CTA "Estudar agora". Submete o form que seta profiles.active_exam.
+ */
+function ExamActiveCard({
+  formAction,
+  label,
+  questionCount,
+  description,
+  icon,
+  accentVar,
+}: ActiveCardProps) {
+  return (
+    <form action={formAction}>
+      <button
+        type="submit"
+        className="group block w-full text-left"
+        aria-label={`Estudar ${label} — ${questionCount} questões`}
+      >
+        <Card
+          className="flex h-full flex-col gap-3 border-l-4 p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
+          style={{
+            borderLeftColor: `hsl(var(${accentVar}))`,
+            backgroundColor: `hsl(var(${accentVar}) / 0.04)`,
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-lg"
+              style={{
+                backgroundColor: `hsl(var(${accentVar}) / 0.16)`,
+                color: `hsl(var(${accentVar}))`,
+              }}
+              aria-hidden="true"
+            >
+              {icon}
+            </span>
+            <span className="rounded-full bg-success-bg px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-success">
+              Disponível
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-base font-semibold text-foreground">{label}</span>
+            <span
+              className="text-sm font-semibold tabular-nums"
+              style={{ color: `hsl(var(${accentVar}))` }}
+            >
+              {questionCount} questões oficiais
+            </span>
+            <span className="text-xs text-muted-foreground">{description}</span>
+          </div>
+          <span
+            className="mt-auto inline-flex items-center self-start rounded-full px-3 py-1 text-xs font-semibold"
+            style={{
+              backgroundColor: `hsl(var(${accentVar}) / 0.16)`,
+              color: `hsl(var(${accentVar}))`,
+            }}
+          >
+            Estudar agora
+          </span>
+        </Card>
+      </button>
+    </form>
+  );
 }
 
 interface ComingSoonProps {
