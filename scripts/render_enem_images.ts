@@ -86,6 +86,16 @@ const BUCKET = 'questions';
 const RENDER_SCALE = 2.0;
 const TOTAL_QUESTIONS = 180;
 
+// PDFs oficiais do INEP (caderno AZUL). D1 azul = CD1; D2 azul = CD7 (2023).
+// Em outros anos o numero do caderno azul muda — adicione o ano aqui.
+const INEP_BASE = 'https://download.inep.gov.br/enem/provas_e_gabaritos';
+const PROVA_URLS: Record<number, { dia1: string; dia2: string }> = {
+  2023: {
+    dia1: `${INEP_BASE}/2023_PV_impresso_D1_CD1.pdf`,
+    dia2: `${INEP_BASE}/2023_PV_impresso_D2_CD7.pdf`,
+  },
+};
+
 // pdfjs-dist 3.x + node-canvas (mesmo padrão de render_linguagens_images.ts)
 const require = createRequire(import.meta.url);
 type CanvasMod = { createCanvas: (w: number, h: number) => any };
@@ -591,9 +601,42 @@ async function processPdf(
   }
 }
 
+/**
+ * Baixa o PDF do INEP se ainda não estiver em disco. Roda na máquina do
+ * usuário (internet liberada). Best-effort: se falhar, segue e o usuário
+ * pode colocar o arquivo manualmente.
+ */
+async function downloadIfMissing(url: string, dest: string): Promise<void> {
+  if (existsSync(dest)) {
+    console.log(`[pdf] já existe: ${dest}`);
+    return;
+  }
+  console.log(`[download] ${url}`);
+  try {
+    const res: any = await (globalThis as any).fetch(url);
+    if (!res || !res.ok) {
+      console.warn(`  [warn] download falhou (HTTP ${res?.status ?? '?'})`);
+      return;
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!existsSync(dirname(dest))) mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, buf);
+    console.log(`  salvo: ${dest} (${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
+  } catch (err) {
+    console.warn(`  [warn] download falhou: ${(err as Error).message}`);
+  }
+}
+
 async function main() {
   const startTs = Date.now();
   console.log(`[ENEM ${YEAR}] render de questões${DRY_RUN ? ' (DRY-RUN)' : ''}`);
+
+  // Baixa os PDFs do INEP automaticamente (se ainda não estiverem em disco).
+  const urls = PROVA_URLS[YEAR];
+  if (urls) {
+    await downloadIfMissing(urls.dia1, join(PROVAS_DIR, 'dia1.pdf'));
+    await downloadIfMissing(urls.dia2, join(PROVAS_DIR, 'dia2.pdf'));
+  }
 
   const dia1 = join(PROVAS_DIR, 'dia1.pdf');
   const dia2 = join(PROVAS_DIR, 'dia2.pdf');
