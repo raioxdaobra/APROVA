@@ -3,9 +3,9 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { getActiveExam } from '@/lib/exam/active-exam';
 import type { Json } from '@/lib/supabase/types';
 
-const EXAM = 'unifor-medicina';
 const MAX_QUIZ_QUESTIONS = 10;
 
 const disciplineSchema = z.enum([
@@ -55,11 +55,12 @@ export async function startSubtopicQuiz(
   }
 
   const { discipline, subtopic } = parsed.data;
+  const exam = await getActiveExam(supabase, user.id);
 
   const { data: rows, error: qErr } = await supabase
     .from('questions')
     .select('id')
-    .eq('exam', EXAM)
+    .eq('exam', exam)
     .eq('discipline', discipline)
     .eq('subtopic', subtopic)
     .eq('annulled', false);

@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/card';
 import { WeakPointsView } from '@/components/stats/weak-points-view';
 import { createClient } from '@/lib/supabase/server';
 import { fetchAll } from '@/lib/supabase/fetch-all';
+import { getActiveExam } from '@/lib/exam/active-exam';
 import { fetchWeakPoints } from '@/lib/stats/weak-points';
 import type { Discipline } from '@/lib/supabase/types';
 import { DeleteAllDialog } from './_components/delete-all-dialog';
@@ -134,6 +135,8 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
   twelveWeeksAgo.setUTCDate(twelveWeeksAgo.getUTCDate() - 12 * 7);
   const twelveWeeksAgoIso = twelveWeeksAgo.toISOString();
 
+  const exam = await getActiveExam(supabase, user.id);
+
   const [
     { data: profile },
     { data: streakRow },
@@ -175,7 +178,7 @@ export default async function EstatisticasPage({ searchParams }: PageProps) {
         supabase
           .from('questions')
           .select('id, discipline, annulled')
-          .eq('exam', 'unifor-medicina')
+          .eq('exam', exam)
           .range(from, to),
     ).then((data) => ({ data, error: null })),
     supabase

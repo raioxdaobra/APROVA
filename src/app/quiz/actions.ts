@@ -9,9 +9,9 @@ import {
   checkQuestionsCap,
   incrementUsageCounter,
 } from '@/lib/billing/caps';
+import { getActiveExam } from '@/lib/exam/active-exam';
 import { classifyLanguage, classifySubject } from '@/lib/stats/sub-filters';
 
-const EXAM = 'unifor-medicina';
 // Teto absoluto de questões por sessão. Subiu de 60 → 200 pra atender
 // disciplinas grandes (matemática, biologia) cujo pool excede 60. Mantém
 // teto de segurança contra abuso (sessões absurdas / DoS no PostgREST).
@@ -95,13 +95,14 @@ async function loadCandidateQuestionIds(
   userId: string,
   f: NormalizedFilters,
 ): Promise<string[]> {
+  const exam = await getActiveExam(supabase, userId);
   // Pagina pra contornar cap de 1000 do PostgREST.
   const questionRows = await fetchAll<{ id: string; discipline: string; subtopic: string }>(
     ({ from, to }) => {
       let q = supabase
         .from('questions')
         .select('id, discipline, subtopic')
-        .eq('exam', EXAM)
+        .eq('exam', exam)
         .eq('annulled', false);
       if (f.discipline) q = q.eq('discipline', f.discipline);
       if (f.subtopic) q = q.eq('subtopic', f.subtopic);
@@ -151,6 +152,11 @@ async function loadCandidateQuestionIds(
 
 export async function getSubtopics(discipline: string | null): Promise<string[]> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const exam = await getActiveExam(supabase, user.id);
   let parsedDiscipline: string | null = null;
   if (discipline) {
     const parsed = disciplineSchema.safeParse(discipline);
@@ -161,7 +167,7 @@ export async function getSubtopics(discipline: string | null): Promise<string[]>
     let q = supabase
       .from('questions')
       .select('subtopic')
-      .eq('exam', EXAM)
+      .eq('exam', exam)
       .eq('annulled', false);
     if (parsedDiscipline) q = q.eq('discipline', parsedDiscipline);
     return q.range(from, to);
@@ -176,11 +182,16 @@ export async function getSubtopics(discipline: string | null): Promise<string[]>
 
 export async function getYears(): Promise<number[]> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const exam = await getActiveExam(supabase, user.id);
   const data = await fetchAll<{ year: number | null }>(({ from, to }) =>
     supabase
       .from('questions')
       .select('year')
-      .eq('exam', EXAM)
+      .eq('exam', exam)
       .eq('annulled', false)
       .range(from, to),
   );
@@ -200,13 +211,18 @@ export interface TopicFrequencyNode {
 
 export async function getTopicFrequency(): Promise<TopicFrequencyNode[]> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const exam = await getActiveExam(supabase, user.id);
   // Supabase enforça hard cap de 1000 rows (db-max-rows). Pagina via fetchAll.
   const data = await fetchAll<{ discipline: string | null; subtopic: string | null; annulled: boolean | null }>(
     ({ from, to }) =>
       supabase
         .from('questions')
         .select('discipline, subtopic, annulled')
-        .eq('exam', EXAM)
+        .eq('exam', exam)
         .range(from, to),
   );
   if (data.length === 0) return [];
@@ -268,6 +284,7 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
     return { ok: false, error: 'Sessão expirada.' };
   }
 
+  const exam = await getActiveExam(supabase, user.id);
   const f = normalizeFilters(parsed.data.filters);
   const mode = parsed.data.mode;
 
@@ -286,7 +303,7 @@ export async function startQuizSession(input: StartQuizInput): Promise<StartQuiz
     let q = supabase
       .from('questions')
       .select('id, year, semester, question_num, discipline, subtopic, annulled')
-      .eq('exam', EXAM)
+      .eq('exam', exam)
       .eq('annulled', false);
     if (f.discipline) q = q.eq('discipline', f.discipline);
     if (f.subtopic) q = q.eq('subtopic', f.subtopic);
@@ -443,6 +460,7 @@ export async function startTopicsQuizAndRedirect(
     throw new Error('Sessão expirada.');
   }
 
+  const exam = await getActiveExam(supabase, user.id);
   const mode = parsed.data.mode ?? 'aleatorio';
   const pairs = parsed.data.topics;
   const language = parsed.data.language ?? null;
@@ -471,7 +489,7 @@ export async function startTopicsQuizAndRedirect(
       supabase
         .from('questions')
         .select('id, year, semester, question_num, discipline, subtopic, annulled')
-        .eq('exam', EXAM)
+        .eq('exam', exam)
         .eq('discipline', discipline)
         .in('subtopic', subs)
         .eq('annulled', false)
