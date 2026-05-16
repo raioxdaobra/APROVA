@@ -24,7 +24,7 @@
  *   vem do arquivo de config por ano (campo naturezaDisciplinas).
  *
  * Config por ano: scripts/enem-config/{ano}.json
- *   Campos: year, caderno, gabarito (180 letras A-E) e naturezaDisciplinas
+ *   Campos: year, caderno, gabarito (180 chars A-E; '*' = anulada) e naturezaDisciplinas
  *   (disciplina fisica/quimica/biologia das questoes 91..135).
  *   Se o arquivo não existir, um TEMPLATE é gerado no 1o --dry-run.
  *
@@ -117,7 +117,7 @@ const DISCIPLINE_LABEL: Record<string, string> = {
 interface EnemConfig {
   year: number;
   caderno: string;
-  /** 180 letras A-E; índice = (questão - 1). '?' = pendente. */
+  /** 180 chars; índice = (questão-1). A-E = resposta; '*' = anulada; '?' = pendente. */
   gabarito: string;
   /** Disciplina das questões 91..135 (Ciências da Natureza). */
   naturezaDisciplinas: Record<string, string>;
@@ -527,10 +527,15 @@ async function processPdf(
     const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${remotePath}`;
     const discipline = disciplineFor(num, cfg);
     const label = DISCIPLINE_LABEL[discipline] ?? 'Geral';
-    const correct =
+    const gabChar =
       cfg && cfg.gabarito && cfg.gabarito.length >= num
         ? cfg.gabarito[num - 1]!.toUpperCase()
         : '?';
+    // '*' no gabarito = questão anulada pelo INEP: entra com annulled=true
+    // e correct_answer NULL. O app filtra annulled=false em toda query,
+    // então ela nunca é servida ao aluno.
+    const annulled = gabChar === '*';
+    const correct = annulled ? null : gabChar;
 
     if (DRY_RUN) {
       if (!existsSync(DEBUG_DIR)) mkdirSync(DEBUG_DIR, { recursive: true });
@@ -540,7 +545,7 @@ async function processPdf(
       continue;
     }
 
-    if (!/^[A-E]$/.test(correct)) {
+    if (!annulled && !/^[A-E]$/.test(correct ?? '')) {
       console.warn(`    [skip] Q${numPad}: gabarito ausente no config`);
       stats.failed++;
       continue;
@@ -589,7 +594,7 @@ async function processPdf(
           null,
           imageUrl,
           correct,
-          false,
+          annulled,
           'enem',
         ],
       );
