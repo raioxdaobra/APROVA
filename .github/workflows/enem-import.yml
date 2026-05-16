@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       year:
-        description: 'Ano do ENEM (ex: 2023)'
+        description: 'Ano do ENEM (ex: 2025)'
         required: true
-        default: '2023'
+        default: '2025'
       mode:
         description: 'dry-run (só testa o recorte) ou upload (sobe pro banco)'
         required: true

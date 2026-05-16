@@ -27,6 +27,9 @@
  *   Campos: year, caderno, gabarito (180 letras A-E) e naturezaDisciplinas
  *   (disciplina fisica/quimica/biologia das questoes 91..135).
  *   Se o arquivo não existir, um TEMPLATE é gerado no 1o --dry-run.
+ *   O gabarito é preenchido automaticamente a partir dos PDFs GB_impresso
+ *   do INEP (ver GABARITO_URLS); o que sobrar como '?' precisa ser ajustado
+ *   à mão no config antes do upload.
  *
  * Uso:
  *   npx tsx scripts/render_enem_images.ts --year=2023 --dry-run --debug
@@ -86,13 +89,26 @@ const BUCKET = 'questions';
 const RENDER_SCALE = 2.0;
 const TOTAL_QUESTIONS = 180;
 
-// PDFs oficiais do INEP (caderno AZUL). D1 azul = CD1; D2 azul = CD7 (2023).
+// PDFs oficiais do INEP (caderno AZUL). D1 azul = CD1; D2 azul = CD7.
 // Em outros anos o numero do caderno azul muda — adicione o ano aqui.
 const INEP_BASE = 'https://download.inep.gov.br/enem/provas_e_gabaritos';
 const PROVA_URLS: Record<number, { dia1: string; dia2: string }> = {
   2023: {
     dia1: `${INEP_BASE}/2023_PV_impresso_D1_CD1.pdf`,
     dia2: `${INEP_BASE}/2023_PV_impresso_D2_CD7.pdf`,
+  },
+  2025: {
+    dia1: `${INEP_BASE}/2025_PV_impresso_D1_CD1.pdf`,
+    dia2: `${INEP_BASE}/2025_PV_impresso_D2_CD7.pdf`,
+  },
+};
+
+// Gabaritos oficiais do INEP (mesmo caderno AZUL das provas acima). O script
+// lê a camada de texto destes PDFs e preenche as posições '?' do config.
+const GABARITO_URLS: Record<number, { dia1: string; dia2: string }> = {
+  2025: {
+    dia1: `${INEP_BASE}/2025_GB_impresso_D1_CD1.pdf`,
+    dia2: `${INEP_BASE}/2025_GB_impresso_D2_CD7.pdf`,
   },
 };
 
@@ -297,6 +313,94 @@ async function renderPdf(
 
   await doc.destroy();
   return { pages, markers };
+}
+
+// ---------------------------------------------------------------------------
+// Gabarito — extrai questão -> letra da camada de texto dos PDFs GB_impresso
+// ---------------------------------------------------------------------------
+/**
+ * Lê um PDF "GB_impresso" do INEP e devolve um mapa questão -> letra (A-E).
+ *
+ * Best-effort: agrupa os itens de texto por linha (tolerante a tabelas de
+ * colunas largas — não usa o corte de 60u do groupItemsToLines) e casa pares
+ * `numero ... letra`. Em tabela multi-caderno pega a 1a letra após o número
+ * (coluna azul, sempre a primeira). Conflitos (mesma questão com letras
+ * diferentes) são descartados — a checagem de '?' bloqueia upload incompleto.
+ *
+ * @param minQ/maxQ  intervalo esperado (dia 1 = 1..90, dia 2 = 91..180). Se o
+ *   arquivo renumerou o dia 2 como 1..90, desloca +90 automaticamente.
+ */
+async function parseGabaritoPdf(
+  pdfPath: string,
+  minQ: number,
+  maxQ: number,
+): Promise<Map<number, string>> {
+  const data = new Uint8Array(readFileSync(pdfPath));
+  const doc = await pdfjs.getDocument({
+    data,
+    disableFontFace: true,
+    useSystemFonts: false,
+  }).promise;
+
+  const raw = new Map<number, string>();
+  const conflict = new Set<number>();
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    let items: { str: string; x: number; y: number }[] = [];
+    try {
+      const content = await page.getTextContent();
+      items = (content.items as any[]).map((item) => ({
+        str: String(item.str ?? ''),
+        x: Number(item.transform?.[4] ?? 0),
+        y: Number(item.transform?.[5] ?? 0),
+      }));
+    } catch {
+      items = [];
+    }
+    // Agrupa por linha (y), tolerante a colunas largas.
+    const rows: { y: number; cells: { x: number; str: string }[] }[] = [];
+    for (const it of items) {
+      if (!it.str.trim()) continue;
+      let row = rows.find((r) => Math.abs(r.y - it.y) <= 3);
+      if (!row) {
+        row = { y: it.y, cells: [] };
+        rows.push(row);
+      }
+      row.cells.push({ x: it.x, str: it.str });
+    }
+    for (const row of rows) {
+      row.cells.sort((a, b) => a.x - b.x);
+      const text = row.cells
+        .map((c) => c.str)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const re = /\b(\d{1,3})\b[^0-9A-Ea-e]{0,6}([A-Ea-e])\b/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        const num = parseInt(m[1]!, 10);
+        const letter = m[2]!.toUpperCase();
+        if (num < 1 || num > TOTAL_QUESTIONS) continue;
+        const prev = raw.get(num);
+        if (prev && prev !== letter) conflict.add(num);
+        else raw.set(num, letter);
+      }
+    }
+  }
+  await doc.destroy();
+  for (const n of conflict) raw.delete(n);
+
+  // Dia 2: se o arquivo renumerou como 1..90, desloca pro intervalo 91..180.
+  let normalized = raw;
+  if (minQ > 90 && raw.size > 0 && Math.max(...raw.keys()) <= 90) {
+    normalized = new Map();
+    for (const [k, v] of raw) normalized.set(k + 90, v);
+  }
+  const out = new Map<number, string>();
+  for (const [k, v] of normalized) {
+    if (k >= minQ && k <= maxQ) out.set(k, v);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -637,6 +741,11 @@ async function main() {
     await downloadIfMissing(urls.dia1, join(PROVAS_DIR, 'dia1.pdf'));
     await downloadIfMissing(urls.dia2, join(PROVAS_DIR, 'dia2.pdf'));
   }
+  const gabUrls = GABARITO_URLS[YEAR];
+  if (gabUrls) {
+    await downloadIfMissing(gabUrls.dia1, join(PROVAS_DIR, 'gabarito-dia1.pdf'));
+    await downloadIfMissing(gabUrls.dia2, join(PROVAS_DIR, 'gabarito-dia2.pdf'));
+  }
 
   const dia1 = join(PROVAS_DIR, 'dia1.pdf');
   const dia2 = join(PROVAS_DIR, 'dia2.pdf');
@@ -652,6 +761,57 @@ async function main() {
   if (!cfg) {
     writeConfigTemplate();
     cfg = loadConfig();
+  }
+
+  // Gabarito: extrai automaticamente dos PDFs GB_impresso do INEP e preenche
+  // as posições '?' do config. O que não der pra ler continua '?' — a checagem
+  // mais abaixo bloqueia upload com gabarito incompleto.
+  if (cfg) {
+    const gab1 = join(PROVAS_DIR, 'gabarito-dia1.pdf');
+    const gab2 = join(PROVAS_DIR, 'gabarito-dia2.pdf');
+    const parsed = new Map<number, string>();
+    for (const [path, lo, hi] of [
+      [gab1, 1, 90],
+      [gab2, 91, 180],
+    ] as [string, number, number][]) {
+      if (!existsSync(path)) continue;
+      try {
+        for (const [k, v] of await parseGabaritoPdf(path, lo, hi)) {
+          parsed.set(k, v);
+        }
+      } catch (err) {
+        console.warn(`  [warn] falha ao ler ${path}: ${(err as Error).message}`);
+      }
+    }
+    if (parsed.size > 0) {
+      const chars = cfg.gabarito.padEnd(TOTAL_QUESTIONS, '?').split('');
+      let filled = 0;
+      for (const [num, letter] of parsed) {
+        if (num >= 1 && num <= TOTAL_QUESTIONS && chars[num - 1] === '?') {
+          chars[num - 1] = letter;
+          filled++;
+        }
+      }
+      cfg.gabarito = chars.join('');
+      console.log(
+        `[gabarito] ${parsed.size} respostas lidas dos PDFs do INEP, ${filled} preenchidas`,
+      );
+    }
+    const missing = cfg.gabarito.split('').filter((c) => c === '?').length;
+    console.log(
+      missing > 0
+        ? `[gabarito] ${missing} questão(ões) ainda sem resposta — preencha ${CONFIG_PATH}`
+        : `[gabarito] completo (${TOTAL_QUESTIONS}/${TOTAL_QUESTIONS})`,
+    );
+    if (DEBUG || DRY_RUN) {
+      for (let r = 0; r < TOTAL_QUESTIONS; r += 30) {
+        const lo = String(r + 1).padStart(3, '0');
+        const hi = String(Math.min(r + 30, TOTAL_QUESTIONS)).padStart(3, '0');
+        console.log(
+          `  Q${lo}-${hi}: ${cfg.gabarito.slice(r, r + 30).split('').join(' ')}`,
+        );
+      }
+    }
   }
 
   let supabase: ReturnType<typeof createClient> | null = null;
