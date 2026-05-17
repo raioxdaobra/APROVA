@@ -38,11 +38,6 @@ on:
     branches:
       - claude/import-enem-2025-questions-sF0AJ
 
-# Modo usado quando o disparo é por PUSH (o workflow_dispatch usa inputs.mode).
-env:
-  PUSH_MODE: dry-run
-  PUSH_YEAR: '2025'
-
 jobs:
   enem:
     runs-on: ubuntu-latest
@@ -50,8 +45,10 @@ jobs:
       contents: read
       pull-requests: write
     env:
+      # Disparo por PUSH usa ano 2025 e modo upload (sobe pro Supabase);
+      # o workflow_dispatch manual usa os inputs escolhidos na aba Actions.
       YEAR: ${{ github.event_name == 'push' && '2025' || inputs.year }}
-      MODE: ${{ github.event_name == 'push' && 'dry-run' || inputs.mode }}
+      MODE: ${{ github.event_name == 'push' && 'upload' || inputs.mode }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
