@@ -27,6 +27,9 @@
  *   Campos: year, caderno, gabarito (180 letras A-E) e naturezaDisciplinas
  *   (disciplina fisica/quimica/biologia das questoes 91..135).
  *   Se o arquivo não existir, um TEMPLATE é gerado no 1o --dry-run.
+ *   O gabarito é preenchido automaticamente a partir dos PDFs GB_impresso
+ *   do INEP (ver GABARITO_URLS); o que sobrar como '?' precisa ser ajustado
+ *   à mão no config antes do upload.
  *
  * Uso:
  *   npx tsx scripts/render_enem_images.ts --year=2023 --dry-run --debug
@@ -39,10 +42,18 @@
  *   PROVAS ENEM/{ano}/dia1.pdf   (questões 1..90)
  *   PROVAS ENEM/{ano}/dia2.pdf   (questões 91..180)
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  statSync,
+  rmSync,
+} from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
@@ -83,16 +94,34 @@ const SUPABASE_SECRET =
 const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL ?? '';
 
 const BUCKET = 'questions';
-const RENDER_SCALE = 2.0;
+const RENDER_SCALE = 3.0;
 const TOTAL_QUESTIONS = 180;
 
-// PDFs oficiais do INEP (caderno AZUL). D1 azul = CD1; D2 azul = CD7 (2023).
+// Fontes padrão do pdfjs (Helvetica/Times/etc). Sem isso o render solta
+// "failed to fetch standard font" e pode perder glifos no recorte.
+const STANDARD_FONTS =
+  join(ROOT, 'node_modules', 'pdfjs-dist', 'standard_fonts') + '/';
+
+// PDFs oficiais do INEP (caderno AZUL). D1 azul = CD1; D2 azul = CD7.
 // Em outros anos o numero do caderno azul muda — adicione o ano aqui.
 const INEP_BASE = 'https://download.inep.gov.br/enem/provas_e_gabaritos';
 const PROVA_URLS: Record<number, { dia1: string; dia2: string }> = {
   2023: {
     dia1: `${INEP_BASE}/2023_PV_impresso_D1_CD1.pdf`,
     dia2: `${INEP_BASE}/2023_PV_impresso_D2_CD7.pdf`,
+  },
+  2025: {
+    dia1: `${INEP_BASE}/2025_PV_impresso_D1_CD1.pdf`,
+    dia2: `${INEP_BASE}/2025_PV_impresso_D2_CD7.pdf`,
+  },
+};
+
+// Gabaritos oficiais do INEP (mesmo caderno AZUL das provas acima). O script
+// lê a camada de texto destes PDFs e preenche as posições '?' do config.
+const GABARITO_URLS: Record<number, { dia1: string; dia2: string }> = {
+  2025: {
+    dia1: `${INEP_BASE}/2025_GB_impresso_D1_CD1.pdf`,
+    dia2: `${INEP_BASE}/2025_GB_impresso_D2_CD7.pdf`,
   },
 };
 
@@ -166,6 +195,57 @@ interface PageRender {
   width: number;
   height: number;
   png: Buffer;
+  /** x (px) da calha entre as 2 colunas; -1 = página de coluna única. */
+  gutterX: number;
+}
+
+/**
+ * Detecta a calha (gutter) entre as colunas direto na imagem renderizada:
+ * procura, no centro da página, a faixa vertical branca mais alta. Se ela
+ * cobrir boa parte da altura -> página de 2 colunas (devolve o x da calha);
+ * senão -> coluna única (devolve -1). Imune a figuras largas pontuais.
+ */
+async function detectGutter(
+  png: Buffer,
+  width: number,
+  height: number,
+): Promise<number> {
+  const { data, info } = await sharp(png)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const w = info.width;
+  const h = info.height;
+  const y0 = Math.floor(h * 0.14);
+  const y1 = Math.floor(h * 0.86);
+  let bestX = -1;
+  let bestRun = 0;
+  for (let x = Math.floor(w * 0.4); x <= Math.floor(w * 0.6); x++) {
+    let run = 0;
+    let mx = 0;
+    for (let y = y0; y < y1; y++) {
+      let white = true;
+      for (let dx = -2; dx <= 2; dx++) {
+        if ((data[y * w + x + dx] ?? 0) < 235) {
+          white = false;
+          break;
+        }
+      }
+      if (white) {
+        run++;
+        if (run > mx) mx = run;
+      } else {
+        run = 0;
+      }
+    }
+    if (mx > bestRun) {
+      bestRun = mx;
+      bestX = x;
+    }
+  }
+  void width;
+  void height;
+  return bestRun / (y1 - y0) >= 0.5 ? bestX : -1;
 }
 
 interface QuestionMarker {
@@ -175,48 +255,22 @@ interface QuestionMarker {
   xLeft: number;
 }
 
-function groupItemsToLines(
-  items: { str: string; x: number; y: number; height: number }[],
-): { text: string; yPdf: number; xPdf: number }[] {
-  if (items.length === 0) return [];
-  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
-  const lines: { text: string; yPdf: number; xPdf: number; xMax: number }[] = [];
-  for (const it of sorted) {
-    let placed = false;
-    for (const ln of lines) {
-      if (Math.abs(ln.yPdf - it.y) <= 3) {
-        if (it.x - ln.xMax > 60 && ln.text.length > 0) continue;
-        ln.text = (ln.text + ' ' + it.str).replace(/\s+/g, ' ').trim();
-        ln.xMax = Math.max(ln.xMax, it.x + (it.str.length || 0));
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      lines.push({
-        text: it.str.replace(/\s+/g, ' ').trim(),
-        yPdf: it.y,
-        xPdf: it.x,
-        xMax: it.x + (it.str.length || 0),
-      });
-    }
-  }
-  return lines
-    .filter((l) => l.text.length > 0)
-    .map((l) => ({ text: l.text, yPdf: l.yPdf, xPdf: l.xPdf }));
-}
-
 /**
  * Renderiza as páginas relevantes do PDF e extrai os marcadores QUESTAO-NN.
  */
 async function renderPdf(
   pdfPath: string,
-): Promise<{ pages: PageRender[]; markers: QuestionMarker[] }> {
+): Promise<{
+  pages: PageRender[];
+  markers: QuestionMarker[];
+  contentBottom: number;
+}> {
   const data = new Uint8Array(readFileSync(pdfPath));
   const doc = await pdfjs.getDocument({
     data,
     disableFontFace: true,
     useSystemFonts: false,
+    standardFontDataUrl: STANDARD_FONTS,
   }).promise;
 
   const pageItems = new Map<
@@ -241,22 +295,68 @@ async function renderPdf(
     }
   }
 
-  // Detecta marcadores QUESTAO-NN (1..180). Case-insensitive.
+  // Detecta marcadores "QUESTÃO N". Detalhes da camada de texto do INEP:
+  //  - o cabeçalho vem com letter-spacing → sai como "Q UEST ã O 95";
+  //  - às vezes o fim do corpo de uma questão e o cabeçalho da outra coluna
+  //    caem na mesma linha de texto ("...recebido Q UEST ã O 150").
+  // Por isso: agrupa itens por linha (y), concatena rastreando a posição
+  // (x,y) de cada caractere, e usa regex GLOBAL — a posição do marcador é a
+  // do token "QUESTÃO", não a do início da linha (que pode ser corpo).
   const markers: QuestionMarker[] = [];
+  // yPdf do rodapé (cabeçalho do INEP repetido no pé): a linha mais baixa
+  // que contém "CADERNO". yPdf menor = mais embaixo na página.
+  const footerYPdf = new Map<number, number>();
   for (const [p, items] of pageItems) {
-    for (const line of groupItemsToLines(items)) {
-      const m = /quest[ãa]o\s+(\d{1,3})/i.exec(line.text);
-      if (!m) continue;
-      const num = parseInt(m[1]!, 10);
-      if (num < 1 || num > TOTAL_QUESTIONS) continue;
-      markers.push({ questionNum: num, pageNum: p, yTop: line.yPdf, xLeft: line.xPdf });
+    const rows: { y: number; cells: { str: string; x: number; y: number }[] }[] =
+      [];
+    for (const it of items) {
+      if (!it.str.trim()) continue;
+      let row = rows.find((r) => Math.abs(r.y - it.y) <= 3);
+      if (!row) {
+        row = { y: it.y, cells: [] };
+        rows.push(row);
+      }
+      row.cells.push({ str: it.str, x: it.x, y: it.y });
+    }
+    for (const row of rows) {
+      row.cells.sort((a, b) => a.x - b.x);
+      let text = '';
+      const charPos: { x: number; y: number }[] = [];
+      for (let ci = 0; ci < row.cells.length; ci++) {
+        const cell = row.cells[ci]!;
+        if (ci > 0) {
+          text += ' ';
+          charPos.push({ x: cell.x, y: cell.y });
+        }
+        for (let k = 0; k < cell.str.length; k++) {
+          text += cell.str[k];
+          charPos.push({ x: cell.x, y: cell.y });
+        }
+      }
+      if (text.replace(/\s/g, '').toLowerCase().includes('caderno')) {
+        const prev = footerYPdf.get(p);
+        if (prev === undefined || row.y < prev) footerYPdf.set(p, row.y);
+      }
+      const re = /q\s*u\s*e\s*s\s*t\s*[ãa]\s*o\s*(\d{1,3})/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        const num = parseInt(m[1]!, 10);
+        if (num < 1 || num > TOTAL_QUESTIONS) continue;
+        const pos = charPos[m.index] ?? { x: row.cells[0]!.x, y: row.y };
+        markers.push({
+          questionNum: num,
+          pageNum: p,
+          yTop: pos.y,
+          xLeft: pos.x,
+        });
+      }
     }
   }
 
   if (markers.length === 0) {
     console.warn(`  [warn] nenhum marcador QUESTAO-NN em ${pdfPath}`);
     await doc.destroy();
-    return { pages: [], markers: [] };
+    return { pages: [], markers: [], contentBottom: 0 };
   }
 
   // Renderiza da primeira à última página com marcador (+1 de folga).
@@ -264,9 +364,11 @@ async function renderPdf(
   const minP = Math.min(...pagesWithMarkers);
   const maxP = Math.min(doc.numPages, Math.max(...pagesWithMarkers) + 1);
   const pages: PageRender[] = [];
+  const viewportByPage = new Map<number, any>();
   for (let p = minP; p <= maxP; p++) {
     const page = await doc.getPage(p);
     const viewport = page.getViewport({ scale: RENDER_SCALE });
+    viewportByPage.set(p, viewport);
     const canvas = createCanvas(
       Math.ceil(viewport.width),
       Math.ceil(viewport.height),
@@ -275,28 +377,148 @@ async function renderPdf(
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const png = canvas.toBuffer('image/png');
     pages.push({
       pageNum: p,
       width: canvas.width,
       height: canvas.height,
-      png: canvas.toBuffer('image/png'),
+      png,
+      gutterX: await detectGutter(png, canvas.width, canvas.height),
     });
   }
 
-  // Converte coords PDF (bottom-up) -> pixel top-down.
-  const heightPxByPage = new Map<number, number>();
-  for (const pg of pages) heightPxByPage.set(pg.pageNum, pg.height);
+  // Converte as coords do marcador (espaço PDF) -> pixel da imagem com o
+  // transform do viewport. Isso respeita o offset de CropBox dos PDFs do
+  // INEP — a conversão manual antiga ignorava o CropBox e errava o Y ~30pt.
+  const HEADER_PAD = Math.round(16 * RENDER_SCALE);
   for (const mk of markers) {
-    const heightPx = heightPxByPage.get(mk.pageNum);
-    if (heightPx === undefined) continue;
-    const heightPdf = heightPx / RENDER_SCALE;
-    const yPx = (heightPdf - mk.yTop) * RENDER_SCALE;
-    mk.yTop = Math.max(0, Math.floor(yPx - 8 * RENDER_SCALE));
-    mk.xLeft = mk.xLeft * RENDER_SCALE;
+    const vp = viewportByPage.get(mk.pageNum);
+    if (!vp) continue;
+    const [vx, vy] = vp.convertToViewportPoint(mk.xLeft, mk.yTop) as [
+      number,
+      number,
+    ];
+    mk.xLeft = vx;
+    mk.yTop = Math.max(0, Math.floor(vy - HEADER_PAD));
+  }
+
+  // contentBottom: y (px) logo acima do rodapé. As fatias de coluna param
+  // aqui pra não capturar a linha de rodapé repetida do INEP.
+  let contentBottom = pages.length
+    ? Math.min(...pages.map((p) => p.height))
+    : 0;
+  for (const pg of pages) {
+    const fy = footerYPdf.get(pg.pageNum);
+    const vp = viewportByPage.get(pg.pageNum);
+    if (fy === undefined || !vp) continue;
+    const cy = (vp.convertToViewportPoint(0, fy) as number[])[1]!;
+    contentBottom = Math.min(
+      contentBottom,
+      Math.floor(cy - 12 * RENDER_SCALE),
+    );
   }
 
   await doc.destroy();
-  return { pages, markers };
+  return { pages, markers, contentBottom };
+}
+
+// ---------------------------------------------------------------------------
+// Gabarito — extrai questão -> letra da camada de texto dos PDFs GB_impresso
+// ---------------------------------------------------------------------------
+/**
+ * Lê um PDF "GB_impresso" do INEP e devolve um mapa questão -> letra (A-E).
+ *
+ * Best-effort: agrupa os itens de texto por linha (tolerante a tabelas de
+ * colunas largas — não usa o corte de 60u do groupItemsToLines) e casa pares
+ * `numero ... letra`. Em tabela multi-caderno pega a 1a letra após o número
+ * (coluna azul, sempre a primeira). Conflitos (mesma questão com letras
+ * diferentes) são descartados — a checagem de '?' bloqueia upload incompleto.
+ *
+ * @param minQ/maxQ  intervalo esperado (dia 1 = 1..90, dia 2 = 91..180). Se o
+ *   arquivo renumerou o dia 2 como 1..90, desloca +90 automaticamente.
+ */
+async function parseGabaritoPdf(
+  pdfPath: string,
+  minQ: number,
+  maxQ: number,
+): Promise<Map<number, string>> {
+  const data = new Uint8Array(readFileSync(pdfPath));
+  const doc = await pdfjs.getDocument({
+    data,
+    disableFontFace: true,
+    useSystemFonts: false,
+    standardFontDataUrl: STANDARD_FONTS,
+  }).promise;
+
+  const raw = new Map<number, string>();
+  const conflict = new Set<number>();
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    let items: { str: string; x: number; y: number }[] = [];
+    try {
+      const content = await page.getTextContent();
+      items = (content.items as any[]).map((item) => ({
+        str: String(item.str ?? ''),
+        x: Number(item.transform?.[4] ?? 0),
+        y: Number(item.transform?.[5] ?? 0),
+      }));
+    } catch {
+      items = [];
+    }
+    // Agrupa por linha (y), tolerante a colunas largas.
+    const rows: { y: number; cells: { x: number; str: string }[] }[] = [];
+    for (const it of items) {
+      if (!it.str.trim()) continue;
+      let row = rows.find((r) => Math.abs(r.y - it.y) <= 3);
+      if (!row) {
+        row = { y: it.y, cells: [] };
+        rows.push(row);
+      }
+      row.cells.push({ x: it.x, str: it.str });
+    }
+    for (const row of rows) {
+      row.cells.sort((a, b) => a.x - b.x);
+      const text = row.cells
+        .map((c) => c.str)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const re = /\b(\d{1,3})\b[^0-9A-Ea-e]{0,6}([A-Ea-e])\b/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        const num = parseInt(m[1]!, 10);
+        const letter = m[2]!.toUpperCase();
+        if (num < 1 || num > TOTAL_QUESTIONS) continue;
+        const prev = raw.get(num);
+        if (prev && prev !== letter) conflict.add(num);
+        else raw.set(num, letter);
+      }
+      // "NN Anulado" -> questão anulada (marcador '*').
+      const reAnn = /\b(\d{1,3})\b[^0-9A-Za-z]{0,4}anulad/gi;
+      let a: RegExpExecArray | null;
+      while ((a = reAnn.exec(text)) !== null) {
+        const num = parseInt(a[1]!, 10);
+        if (num >= 1 && num <= TOTAL_QUESTIONS) {
+          conflict.delete(num);
+          raw.set(num, '*');
+        }
+      }
+    }
+  }
+  await doc.destroy();
+  for (const n of conflict) raw.delete(n);
+
+  // Dia 2: se o arquivo renumerou como 1..90, desloca pro intervalo 91..180.
+  let normalized = raw;
+  if (minQ > 90 && raw.size > 0 && Math.max(...raw.keys()) <= 90) {
+    normalized = new Map();
+    for (const [k, v] of raw) normalized.set(k + 90, v);
+  }
+  const out = new Map<number, string>();
+  for (const [k, v] of normalized) {
+    if (k >= minQ && k <= maxQ) out.set(k, v);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -323,22 +545,6 @@ async function cropPngRaw(
     })
     .png()
     .toBuffer();
-}
-
-async function cropPng(
-  png: Buffer,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): Promise<Buffer> {
-  const raw = await cropPngRaw(png, x, y, w, h);
-  let img = sharp(raw).flatten({ background: '#ffffff' });
-  const meta = await img.metadata();
-  if (meta.width && meta.width > 1200) {
-    img = img.resize({ width: 1200, withoutEnlargement: true });
-  }
-  return img.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
 }
 
 async function stackVertical(slices: Buffer[], width: number): Promise<Buffer> {
@@ -380,103 +586,111 @@ async function stackVertical(slices: Buffer[], width: number): Promise<Buffer> {
 }
 
 /**
- * Recorta cada questão entre o seu marcador e o do próximo. Trata layout de
- * 2 colunas (marcadores na mesma página com Y próximo) e questões que
- * atravessam páginas (empilha verticalmente).
+ * Recorta cada questão respeitando o layout do ENEM, que MISTURA páginas de
+ * 2 colunas e de coluna única (questões com figuras/tabelas largas).
+ *
+ * Cada página vira 1 ou 2 "segmentos" de coluna conforme a calha detectada
+ * na imagem (PageRender.gutterX). A leitura flui segmento a segmento; cada
+ * questão ocupa do seu marcador ao da próxima, empilhando os segmentos
+ * atravessados. Resolve tanto o layout 2-colunas quanto figuras largas.
  */
 async function cropQuestions(
   pages: PageRender[],
   markers: QuestionMarker[],
+  contentBottom: number,
 ): Promise<QuestionCrop[]> {
-  if (markers.length === 0) return [];
-  const sorted = [...markers].sort((a, b) =>
-    a.pageNum !== b.pageNum ? a.pageNum - b.pageNum : a.yTop - b.yTop,
-  );
-  const dedup: QuestionMarker[] = [];
-  const seen = new Set<number>();
-  for (const m of sorted) {
-    if (seen.has(m.questionNum)) continue;
-    seen.add(m.questionNum);
-    dedup.push(m);
-  }
+  if (markers.length === 0 || pages.length === 0) return [];
 
+  const orderedPages = [...pages].sort((a, b) => a.pageNum - b.pageNum);
   const pageMap = new Map<number, PageRender>();
   for (const p of pages) pageMap.set(p.pageNum, p);
 
+  // Segmentos de coluna em ordem de leitura. Página de 2 colunas -> 2
+  // segmentos (esq/dir na calha); página de coluna única -> 1 segmento.
+  interface ColSeg {
+    pageNum: number;
+    x0: number;
+    x1: number;
+  }
+  const colSeq: ColSeg[] = [];
+  for (const p of orderedPages) {
+    if (p.gutterX > 0) {
+      colSeq.push({ pageNum: p.pageNum, x0: 0, x1: p.gutterX });
+      colSeq.push({ pageNum: p.pageNum, x0: p.gutterX, x1: p.width });
+    } else {
+      colSeq.push({ pageNum: p.pageNum, x0: 0, x1: p.width });
+    }
+  }
+  const segIndexFor = (pageNum: number, x: number): number => {
+    let first = -1;
+    for (let i = 0; i < colSeq.length; i++) {
+      if (colSeq[i]!.pageNum !== pageNum) continue;
+      if (first < 0) first = i;
+      if (x >= colSeq[i]!.x0 && x < colSeq[i]!.x1) return i;
+    }
+    return first;
+  };
+
+  // Topo do conteúdo (logo abaixo do cabeçalho): o marcador mais alto.
+  const contentTop = Math.max(0, Math.min(...markers.map((m) => m.yTop)));
+
+  // dedup + segmento de cada marcador.
+  const seen = new Set<number>();
+  const ordered: (QuestionMarker & { seg: number })[] = [];
+  for (const m of markers) {
+    if (seen.has(m.questionNum) || !pageMap.has(m.pageNum)) continue;
+    const seg = segIndexFor(m.pageNum, m.xLeft);
+    if (seg < 0) continue;
+    seen.add(m.questionNum);
+    ordered.push({ ...m, seg });
+  }
+  // Ordem de leitura: índice do segmento (já é página+coluna) e depois y.
+  ordered.sort((a, b) => a.seg - b.seg || a.yTop - b.yTop);
+
   const crops: QuestionCrop[] = [];
-  for (let i = 0; i < dedup.length; i++) {
-    const cur = dedup[i]!;
-    const nxt = dedup[i + 1] ?? null;
-    const curPage = pageMap.get(cur.pageNum);
-    if (!curPage) continue;
-
-    const twoColumn =
-      nxt && nxt.pageNum === cur.pageNum && Math.abs(nxt.yTop - cur.yTop) <= 40;
-
-    if (twoColumn) {
-      const curIsLeft = cur.xLeft < (nxt!.xLeft ?? 0);
-      const rightColX = curIsLeft ? nxt!.xLeft : cur.xLeft;
-      const splitX = Math.max(50, Math.floor(rightColX - 20));
-      const top = Math.max(0, Math.min(cur.yTop, nxt!.yTop));
-      const bottom = curPage.height;
-      const leftEdge = curIsLeft ? 0 : splitX;
-      const rightEdge = curIsLeft ? splitX : curPage.width;
-      const w = rightEdge - leftEdge;
-      if (w > 50 && bottom - top > 30) {
-        crops.push({
-          questionNum: cur.questionNum,
-          jpeg: await cropPng(curPage.png, leftEdge, top, w, bottom - top),
-        });
-      }
-      const otherLeft = curIsLeft ? splitX : 0;
-      const otherRight = curIsLeft ? curPage.width : splitX;
-      const otherW = otherRight - otherLeft;
-      if (otherW > 50 && bottom - top > 30) {
-        crops.push({
-          questionNum: nxt!.questionNum,
-          jpeg: await cropPng(curPage.png, otherLeft, top, otherW, bottom - top),
-        });
-      }
-      i++; // nxt já processado
-      continue;
-    }
-
-    if (nxt && nxt.pageNum === cur.pageNum) {
-      const top = Math.max(0, cur.yTop);
-      const bottom = Math.min(curPage.height, nxt.yTop);
-      if (bottom <= top + 30) continue;
-      crops.push({
-        questionNum: cur.questionNum,
-        jpeg: await cropPng(curPage.png, 0, top, curPage.width, bottom - top),
-      });
-      continue;
-    }
-
-    // Atravessa páginas (ou é a última questão).
-    const top = Math.max(0, cur.yTop);
-    const slices: Buffer[] = [
-      await cropPngRaw(curPage.png, 0, top, curPage.width, curPage.height - top),
-    ];
-    const endPage = nxt ? nxt.pageNum : cur.pageNum + 1;
-    for (let p = cur.pageNum + 1; p < endPage; p++) {
-      const inter = pageMap.get(p);
-      if (inter) slices.push(inter.png);
-    }
+  for (let i = 0; i < ordered.length; i++) {
+    const cur = ordered[i]!;
+    const nxt = ordered[i + 1] ?? null;
+    const startIdx = cur.seg;
+    let endIdx: number;
+    let endY: number; // y final no último segmento; -1 = até a base
     if (nxt) {
-      const nxtPage = pageMap.get(nxt.pageNum);
-      if (nxtPage) {
-        const cutBottom = Math.min(nxtPage.height, nxt.yTop);
-        if (cutBottom > 30) {
-          slices.push(
-            await cropPngRaw(nxtPage.png, 0, 0, nxtPage.width, cutBottom),
-          );
-        }
+      endIdx = nxt.seg >= startIdx ? nxt.seg : startIdx;
+      endY = nxt.yTop;
+    } else {
+      endIdx = startIdx;
+      endY = -1;
+    }
+
+    const slices: Buffer[] = [];
+    let maxW = 0;
+    for (let c = startIdx; c <= endIdx; c++) {
+      const seg = colSeq[c]!;
+      const page = pageMap.get(seg.pageNum);
+      if (!page) continue;
+      const top = c === startIdx ? cur.yTop : contentTop;
+      const segBottom = contentBottom > 0 ? contentBottom : page.height;
+      const bottom = c === endIdx && endY >= 0 ? endY : segBottom;
+      const w = Math.min(seg.x1 - seg.x0, page.width - seg.x0);
+      const h = Math.min(bottom, page.height) - top;
+      if (w < 20 || h < 20) continue;
+      slices.push(await cropPngRaw(page.png, seg.x0, top, w, h));
+      if (w > maxW) maxW = w;
+    }
+    if (slices.length === 0) continue;
+    let jpeg = await stackVertical(slices, maxW);
+    if (!nxt) {
+      // Última questão: corta o branco que sobra até o pé da coluna.
+      try {
+        jpeg = await sharp(jpeg)
+          .trim({ background: '#ffffff', threshold: 15 })
+          .jpeg({ quality: 85, mozjpeg: true })
+          .toBuffer();
+      } catch {
+        /* sem borda pra cortar — mantém como está */
       }
     }
-    crops.push({
-      questionNum: cur.questionNum,
-      jpeg: await stackVertical(slices, curPage.width),
-    });
+    crops.push({ questionNum: cur.questionNum, jpeg });
   }
   return crops;
 }
@@ -500,7 +714,7 @@ async function processPdf(
   stats: Stats,
 ): Promise<void> {
   console.log(`  [render] ${pdfPath}`);
-  const { pages, markers } = await renderPdf(pdfPath);
+  const { pages, markers, contentBottom } = await renderPdf(pdfPath);
   stats.detected += new Set(markers.map((m) => m.questionNum)).size;
 
   if (DEBUG) {
@@ -513,7 +727,7 @@ async function processPdf(
     }
   }
 
-  let crops = await cropQuestions(pages, markers);
+  let crops = await cropQuestions(pages, markers, contentBottom);
   crops.sort((a, b) => a.questionNum - b.questionNum);
   if (LIMIT > 0) crops = crops.slice(0, LIMIT);
   stats.cropped += crops.length;
@@ -531,6 +745,9 @@ async function processPdf(
       cfg && cfg.gabarito && cfg.gabarito.length >= num
         ? cfg.gabarito[num - 1]!.toUpperCase()
         : '?';
+    // '*' no gabarito = questão anulada pelo INEP (entra com annulled=true
+    // e correct_answer=null; o app já trata isso em quiz-runner/simulado).
+    const annulledQ = correct === '*';
 
     if (DRY_RUN) {
       if (!existsSync(DEBUG_DIR)) mkdirSync(DEBUG_DIR, { recursive: true });
@@ -540,7 +757,7 @@ async function processPdf(
       continue;
     }
 
-    if (!/^[A-E]$/.test(correct)) {
+    if (!annulledQ && !/^[A-E]$/.test(correct)) {
       console.warn(`    [skip] Q${numPad}: gabarito ausente no config`);
       stats.failed++;
       continue;
@@ -588,8 +805,8 @@ async function processPdf(
           num,
           null,
           imageUrl,
-          correct,
-          false,
+          annulledQ ? null : correct,
+          annulledQ,
           'enem',
         ],
       );
@@ -602,9 +819,10 @@ async function processPdf(
 }
 
 /**
- * Baixa o PDF do INEP se ainda não estiver em disco. Roda na máquina do
- * usuário (internet liberada). Best-effort: se falhar, segue e o usuário
- * pode colocar o arquivo manualmente.
+ * Baixa um PDF do INEP via `curl` (User-Agent de navegador, redirects,
+ * retries) — bem mais tolerante que o `fetch` do Node, que o WAF do INEP
+ * derruba na conexão ("fetch failed"). Best-effort: se falhar, segue e o
+ * PDF pode ser colocado à mão em PROVAS ENEM/{ano}/.
  */
 async function downloadIfMissing(url: string, dest: string): Promise<void> {
   if (existsSync(dest)) {
@@ -612,19 +830,40 @@ async function downloadIfMissing(url: string, dest: string): Promise<void> {
     return;
   }
   console.log(`[download] ${url}`);
-  try {
-    const res: any = await (globalThis as any).fetch(url);
-    if (!res || !res.ok) {
-      console.warn(`  [warn] download falhou (HTTP ${res?.status ?? '?'})`);
-      return;
-    }
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (!existsSync(dirname(dest))) mkdirSync(dirname(dest), { recursive: true });
-    writeFileSync(dest, buf);
-    console.log(`  salvo: ${dest} (${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
-  } catch (err) {
-    console.warn(`  [warn] download falhou: ${(err as Error).message}`);
+  if (!existsSync(dirname(dest))) mkdirSync(dirname(dest), { recursive: true });
+  const res = spawnSync(
+    'curl',
+    [
+      '-fsSL',
+      '--retry', '4',
+      '--retry-delay', '3',
+      '--retry-all-errors',
+      '--connect-timeout', '30',
+      '--max-time', '600',
+      '-A',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+        '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      '-H',
+      'Accept: application/pdf,application/octet-stream,*/*',
+      '-o', dest,
+      url,
+    ],
+    { stdio: ['ignore', 'ignore', 'inherit'] },
+  );
+  if (res.status !== 0 || !existsSync(dest)) {
+    console.warn(`  [warn] download falhou (curl exit ${res.status ?? '?'})`);
+    rmSync(dest, { force: true });
+    return;
   }
+  // O WAF do INEP às vezes responde 200 com uma página HTML de bloqueio.
+  const head = readFileSync(dest).subarray(0, 5).toString('latin1');
+  if (!head.startsWith('%PDF')) {
+    console.warn(`  [warn] resposta não é PDF (começa com "${head.trim()}")`);
+    rmSync(dest, { force: true });
+    return;
+  }
+  const mb = (statSync(dest).size / 1024 / 1024).toFixed(1);
+  console.log(`  salvo: ${dest} (${mb} MB)`);
 }
 
 async function main() {
@@ -636,6 +875,11 @@ async function main() {
   if (urls) {
     await downloadIfMissing(urls.dia1, join(PROVAS_DIR, 'dia1.pdf'));
     await downloadIfMissing(urls.dia2, join(PROVAS_DIR, 'dia2.pdf'));
+  }
+  const gabUrls = GABARITO_URLS[YEAR];
+  if (gabUrls) {
+    await downloadIfMissing(gabUrls.dia1, join(PROVAS_DIR, 'gabarito-dia1.pdf'));
+    await downloadIfMissing(gabUrls.dia2, join(PROVAS_DIR, 'gabarito-dia2.pdf'));
   }
 
   const dia1 = join(PROVAS_DIR, 'dia1.pdf');
@@ -652,6 +896,57 @@ async function main() {
   if (!cfg) {
     writeConfigTemplate();
     cfg = loadConfig();
+  }
+
+  // Gabarito: extrai automaticamente dos PDFs GB_impresso do INEP e preenche
+  // as posições '?' do config. O que não der pra ler continua '?' — a checagem
+  // mais abaixo bloqueia upload com gabarito incompleto.
+  if (cfg) {
+    const gab1 = join(PROVAS_DIR, 'gabarito-dia1.pdf');
+    const gab2 = join(PROVAS_DIR, 'gabarito-dia2.pdf');
+    const parsed = new Map<number, string>();
+    for (const [path, lo, hi] of [
+      [gab1, 1, 90],
+      [gab2, 91, 180],
+    ] as [string, number, number][]) {
+      if (!existsSync(path)) continue;
+      try {
+        for (const [k, v] of await parseGabaritoPdf(path, lo, hi)) {
+          parsed.set(k, v);
+        }
+      } catch (err) {
+        console.warn(`  [warn] falha ao ler ${path}: ${(err as Error).message}`);
+      }
+    }
+    if (parsed.size > 0) {
+      const chars = cfg.gabarito.padEnd(TOTAL_QUESTIONS, '?').split('');
+      let filled = 0;
+      for (const [num, letter] of parsed) {
+        if (num >= 1 && num <= TOTAL_QUESTIONS && chars[num - 1] === '?') {
+          chars[num - 1] = letter;
+          filled++;
+        }
+      }
+      cfg.gabarito = chars.join('');
+      console.log(
+        `[gabarito] ${parsed.size} respostas lidas dos PDFs do INEP, ${filled} preenchidas`,
+      );
+    }
+    const missing = cfg.gabarito.split('').filter((c) => c === '?').length;
+    console.log(
+      missing > 0
+        ? `[gabarito] ${missing} questão(ões) ainda sem resposta — preencha ${CONFIG_PATH}`
+        : `[gabarito] completo (${TOTAL_QUESTIONS}/${TOTAL_QUESTIONS})`,
+    );
+    if (DEBUG || DRY_RUN) {
+      for (let r = 0; r < TOTAL_QUESTIONS; r += 30) {
+        const lo = String(r + 1).padStart(3, '0');
+        const hi = String(Math.min(r + 30, TOTAL_QUESTIONS)).padStart(3, '0');
+        console.log(
+          `  Q${lo}-${hi}: ${cfg.gabarito.slice(r, r + 30).split('').join(' ')}`,
+        );
+      }
+    }
   }
 
   let supabase: ReturnType<typeof createClient> | null = null;

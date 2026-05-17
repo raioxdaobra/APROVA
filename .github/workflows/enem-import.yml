@@ -1,7 +1,13 @@
 name: ENEM — importar questões
 
-# Roda o pipeline de render das questões do ENEM nos servidores do GitHub.
-# Disparo MANUAL (aba Actions -> "ENEM — importar questões" -> Run workflow).
+# Roda o pipeline de render das questões do ENEM nos servidores do GitHub
+# (internet liberada pros PDFs do INEP + secrets do Supabase).
+#
+# Disparo:
+#   - MANUAL: aba Actions -> "ENEM — importar questões" -> Run workflow.
+#   - PUSH:   todo push na branch claude/import-enem-2025-questions-sF0AJ
+#             dispara o pipeline no modo definido em PUSH_MODE (abaixo) e
+#             comenta o resultado no PR.
 #
 # Modos:
 #   dry-run  -> só recorta as questões e publica os recortes como artefato
@@ -11,15 +17,15 @@ name: ENEM — importar questões
 #                 NEXT_PUBLIC_SUPABASE_URL
 #                 SUPABASE_SECRET_KEY
 #                 SUPABASE_DB_URL
-#               (e o gabarito preenchido em scripts/enem-config/{ano}.json)
+#               (o gabarito é lido automaticamente dos PDFs GB_impresso.)
 
 on:
   workflow_dispatch:
     inputs:
       year:
-        description: 'Ano do ENEM (ex: 2023)'
+        description: 'Ano do ENEM (ex: 2025)'
         required: true
-        default: '2023'
+        default: '2025'
       mode:
         description: 'dry-run (só testa o recorte) ou upload (sobe pro banco)'
         required: true
@@ -28,10 +34,21 @@ on:
         options:
           - dry-run
           - upload
+  push:
+    branches:
+      - claude/import-enem-2025-questions-sF0AJ
 
 jobs:
   enem:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      # Disparo por PUSH usa ano 2025 e modo upload (sobe pro Supabase);
+      # o workflow_dispatch manual usa os inputs escolhidos na aba Actions.
+      YEAR: ${{ github.event_name == 'push' && '2025' || inputs.year }}
+      MODE: ${{ github.event_name == 'push' && 'upload' || inputs.mode }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,23 +67,44 @@ jobs:
 
       - name: Render das questões do ENEM
         env:
-          YEAR: ${{ inputs.year }}
-          MODE: ${{ inputs.mode }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_POOLER_HOST: ${{ secrets.SUPABASE_POOLER_HOST }}
         run: |
+          set -o pipefail
+          echo "modo=$MODE ano=$YEAR"
           if [ "$MODE" = upload ]; then
-            npx tsx scripts/render_enem_images.ts --year="$YEAR"
+            npx tsx scripts/render_enem_images.ts --year="$YEAR" 2>&1 | tee render.log
           else
-            npx tsx scripts/render_enem_images.ts --year="$YEAR" --dry-run --debug
+            npx tsx scripts/render_enem_images.ts --year="$YEAR" --dry-run --debug 2>&1 | tee render.log
           fi
 
-      - name: Publicar os recortes para download (modo dry-run)
-        if: ${{ inputs.mode == 'dry-run' }}
+      - name: Comentar resultado no PR
+        if: ${{ always() && github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STATUS="${{ job.status }}"
+          {
+            echo "## ENEM import — modo \`$MODE\` (ano $YEAR) — **$STATUS**"
+            echo ""
+            echo "Workflow \`enem-import\` no commit \`${GITHUB_SHA::7}\`."
+            echo ""
+            echo '```'
+            if [ -f render.log ]; then
+              grep -v '\[marker\]' render.log | tail -c 8000
+            else
+              echo "(render.log ausente — o job falhou antes de rodar o script)"
+            fi
+            echo '```'
+          } > comment.md
+          gh pr comment "$GITHUB_REF_NAME" --body-file comment.md || true
+
+      - name: Publicar os recortes para download (dry-run)
+        if: ${{ always() && env.MODE == 'dry-run' }}
         uses: actions/upload-artifact@v4
         with:
-          name: enem-recortes-${{ inputs.year }}
+          name: enem-recortes-${{ env.YEAR }}
           path: scripts/enem-debug/
           if-no-files-found: warn
