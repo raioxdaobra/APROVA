@@ -195,6 +195,57 @@ interface PageRender {
   width: number;
   height: number;
   png: Buffer;
+  /** x (px) da calha entre as 2 colunas; -1 = página de coluna única. */
+  gutterX: number;
+}
+
+/**
+ * Detecta a calha (gutter) entre as colunas direto na imagem renderizada:
+ * procura, no centro da página, a faixa vertical branca mais alta. Se ela
+ * cobrir boa parte da altura -> página de 2 colunas (devolve o x da calha);
+ * senão -> coluna única (devolve -1). Imune a figuras largas pontuais.
+ */
+async function detectGutter(
+  png: Buffer,
+  width: number,
+  height: number,
+): Promise<number> {
+  const { data, info } = await sharp(png)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const w = info.width;
+  const h = info.height;
+  const y0 = Math.floor(h * 0.14);
+  const y1 = Math.floor(h * 0.86);
+  let bestX = -1;
+  let bestRun = 0;
+  for (let x = Math.floor(w * 0.4); x <= Math.floor(w * 0.6); x++) {
+    let run = 0;
+    let mx = 0;
+    for (let y = y0; y < y1; y++) {
+      let white = true;
+      for (let dx = -2; dx <= 2; dx++) {
+        if ((data[y * w + x + dx] ?? 0) < 235) {
+          white = false;
+          break;
+        }
+      }
+      if (white) {
+        run++;
+        if (run > mx) mx = run;
+      } else {
+        run = 0;
+      }
+    }
+    if (mx > bestRun) {
+      bestRun = mx;
+      bestX = x;
+    }
+  }
+  void width;
+  void height;
+  return bestRun / (y1 - y0) >= 0.5 ? bestX : -1;
 }
 
 interface QuestionMarker {
@@ -202,37 +253,6 @@ interface QuestionMarker {
   pageNum: number;
   yTop: number;
   xLeft: number;
-}
-
-function groupItemsToLines(
-  items: { str: string; x: number; y: number; height: number }[],
-): { text: string; yPdf: number; xPdf: number }[] {
-  if (items.length === 0) return [];
-  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
-  const lines: { text: string; yPdf: number; xPdf: number; xMax: number }[] = [];
-  for (const it of sorted) {
-    let placed = false;
-    for (const ln of lines) {
-      if (Math.abs(ln.yPdf - it.y) <= 3) {
-        if (it.x - ln.xMax > 60 && ln.text.length > 0) continue;
-        ln.text = (ln.text + ' ' + it.str).replace(/\s+/g, ' ').trim();
-        ln.xMax = Math.max(ln.xMax, it.x + (it.str.length || 0));
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      lines.push({
-        text: it.str.replace(/\s+/g, ' ').trim(),
-        yPdf: it.y,
-        xPdf: it.x,
-        xMax: it.x + (it.str.length || 0),
-      });
-    }
-  }
-  return lines
-    .filter((l) => l.text.length > 0)
-    .map((l) => ({ text: l.text, yPdf: l.yPdf, xPdf: l.xPdf }));
 }
 
 /**
@@ -275,26 +295,61 @@ async function renderPdf(
     }
   }
 
-  // Detecta marcadores QUESTAO-NN (1..180). Case-insensitive.
-  // O cabeçalho do INEP vem com letter-spacing: a camada de texto sai como
-  // "Q UEST ã O 95" — por isso o regex aceita espaços entre cada letra.
+  // Detecta marcadores "QUESTÃO N". Detalhes da camada de texto do INEP:
+  //  - o cabeçalho vem com letter-spacing → sai como "Q UEST ã O 95";
+  //  - às vezes o fim do corpo de uma questão e o cabeçalho da outra coluna
+  //    caem na mesma linha de texto ("...recebido Q UEST ã O 150").
+  // Por isso: agrupa itens por linha (y), concatena rastreando a posição
+  // (x,y) de cada caractere, e usa regex GLOBAL — a posição do marcador é a
+  // do token "QUESTÃO", não a do início da linha (que pode ser corpo).
   const markers: QuestionMarker[] = [];
   // yPdf do rodapé (cabeçalho do INEP repetido no pé): a linha mais baixa
   // que contém "CADERNO". yPdf menor = mais embaixo na página.
   const footerYPdf = new Map<number, number>();
   for (const [p, items] of pageItems) {
-    for (const line of groupItemsToLines(items)) {
-      if (line.text.replace(/\s/g, '').toLowerCase().includes('caderno')) {
-        const prev = footerYPdf.get(p);
-        if (prev === undefined || line.yPdf < prev) {
-          footerYPdf.set(p, line.yPdf);
+    const rows: { y: number; cells: { str: string; x: number; y: number }[] }[] =
+      [];
+    for (const it of items) {
+      if (!it.str.trim()) continue;
+      let row = rows.find((r) => Math.abs(r.y - it.y) <= 3);
+      if (!row) {
+        row = { y: it.y, cells: [] };
+        rows.push(row);
+      }
+      row.cells.push({ str: it.str, x: it.x, y: it.y });
+    }
+    for (const row of rows) {
+      row.cells.sort((a, b) => a.x - b.x);
+      let text = '';
+      const charPos: { x: number; y: number }[] = [];
+      for (let ci = 0; ci < row.cells.length; ci++) {
+        const cell = row.cells[ci]!;
+        if (ci > 0) {
+          text += ' ';
+          charPos.push({ x: cell.x, y: cell.y });
+        }
+        for (let k = 0; k < cell.str.length; k++) {
+          text += cell.str[k];
+          charPos.push({ x: cell.x, y: cell.y });
         }
       }
-      const m = /q\s*u\s*e\s*s\s*t\s*[ãa]\s*o\s*(\d{1,3})/i.exec(line.text);
-      if (!m) continue;
-      const num = parseInt(m[1]!, 10);
-      if (num < 1 || num > TOTAL_QUESTIONS) continue;
-      markers.push({ questionNum: num, pageNum: p, yTop: line.yPdf, xLeft: line.xPdf });
+      if (text.replace(/\s/g, '').toLowerCase().includes('caderno')) {
+        const prev = footerYPdf.get(p);
+        if (prev === undefined || row.y < prev) footerYPdf.set(p, row.y);
+      }
+      const re = /q\s*u\s*e\s*s\s*t\s*[ãa]\s*o\s*(\d{1,3})/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        const num = parseInt(m[1]!, 10);
+        if (num < 1 || num > TOTAL_QUESTIONS) continue;
+        const pos = charPos[m.index] ?? { x: row.cells[0]!.x, y: row.y };
+        markers.push({
+          questionNum: num,
+          pageNum: p,
+          yTop: pos.y,
+          xLeft: pos.x,
+        });
+      }
     }
   }
 
@@ -322,11 +377,13 @@ async function renderPdf(
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const png = canvas.toBuffer('image/png');
     pages.push({
       pageNum: p,
       width: canvas.width,
       height: canvas.height,
-      png: canvas.toBuffer('image/png'),
+      png,
+      gutterX: await detectGutter(png, canvas.width, canvas.height),
     });
   }
 
@@ -529,13 +586,13 @@ async function stackVertical(slices: Buffer[], width: number): Promise<Buffer> {
 }
 
 /**
- * Recorta cada questão respeitando o layout fixo de 2 colunas do ENEM.
+ * Recorta cada questão respeitando o layout do ENEM, que MISTURA páginas de
+ * 2 colunas e de coluna única (questões com figuras/tabelas largas).
  *
- * Modelo: a prova é uma grade de 2 colunas; a leitura flui pela coluna
- * esquerda (topo→base), depois pela direita, depois pela próxima página.
- * Cada questão ocupa do seu marcador até o marcador da questão seguinte,
- * atravessando uma ou mais "colunas" — que são empilhadas verticalmente.
- * Isso evita o recorte de largura cheia (que misturava as 2 colunas).
+ * Cada página vira 1 ou 2 "segmentos" de coluna conforme a calha detectada
+ * na imagem (PageRender.gutterX). A leitura flui segmento a segmento; cada
+ * questão ocupa do seu marcador ao da próxima, empilhando os segmentos
+ * atravessados. Resolve tanto o layout 2-colunas quanto figuras largas.
  */
 async function cropQuestions(
   pages: PageRender[],
@@ -544,75 +601,84 @@ async function cropQuestions(
 ): Promise<QuestionCrop[]> {
   if (markers.length === 0 || pages.length === 0) return [];
 
-  const ordered2 = [...pages].sort((a, b) => a.pageNum - b.pageNum);
+  const orderedPages = [...pages].sort((a, b) => a.pageNum - b.pageNum);
   const pageMap = new Map<number, PageRender>();
   for (const p of pages) pageMap.set(p.pageNum, p);
-  const colW = Math.floor(ordered2[0]!.width / 2);
 
-  // Topo do conteúdo (logo abaixo do cabeçalho da página): o marcador mais
-  // alto de toda a prova. Início das fatias de continuação de coluna.
+  // Segmentos de coluna em ordem de leitura. Página de 2 colunas -> 2
+  // segmentos (esq/dir na calha); página de coluna única -> 1 segmento.
+  interface ColSeg {
+    pageNum: number;
+    x0: number;
+    x1: number;
+  }
+  const colSeq: ColSeg[] = [];
+  for (const p of orderedPages) {
+    if (p.gutterX > 0) {
+      colSeq.push({ pageNum: p.pageNum, x0: 0, x1: p.gutterX });
+      colSeq.push({ pageNum: p.pageNum, x0: p.gutterX, x1: p.width });
+    } else {
+      colSeq.push({ pageNum: p.pageNum, x0: 0, x1: p.width });
+    }
+  }
+  const segIndexFor = (pageNum: number, x: number): number => {
+    let first = -1;
+    for (let i = 0; i < colSeq.length; i++) {
+      if (colSeq[i]!.pageNum !== pageNum) continue;
+      if (first < 0) first = i;
+      if (x >= colSeq[i]!.x0 && x < colSeq[i]!.x1) return i;
+    }
+    return first;
+  };
+
+  // Topo do conteúdo (logo abaixo do cabeçalho): o marcador mais alto.
   const contentTop = Math.max(0, Math.min(...markers.map((m) => m.yTop)));
 
-  // dedup + coluna de cada marcador (0 = esquerda, 1 = direita).
-  type OrderedMarker = QuestionMarker & { col: 0 | 1 };
+  // dedup + segmento de cada marcador.
   const seen = new Set<number>();
-  const ordered: OrderedMarker[] = [];
+  const ordered: (QuestionMarker & { seg: number })[] = [];
   for (const m of markers) {
-    if (seen.has(m.questionNum)) continue;
-    const page = pageMap.get(m.pageNum);
-    if (!page) continue;
+    if (seen.has(m.questionNum) || !pageMap.has(m.pageNum)) continue;
+    const seg = segIndexFor(m.pageNum, m.xLeft);
+    if (seg < 0) continue;
     seen.add(m.questionNum);
-    ordered.push({ ...m, col: m.xLeft >= page.width / 2 ? 1 : 0 });
+    ordered.push({ ...m, seg });
   }
-  // Ordem de leitura: página, coluna, y (topo→base).
-  ordered.sort(
-    (a, b) => a.pageNum - b.pageNum || a.col - b.col || a.yTop - b.yTop,
-  );
-
-  // Sequência de colunas em ordem de leitura.
-  const colSeq: { pageNum: number; col: 0 | 1 }[] = [];
-  for (const p of ordered2) {
-    colSeq.push({ pageNum: p.pageNum, col: 0 });
-    colSeq.push({ pageNum: p.pageNum, col: 1 });
-  }
-  const colIdx = (pageNum: number, col: 0 | 1) =>
-    colSeq.findIndex((c) => c.pageNum === pageNum && c.col === col);
+  // Ordem de leitura: índice do segmento (já é página+coluna) e depois y.
+  ordered.sort((a, b) => a.seg - b.seg || a.yTop - b.yTop);
 
   const crops: QuestionCrop[] = [];
   for (let i = 0; i < ordered.length; i++) {
     const cur = ordered[i]!;
     const nxt = ordered[i + 1] ?? null;
-    const startIdx = colIdx(cur.pageNum, cur.col);
-    if (startIdx < 0) continue;
-
+    const startIdx = cur.seg;
     let endIdx: number;
-    let endY: number; // y final na última coluna; -1 = até a base
+    let endY: number; // y final no último segmento; -1 = até a base
     if (nxt) {
-      const ni = colIdx(nxt.pageNum, nxt.col);
-      endIdx = ni >= startIdx ? ni : startIdx;
+      endIdx = nxt.seg >= startIdx ? nxt.seg : startIdx;
       endY = nxt.yTop;
     } else {
-      // Última questão: só a própria coluna (o branco é cortado depois).
       endIdx = startIdx;
       endY = -1;
     }
 
     const slices: Buffer[] = [];
+    let maxW = 0;
     for (let c = startIdx; c <= endIdx; c++) {
       const seg = colSeq[c]!;
       const page = pageMap.get(seg.pageNum);
       if (!page) continue;
-      const x0 = seg.col === 0 ? 0 : colW;
       const top = c === startIdx ? cur.yTop : contentTop;
-      const pageBottom = contentBottom > 0 ? contentBottom : page.height;
-      const bottom = c === endIdx && endY >= 0 ? endY : pageBottom;
-      const w = Math.min(colW, page.width - x0);
+      const segBottom = contentBottom > 0 ? contentBottom : page.height;
+      const bottom = c === endIdx && endY >= 0 ? endY : segBottom;
+      const w = Math.min(seg.x1 - seg.x0, page.width - seg.x0);
       const h = Math.min(bottom, page.height) - top;
       if (w < 20 || h < 20) continue;
-      slices.push(await cropPngRaw(page.png, x0, top, w, h));
+      slices.push(await cropPngRaw(page.png, seg.x0, top, w, h));
+      if (w > maxW) maxW = w;
     }
     if (slices.length === 0) continue;
-    let jpeg = await stackVertical(slices, colW);
+    let jpeg = await stackVertical(slices, maxW);
     if (!nxt) {
       // Última questão: corta o branco que sobra até o pé da coluna.
       try {
