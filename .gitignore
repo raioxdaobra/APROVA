@@ -36,5 +36,8 @@ coverage/
 # tesseract.js — baixa modelos de idioma sob demanda no cwd
 *.traineddata
 
+# recortes de debug do pipeline ENEM (gerados no --dry-run)
+scripts/enem-debug/
+
 .vercel
 tsconfig.tsbuildinfo

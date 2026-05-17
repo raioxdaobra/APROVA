@@ -94,8 +94,13 @@ const SUPABASE_SECRET =
 const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL ?? '';
 
 const BUCKET = 'questions';
-const RENDER_SCALE = 2.0;
+const RENDER_SCALE = 3.0;
 const TOTAL_QUESTIONS = 180;
+
+// Fontes padrão do pdfjs (Helvetica/Times/etc). Sem isso o render solta
+// "failed to fetch standard font" e pode perder glifos no recorte.
+const STANDARD_FONTS =
+  join(ROOT, 'node_modules', 'pdfjs-dist', 'standard_fonts') + '/';
 
 // PDFs oficiais do INEP (caderno AZUL). D1 azul = CD1; D2 azul = CD7.
 // Em outros anos o numero do caderno azul muda — adicione o ano aqui.
@@ -235,12 +240,17 @@ function groupItemsToLines(
  */
 async function renderPdf(
   pdfPath: string,
-): Promise<{ pages: PageRender[]; markers: QuestionMarker[] }> {
+): Promise<{
+  pages: PageRender[];
+  markers: QuestionMarker[];
+  contentBottom: number;
+}> {
   const data = new Uint8Array(readFileSync(pdfPath));
   const doc = await pdfjs.getDocument({
     data,
     disableFontFace: true,
     useSystemFonts: false,
+    standardFontDataUrl: STANDARD_FONTS,
   }).promise;
 
   const pageItems = new Map<
@@ -266,10 +276,21 @@ async function renderPdf(
   }
 
   // Detecta marcadores QUESTAO-NN (1..180). Case-insensitive.
+  // O cabeçalho do INEP vem com letter-spacing: a camada de texto sai como
+  // "Q UEST ã O 95" — por isso o regex aceita espaços entre cada letra.
   const markers: QuestionMarker[] = [];
+  // yPdf do rodapé (cabeçalho do INEP repetido no pé): a linha mais baixa
+  // que contém "CADERNO". yPdf menor = mais embaixo na página.
+  const footerYPdf = new Map<number, number>();
   for (const [p, items] of pageItems) {
     for (const line of groupItemsToLines(items)) {
-      const m = /quest[ãa]o\s+(\d{1,3})/i.exec(line.text);
+      if (line.text.replace(/\s/g, '').toLowerCase().includes('caderno')) {
+        const prev = footerYPdf.get(p);
+        if (prev === undefined || line.yPdf < prev) {
+          footerYPdf.set(p, line.yPdf);
+        }
+      }
+      const m = /q\s*u\s*e\s*s\s*t\s*[ãa]\s*o\s*(\d{1,3})/i.exec(line.text);
       if (!m) continue;
       const num = parseInt(m[1]!, 10);
       if (num < 1 || num > TOTAL_QUESTIONS) continue;
@@ -280,7 +301,7 @@ async function renderPdf(
   if (markers.length === 0) {
     console.warn(`  [warn] nenhum marcador QUESTAO-NN em ${pdfPath}`);
     await doc.destroy();
-    return { pages: [], markers: [] };
+    return { pages: [], markers: [], contentBottom: 0 };
   }
 
   // Renderiza da primeira à última página com marcador (+1 de folga).
@@ -288,9 +309,11 @@ async function renderPdf(
   const minP = Math.min(...pagesWithMarkers);
   const maxP = Math.min(doc.numPages, Math.max(...pagesWithMarkers) + 1);
   const pages: PageRender[] = [];
+  const viewportByPage = new Map<number, any>();
   for (let p = minP; p <= maxP; p++) {
     const page = await doc.getPage(p);
     const viewport = page.getViewport({ scale: RENDER_SCALE });
+    viewportByPage.set(p, viewport);
     const canvas = createCanvas(
       Math.ceil(viewport.width),
       Math.ceil(viewport.height),
@@ -307,20 +330,39 @@ async function renderPdf(
     });
   }
 
-  // Converte coords PDF (bottom-up) -> pixel top-down.
-  const heightPxByPage = new Map<number, number>();
-  for (const pg of pages) heightPxByPage.set(pg.pageNum, pg.height);
+  // Converte as coords do marcador (espaço PDF) -> pixel da imagem com o
+  // transform do viewport. Isso respeita o offset de CropBox dos PDFs do
+  // INEP — a conversão manual antiga ignorava o CropBox e errava o Y ~30pt.
+  const HEADER_PAD = Math.round(16 * RENDER_SCALE);
   for (const mk of markers) {
-    const heightPx = heightPxByPage.get(mk.pageNum);
-    if (heightPx === undefined) continue;
-    const heightPdf = heightPx / RENDER_SCALE;
-    const yPx = (heightPdf - mk.yTop) * RENDER_SCALE;
-    mk.yTop = Math.max(0, Math.floor(yPx - 8 * RENDER_SCALE));
-    mk.xLeft = mk.xLeft * RENDER_SCALE;
+    const vp = viewportByPage.get(mk.pageNum);
+    if (!vp) continue;
+    const [vx, vy] = vp.convertToViewportPoint(mk.xLeft, mk.yTop) as [
+      number,
+      number,
+    ];
+    mk.xLeft = vx;
+    mk.yTop = Math.max(0, Math.floor(vy - HEADER_PAD));
+  }
+
+  // contentBottom: y (px) logo acima do rodapé. As fatias de coluna param
+  // aqui pra não capturar a linha de rodapé repetida do INEP.
+  let contentBottom = pages.length
+    ? Math.min(...pages.map((p) => p.height))
+    : 0;
+  for (const pg of pages) {
+    const fy = footerYPdf.get(pg.pageNum);
+    const vp = viewportByPage.get(pg.pageNum);
+    if (fy === undefined || !vp) continue;
+    const cy = (vp.convertToViewportPoint(0, fy) as number[])[1]!;
+    contentBottom = Math.min(
+      contentBottom,
+      Math.floor(cy - 12 * RENDER_SCALE),
+    );
   }
 
   await doc.destroy();
-  return { pages, markers };
+  return { pages, markers, contentBottom };
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +390,7 @@ async function parseGabaritoPdf(
     data,
     disableFontFace: true,
     useSystemFonts: false,
+    standardFontDataUrl: STANDARD_FONTS,
   }).promise;
 
   const raw = new Map<number, string>();
@@ -393,6 +436,16 @@ async function parseGabaritoPdf(
         if (prev && prev !== letter) conflict.add(num);
         else raw.set(num, letter);
       }
+      // "NN Anulado" -> questão anulada (marcador '*').
+      const reAnn = /\b(\d{1,3})\b[^0-9A-Za-z]{0,4}anulad/gi;
+      let a: RegExpExecArray | null;
+      while ((a = reAnn.exec(text)) !== null) {
+        const num = parseInt(a[1]!, 10);
+        if (num >= 1 && num <= TOTAL_QUESTIONS) {
+          conflict.delete(num);
+          raw.set(num, '*');
+        }
+      }
     }
   }
   await doc.destroy();
@@ -437,22 +490,6 @@ async function cropPngRaw(
     .toBuffer();
 }
 
-async function cropPng(
-  png: Buffer,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): Promise<Buffer> {
-  const raw = await cropPngRaw(png, x, y, w, h);
-  let img = sharp(raw).flatten({ background: '#ffffff' });
-  const meta = await img.metadata();
-  if (meta.width && meta.width > 1200) {
-    img = img.resize({ width: 1200, withoutEnlargement: true });
-  }
-  return img.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
-}
-
 async function stackVertical(slices: Buffer[], width: number): Promise<Buffer> {
   if (slices.length === 0) return Buffer.alloc(0);
   if (slices.length === 1) {
@@ -492,103 +529,102 @@ async function stackVertical(slices: Buffer[], width: number): Promise<Buffer> {
 }
 
 /**
- * Recorta cada questão entre o seu marcador e o do próximo. Trata layout de
- * 2 colunas (marcadores na mesma página com Y próximo) e questões que
- * atravessam páginas (empilha verticalmente).
+ * Recorta cada questão respeitando o layout fixo de 2 colunas do ENEM.
+ *
+ * Modelo: a prova é uma grade de 2 colunas; a leitura flui pela coluna
+ * esquerda (topo→base), depois pela direita, depois pela próxima página.
+ * Cada questão ocupa do seu marcador até o marcador da questão seguinte,
+ * atravessando uma ou mais "colunas" — que são empilhadas verticalmente.
+ * Isso evita o recorte de largura cheia (que misturava as 2 colunas).
  */
 async function cropQuestions(
   pages: PageRender[],
   markers: QuestionMarker[],
+  contentBottom: number,
 ): Promise<QuestionCrop[]> {
-  if (markers.length === 0) return [];
-  const sorted = [...markers].sort((a, b) =>
-    a.pageNum !== b.pageNum ? a.pageNum - b.pageNum : a.yTop - b.yTop,
-  );
-  const dedup: QuestionMarker[] = [];
-  const seen = new Set<number>();
-  for (const m of sorted) {
-    if (seen.has(m.questionNum)) continue;
-    seen.add(m.questionNum);
-    dedup.push(m);
-  }
+  if (markers.length === 0 || pages.length === 0) return [];
 
+  const ordered2 = [...pages].sort((a, b) => a.pageNum - b.pageNum);
   const pageMap = new Map<number, PageRender>();
   for (const p of pages) pageMap.set(p.pageNum, p);
+  const colW = Math.floor(ordered2[0]!.width / 2);
+
+  // Topo do conteúdo (logo abaixo do cabeçalho da página): o marcador mais
+  // alto de toda a prova. Início das fatias de continuação de coluna.
+  const contentTop = Math.max(0, Math.min(...markers.map((m) => m.yTop)));
+
+  // dedup + coluna de cada marcador (0 = esquerda, 1 = direita).
+  type OrderedMarker = QuestionMarker & { col: 0 | 1 };
+  const seen = new Set<number>();
+  const ordered: OrderedMarker[] = [];
+  for (const m of markers) {
+    if (seen.has(m.questionNum)) continue;
+    const page = pageMap.get(m.pageNum);
+    if (!page) continue;
+    seen.add(m.questionNum);
+    ordered.push({ ...m, col: m.xLeft >= page.width / 2 ? 1 : 0 });
+  }
+  // Ordem de leitura: página, coluna, y (topo→base).
+  ordered.sort(
+    (a, b) => a.pageNum - b.pageNum || a.col - b.col || a.yTop - b.yTop,
+  );
+
+  // Sequência de colunas em ordem de leitura.
+  const colSeq: { pageNum: number; col: 0 | 1 }[] = [];
+  for (const p of ordered2) {
+    colSeq.push({ pageNum: p.pageNum, col: 0 });
+    colSeq.push({ pageNum: p.pageNum, col: 1 });
+  }
+  const colIdx = (pageNum: number, col: 0 | 1) =>
+    colSeq.findIndex((c) => c.pageNum === pageNum && c.col === col);
 
   const crops: QuestionCrop[] = [];
-  for (let i = 0; i < dedup.length; i++) {
-    const cur = dedup[i]!;
-    const nxt = dedup[i + 1] ?? null;
-    const curPage = pageMap.get(cur.pageNum);
-    if (!curPage) continue;
+  for (let i = 0; i < ordered.length; i++) {
+    const cur = ordered[i]!;
+    const nxt = ordered[i + 1] ?? null;
+    const startIdx = colIdx(cur.pageNum, cur.col);
+    if (startIdx < 0) continue;
 
-    const twoColumn =
-      nxt && nxt.pageNum === cur.pageNum && Math.abs(nxt.yTop - cur.yTop) <= 40;
-
-    if (twoColumn) {
-      const curIsLeft = cur.xLeft < (nxt!.xLeft ?? 0);
-      const rightColX = curIsLeft ? nxt!.xLeft : cur.xLeft;
-      const splitX = Math.max(50, Math.floor(rightColX - 20));
-      const top = Math.max(0, Math.min(cur.yTop, nxt!.yTop));
-      const bottom = curPage.height;
-      const leftEdge = curIsLeft ? 0 : splitX;
-      const rightEdge = curIsLeft ? splitX : curPage.width;
-      const w = rightEdge - leftEdge;
-      if (w > 50 && bottom - top > 30) {
-        crops.push({
-          questionNum: cur.questionNum,
-          jpeg: await cropPng(curPage.png, leftEdge, top, w, bottom - top),
-        });
-      }
-      const otherLeft = curIsLeft ? splitX : 0;
-      const otherRight = curIsLeft ? curPage.width : splitX;
-      const otherW = otherRight - otherLeft;
-      if (otherW > 50 && bottom - top > 30) {
-        crops.push({
-          questionNum: nxt!.questionNum,
-          jpeg: await cropPng(curPage.png, otherLeft, top, otherW, bottom - top),
-        });
-      }
-      i++; // nxt já processado
-      continue;
-    }
-
-    if (nxt && nxt.pageNum === cur.pageNum) {
-      const top = Math.max(0, cur.yTop);
-      const bottom = Math.min(curPage.height, nxt.yTop);
-      if (bottom <= top + 30) continue;
-      crops.push({
-        questionNum: cur.questionNum,
-        jpeg: await cropPng(curPage.png, 0, top, curPage.width, bottom - top),
-      });
-      continue;
-    }
-
-    // Atravessa páginas (ou é a última questão).
-    const top = Math.max(0, cur.yTop);
-    const slices: Buffer[] = [
-      await cropPngRaw(curPage.png, 0, top, curPage.width, curPage.height - top),
-    ];
-    const endPage = nxt ? nxt.pageNum : cur.pageNum + 1;
-    for (let p = cur.pageNum + 1; p < endPage; p++) {
-      const inter = pageMap.get(p);
-      if (inter) slices.push(inter.png);
-    }
+    let endIdx: number;
+    let endY: number; // y final na última coluna; -1 = até a base
     if (nxt) {
-      const nxtPage = pageMap.get(nxt.pageNum);
-      if (nxtPage) {
-        const cutBottom = Math.min(nxtPage.height, nxt.yTop);
-        if (cutBottom > 30) {
-          slices.push(
-            await cropPngRaw(nxtPage.png, 0, 0, nxtPage.width, cutBottom),
-          );
-        }
+      const ni = colIdx(nxt.pageNum, nxt.col);
+      endIdx = ni >= startIdx ? ni : startIdx;
+      endY = nxt.yTop;
+    } else {
+      // Última questão: só a própria coluna (o branco é cortado depois).
+      endIdx = startIdx;
+      endY = -1;
+    }
+
+    const slices: Buffer[] = [];
+    for (let c = startIdx; c <= endIdx; c++) {
+      const seg = colSeq[c]!;
+      const page = pageMap.get(seg.pageNum);
+      if (!page) continue;
+      const x0 = seg.col === 0 ? 0 : colW;
+      const top = c === startIdx ? cur.yTop : contentTop;
+      const pageBottom = contentBottom > 0 ? contentBottom : page.height;
+      const bottom = c === endIdx && endY >= 0 ? endY : pageBottom;
+      const w = Math.min(colW, page.width - x0);
+      const h = Math.min(bottom, page.height) - top;
+      if (w < 20 || h < 20) continue;
+      slices.push(await cropPngRaw(page.png, x0, top, w, h));
+    }
+    if (slices.length === 0) continue;
+    let jpeg = await stackVertical(slices, colW);
+    if (!nxt) {
+      // Última questão: corta o branco que sobra até o pé da coluna.
+      try {
+        jpeg = await sharp(jpeg)
+          .trim({ background: '#ffffff', threshold: 15 })
+          .jpeg({ quality: 85, mozjpeg: true })
+          .toBuffer();
+      } catch {
+        /* sem borda pra cortar — mantém como está */
       }
     }
-    crops.push({
-      questionNum: cur.questionNum,
-      jpeg: await stackVertical(slices, curPage.width),
-    });
+    crops.push({ questionNum: cur.questionNum, jpeg });
   }
   return crops;
 }
@@ -612,7 +648,7 @@ async function processPdf(
   stats: Stats,
 ): Promise<void> {
   console.log(`  [render] ${pdfPath}`);
-  const { pages, markers } = await renderPdf(pdfPath);
+  const { pages, markers, contentBottom } = await renderPdf(pdfPath);
   stats.detected += new Set(markers.map((m) => m.questionNum)).size;
 
   if (DEBUG) {
@@ -625,7 +661,7 @@ async function processPdf(
     }
   }
 
-  let crops = await cropQuestions(pages, markers);
+  let crops = await cropQuestions(pages, markers, contentBottom);
   crops.sort((a, b) => a.questionNum - b.questionNum);
   if (LIMIT > 0) crops = crops.slice(0, LIMIT);
   stats.cropped += crops.length;
@@ -643,6 +679,9 @@ async function processPdf(
       cfg && cfg.gabarito && cfg.gabarito.length >= num
         ? cfg.gabarito[num - 1]!.toUpperCase()
         : '?';
+    // '*' no gabarito = questão anulada pelo INEP (entra com annulled=true
+    // e correct_answer=null; o app já trata isso em quiz-runner/simulado).
+    const annulledQ = correct === '*';
 
     if (DRY_RUN) {
       if (!existsSync(DEBUG_DIR)) mkdirSync(DEBUG_DIR, { recursive: true });
@@ -652,7 +691,7 @@ async function processPdf(
       continue;
     }
 
-    if (!/^[A-E]$/.test(correct)) {
+    if (!annulledQ && !/^[A-E]$/.test(correct)) {
       console.warn(`    [skip] Q${numPad}: gabarito ausente no config`);
       stats.failed++;
       continue;
@@ -700,8 +739,8 @@ async function processPdf(
           num,
           null,
           imageUrl,
-          correct,
-          false,
+          annulledQ ? null : correct,
+          annulledQ,
           'enem',
         ],
       );
